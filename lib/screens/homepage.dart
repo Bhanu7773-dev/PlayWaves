@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
 import 'dart:async';
+import 'dart:math';
+import 'package:just_audio/just_audio.dart';
 import '../services/jiosaavn_api_service.dart';
+import '../widgets/animated_navbar.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -15,16 +17,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final PageController _bannerController = PageController();
 
-  List<Map<String, dynamic>> _trendingSongs = [];
-  List<Map<String, dynamic>> _albums = [];
-  List<Map<String, dynamic>> _bannerSongs = [];
-  List<Map<String, dynamic>> _artists = [];
-  bool _isLoading = true;
-  String? _error;
-
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+
   Timer? _bannerTimer;
+  int _selectedNavIndex = 0;
+
+  List<Map<String, dynamic>> _trendingSongs = [];
+  List<Map<String, dynamic>> _albums = [];
+  List<Map<String, dynamic>> _artists = [];
+  List<Map<String, dynamic>> _bannerSongs = [];
+
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -231,9 +236,48 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ],
             ),
           ),
+          // Animated Navigation Bar
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: AnimatedNavBar(
+              selectedIndex: _selectedNavIndex,
+              onNavTap: _onNavTap,
+              navIcons: const [
+                Icons.home,
+                Icons.search,
+                Icons.playlist_play,
+                Icons.person_outline,
+              ],
+              navLabels: const ['Home', 'Search', 'Playlist', 'Profile'],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  void _onNavTap(int index) {
+    setState(() {
+      _selectedNavIndex = index;
+    });
+
+    // Handle navigation logic here
+    switch (index) {
+      case 0:
+        // Home - already here
+        break;
+      case 1:
+        // Navigate to Search
+        break;
+      case 2:
+        // Navigate to Playlist
+        break;
+      case 3:
+        // Navigate to Profile
+        break;
+    }
   }
 
   Widget _buildAnimatedBackground() {
