@@ -1,36 +1,289 @@
 import 'package:flutter/material.dart';
-
-// Make sure you have 'clarity_icons' in your pubspec.yaml and run 'flutter pub get'
-// dependencies:
-//   clarity_icons: ^1.1.2
-
 import 'package:icons_plus/icons_plus.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:marquee/marquee.dart';
+import 'package:playwaves/widgets/animated_navbar_player.dart';
+import 'package:playwaves/widgets/music_player.dart';
 
-class HomePage extends StatelessWidget {
+// Album Card Model (for future API use)
+class AlbumCardData {
+  final String title;
+  final String artist;
+  final String coverUrl;
+  AlbumCardData({
+    required this.title,
+    required this.artist,
+    required this.coverUrl,
+  });
+}
+
+// Artist Card Model (for future API use)
+class ArtistCardData {
+  final String name;
+  final String imageUrl;
+  ArtistCardData({required this.name, required this.imageUrl});
+}
+
+// Genre Model
+class GenreData {
+  final String name;
+  final IconData icon;
+  final Color color;
+  GenreData({required this.name, required this.icon, required this.color});
+}
+
+class HomePage extends StatefulWidget {
   final String username;
   const HomePage({super.key, this.username = "User Name"});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+  final List<AlbumCardData> albums = [
+    AlbumCardData(
+      title: "Midnight Memories",
+      artist: "One Direction",
+      coverUrl:
+          "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80",
+    ),
+    AlbumCardData(
+      title: "Evermore",
+      artist: "Taylor Swift",
+      coverUrl:
+          "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80",
+    ),
+    AlbumCardData(
+      title: "Divide",
+      artist: "Ed Sheeran",
+      coverUrl:
+          "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80",
+    ),
+    AlbumCardData(
+      title: "After Hours",
+      artist: "The Weeknd",
+      coverUrl:
+          "https://images.unsplash.com/photo-1465101178521-c1a9136a03d4?auto=format&fit=crop&w=400&q=80",
+    ),
+  ];
+
+  final List<ArtistCardData> artists = [
+    ArtistCardData(
+      name: "Taylor Swift",
+      imageUrl: "https://randomuser.me/api/portraits/women/44.jpg",
+    ),
+    ArtistCardData(
+      name: "Ed Sheeran",
+      imageUrl: "https://randomuser.me/api/portraits/men/36.jpg",
+    ),
+    ArtistCardData(
+      name: "The Weeknd",
+      imageUrl: "https://randomuser.me/api/portraits/men/65.jpg",
+    ),
+    ArtistCardData(
+      name: "Ariana Grande",
+      imageUrl: "https://randomuser.me/api/portraits/women/68.jpg",
+    ),
+    ArtistCardData(
+      name: "Billie Eilish",
+      imageUrl: "https://randomuser.me/api/portraits/women/79.jpg",
+    ),
+    ArtistCardData(
+      name: "Drake",
+      imageUrl: "https://randomuser.me/api/portraits/men/41.jpg",
+    ),
+    ArtistCardData(
+      name: "Shawn Mendes",
+      imageUrl: "https://randomuser.me/api/portraits/men/29.jpg",
+    ),
+    ArtistCardData(
+      name: "Dua Lipa",
+      imageUrl: "https://randomuser.me/api/portraits/women/53.jpg",
+    ),
+  ];
+
+  final List<GenreData> genres = [
+    GenreData(name: "Pop", icon: Icons.music_note, color: Colors.pinkAccent),
+    GenreData(name: "Rock", icon: Icons.rocket_launch, color: Colors.redAccent),
+    GenreData(name: "Hip-Hop", icon: Icons.headphones, color: Colors.orange),
+    GenreData(name: "Jazz", icon: Icons.spa, color: Colors.teal),
+    GenreData(name: "EDM", icon: Icons.graphic_eq, color: Colors.indigoAccent),
+    GenreData(
+      name: "Classical",
+      icon: Icons.library_music,
+      color: Colors.green,
+    ),
+    GenreData(name: "Indie", icon: Icons.star_border, color: Colors.deepPurple),
+    GenreData(name: "Country", icon: Icons.landscape, color: Colors.brown),
+    GenreData(name: "Reggae", icon: Icons.sunny, color: Colors.yellow[800]!),
+    GenreData(name: "Metal", icon: Icons.flash_on, color: Colors.grey),
+  ];
+
+  final PageController _albumPageController = PageController(
+    viewportFraction: 0.89,
+    initialPage: 0,
+  );
+  int _currentAlbumPage = 0;
+  late AnimationController _autoScrollController;
+
+  final List<AlbumCardData> trendingAlbums = [
+    AlbumCardData(
+      title: "Happier Than Ever",
+      artist: "Billie Eilish",
+      coverUrl:
+          "https://images.unsplash.com/photo-1453090927415-5f45085b65c0?auto=format&fit=crop&w=400&q=80",
+    ),
+    AlbumCardData(
+      title: "Future Nostalgia",
+      artist: "Dua Lipa",
+      coverUrl:
+          "https://images.unsplash.com/photo-1465101178521-c1a9136a03d4?auto=format&fit=crop&w=400&q=80",
+    ),
+    AlbumCardData(
+      title: "No.6 Collaborations Project",
+      artist: "Ed Sheeran",
+      coverUrl:
+          "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80",
+    ),
+    AlbumCardData(
+      title: "Positions",
+      artist: "Ariana Grande",
+      coverUrl:
+          "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80",
+    ),
+  ];
+
+  // --------- MUSIC PLAYER STATE & LOGIC FOR DEMO ---------
+  bool isPlaying = true;
+  String songTitle = "Midnight Memories";
+  String artistName = "One Direction";
+  String albumArtUrl =
+      "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80";
+  Duration currentPosition = Duration(seconds: 0);
+  Duration totalDuration = Duration(minutes: 3, seconds: 32);
+
+  int _selectedNavIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _albumPageController.addListener(() {
+      int page = _albumPageController.page?.round() ?? 0;
+      if (_currentAlbumPage != page) {
+        setState(() {
+          _currentAlbumPage = page;
+        });
+      }
+    });
+
+    _autoScrollController = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: 3),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startAutoScrollAlbums();
+    });
+  }
+
+  void _startAutoScrollAlbums() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 3));
+      if (!mounted) return false;
+      int nextPage = (_currentAlbumPage + 1) % albums.length;
+      if (_albumPageController.hasClients) {
+        _albumPageController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeIn,
+        );
+      }
+      return mounted;
+    });
+  }
+
+  @override
+  void dispose() {
+    _albumPageController.dispose();
+    _autoScrollController.dispose();
+    super.dispose();
+  }
+
+  // --- MUSIC PLAYER CALLBACKS ---
+  void onPlayPause() => setState(() => isPlaying = !isPlaying);
+  void onNext() {
+    setState(() {
+      int nextIndex =
+          (albums.indexWhere((a) => a.title == songTitle) + 1) % albums.length;
+      songTitle = albums[nextIndex].title;
+      artistName = albums[nextIndex].artist;
+      albumArtUrl = albums[nextIndex].coverUrl;
+      currentPosition = Duration(seconds: 0);
+    });
+  }
+
+  void onPrevious() {
+    setState(() {
+      int prevIndex = (albums.indexWhere((a) => a.title == songTitle) - 1);
+      if (prevIndex < 0) prevIndex = albums.length - 1;
+      songTitle = albums[prevIndex].title;
+      artistName = albums[prevIndex].artist;
+      albumArtUrl = albums[prevIndex].coverUrl;
+      currentPosition = Duration(seconds: 0);
+    });
+  }
+
+  void onSeek(double value) {
+    setState(() {
+      currentPosition = Duration(
+        seconds: (totalDuration.inSeconds * value).round(),
+      );
+    });
+  }
+
+  // --- OPEN FULL PLAYER PAGE ---
+  void openFullPlayer() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MusicPlayerPage(
+          songTitle: songTitle,
+          artistName: artistName,
+          albumArtUrl: albumArtUrl,
+          isPlaying: isPlaying,
+          currentPosition: currentPosition,
+          totalDuration: totalDuration,
+          onPlayPause: onPlayPause,
+          onNext: onNext,
+          onPrevious: onPrevious,
+          onSeek: onSeek,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final List<_FeatureCardData> featureCards = [
       _FeatureCardData(
         title: "Most played",
-        icon: Clarity.play_line, // Clarity play icon
+        icon: Clarity.play_line,
         color: Colors.orangeAccent,
       ),
       _FeatureCardData(
         title: "History",
-        icon: Clarity.history_line, // Clarity history icon
+        icon: Clarity.history_line,
         color: Colors.grey[400]!,
       ),
       _FeatureCardData(
         title: "Favourite",
-        icon: Clarity.favorite_line, // Clarity heart icon
+        icon: Clarity.favorite_line,
         color: Colors.pinkAccent,
       ),
       _FeatureCardData(
         title: "Playlists",
-        icon: Clarity.folder_line, // Clarity folder/playlist icon
+        icon: Clarity.folder_line,
         color: Colors.blueAccent,
       ),
     ];
@@ -80,7 +333,6 @@ class HomePage extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          // Avatar + Welcome Section
           Padding(
             padding: const EdgeInsets.only(left: 22.0, top: 18.0, bottom: 8.0),
             child: Row(
@@ -104,7 +356,7 @@ class HomePage extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      username,
+                      widget.username,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 20,
@@ -116,11 +368,140 @@ class HomePage extends StatelessWidget {
               ],
             ),
           ),
-          // Feature cards grid (2x2) with new order and names
+          const SizedBox(height: 18),
+          SizedBox(
+            height: 270,
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 210,
+                  child: PageView.builder(
+                    controller: _albumPageController,
+                    itemCount: albums.length,
+                    itemBuilder: (context, index) {
+                      final album = albums[index];
+                      final isCurrent = index == _currentAlbumPage;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                        margin: EdgeInsets.symmetric(
+                          horizontal: isCurrent ? 7 : 13,
+                          vertical: isCurrent ? 0 : 18,
+                        ),
+                        child: Material(
+                          elevation: isCurrent ? 9 : 0,
+                          borderRadius: BorderRadius.circular(28),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(28),
+                              image: DecorationImage(
+                                image: NetworkImage(album.coverUrl),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            child: Stack(
+                              children: [
+                                Positioned(
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.vertical(
+                                        bottom: Radius.circular(28),
+                                      ),
+                                      color: Colors.black.withOpacity(0.55),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 18,
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                album.title,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 18,
+                                                  letterSpacing: 1,
+                                                ),
+                                              ),
+                                              Text(
+                                                album.artist,
+                                                style: TextStyle(
+                                                  color: Colors.white
+                                                      .withOpacity(0.88),
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        // Play Button
+                                        IconButton(
+                                          icon: Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.blueAccent,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.blueAccent
+                                                      .withOpacity(0.3),
+                                                  blurRadius: 8,
+                                                ),
+                                              ],
+                                            ),
+                                            child: const Icon(
+                                              Icons.play_arrow_rounded,
+                                              color: Colors.white,
+                                              size: 38,
+                                            ),
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              isPlaying = true;
+                                              songTitle = album.title;
+                                              artistName = album.artist;
+                                              albumArtUrl = album.coverUrl;
+                                              currentPosition = Duration(
+                                                seconds: 0,
+                                              );
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+                AlbumSliderDots(
+                  count: albums.length,
+                  current: _currentAlbumPage,
+                ),
+              ],
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 18.0,
-              vertical: 14.0,
+              vertical: 1.0,
             ),
             child: Column(
               children: [
@@ -142,7 +523,6 @@ class HomePage extends StatelessWidget {
               ],
             ),
           ),
-          // Suggestions title and refresh button row
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 20.0,
@@ -170,30 +550,313 @@ class HomePage extends StatelessWidget {
               ],
             ),
           ),
-          // --- Custom Suggestions Grid with increased sizes ---
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
+            padding: EdgeInsets.symmetric(horizontal: 18.0, vertical: 0.0),
             child: CustomSuggestionsGrid(),
           ),
-          // Top Artists label (optional, for further content)
+          const SizedBox(height: 10),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12),
+            padding: const EdgeInsets.only(left: 20.0, top: 0, bottom: 0),
             child: const Text(
               "Top artists",
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 120,
+            child: ListView.separated(
+              padding: const EdgeInsets.only(left: 20, top: 0, bottom: 0),
+              scrollDirection: Axis.horizontal,
+              itemCount: artists.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 22),
+              itemBuilder: (context, index) {
+                final artist = artists[index];
+                return Column(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.blueAccent.withOpacity(0.7),
+                          width: 2.5,
+                        ),
+                        image: DecorationImage(
+                          image: NetworkImage(artist.imageUrl),
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 9),
+                    SizedBox(
+                      width: 80,
+                      child: Text(
+                        artist.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.only(left: 20.0, bottom: 6.0),
+            child: const Text(
+              "Genres",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SizedBox(
+            height: 52,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(left: 20.0, right: 10.0),
+              itemCount: genres.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 15),
+              itemBuilder: (context, index) {
+                final genre = genres[index];
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: genre.color.withOpacity(0.13),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: genre.color.withOpacity(0.34),
+                      width: 1.3,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(genre.icon, color: genre.color, size: 22),
+                      const SizedBox(width: 8),
+                      Text(
+                        genre.name,
+                        style: TextStyle(
+                          color: genre.color,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 28),
+          Padding(
+            padding: const EdgeInsets.only(left: 20.0, bottom: 8.0),
+            child: const Text(
+              "Trending Albums",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SizedBox(
+            height: 188,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(left: 20, right: 10, top: 10),
+              itemCount: trendingAlbums.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 16),
+              itemBuilder: (context, index) {
+                final album = trendingAlbums[index];
+                return Container(
+                  width: 145,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    image: DecorationImage(
+                      image: NetworkImage(album.coverUrl),
+                      fit: BoxFit.cover,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.18),
+                        blurRadius: 18,
+                        offset: const Offset(2, 10),
+                      ),
+                    ],
+                  ),
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 60,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.vertical(
+                              bottom: Radius.circular(20),
+                            ),
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.black.withOpacity(0.85),
+                                Colors.black.withOpacity(0.0),
+                              ],
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 12,
+                        bottom: 20,
+                        right: 12,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    album.title,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      height: 1.1,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    album.artist,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.82),
+                                      fontSize: 13,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 2),
+                              child: IconButton(
+                                icon: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.blueAccent,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.blueAccent.withOpacity(
+                                          0.36,
+                                        ),
+                                        blurRadius: 7,
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.white,
+                                    size: 26,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    isPlaying = true;
+                                    songTitle = album.title;
+                                    artistName = album.artist;
+                                    albumArtUrl = album.coverUrl;
+                                    currentPosition = Duration(seconds: 0);
+                                  });
+                                },
+                                padding: EdgeInsets.zero,
+                                constraints: BoxConstraints(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 28),
         ],
+      ),
+      bottomNavigationBar: AnimatedPlayerNavBar(
+        isPlaying: isPlaying,
+        songTitle: songTitle,
+        albumArtUrl: albumArtUrl,
+        onPlayPause: onPlayPause,
+        selectedIndex: _selectedNavIndex,
+        onNavTap: (i) => setState(() => _selectedNavIndex = i),
+        onMiniPlayerTap: openFullPlayer,
+        navIcons: [
+          Icons.home,
+          Icons.search,
+          Icons.playlist_play,
+          Icons.bar_chart,
+          Icons.person_outline,
+        ],
+        navLabels: ["Home", "Search", "Playlist", "Usage", "Profile"],
       ),
     );
   }
 }
 
-// ---- Feature Card Data and Widget ----
+class AlbumSliderDots extends StatelessWidget {
+  final int count;
+  final int current;
+  const AlbumSliderDots({
+    super.key,
+    required this.count,
+    required this.current,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(count, (i) {
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: i == current ? 20 : 9,
+          height: 9,
+          decoration: BoxDecoration(
+            color: i == current ? Colors.blueAccent : Colors.white24,
+            borderRadius: BorderRadius.circular(9),
+          ),
+        );
+      }),
+    );
+  }
+}
 
 class _FeatureCardData {
   final String title;
@@ -239,29 +902,12 @@ class _FeatureCard extends StatelessWidget {
   }
 }
 
-// ---- Custom Suggestions Layout as Per Your Image ----
-
 class CustomSuggestionsGrid extends StatelessWidget {
   const CustomSuggestionsGrid({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Get available width (with horizontal padding 18)
     final double panelWidth = MediaQuery.of(context).size.width - 2 * 18;
-
-    // Calculate sizing dynamically so all boxes fill width (plus gaps)
-    // 4 columns: [big (2x2)] [small] [rectW (2x1)] [circle]
-    // Let's set gap = 12, and sum all sizes + 4*gap = panelWidth
-    // Let x = base box size; then big = 2x + gap, small = x, rectW = 2x + gap, circle = 1.1x
-    // So: (2x+gap) + gap + x + gap + (2x+gap) + gap + 1.1x = panelWidth
-    // Simplify: 2x+gap + gap + x + gap + 2x+gap + gap +1.1x = panelWidth
-    // => (2x+gap) + gap + x + gap + 2x+gap + gap + 1.1x
-    // => 2x + gap + gap + x + gap + 2x + gap + gap + 1.1x
-    // => (2x + x + 2x + 1.1x) + (gap + gap + gap + gap)
-    // => (5.1x) + (4*gap)
-    // => 5.1x + 4*gap = panelWidth
-    // => x = (panelWidth - 4*gap)/5.1
-
     const double gap = 12;
     final double x = (panelWidth - 4 * gap) / 5.1;
     final double small = x;
@@ -270,12 +916,19 @@ class CustomSuggestionsGrid extends StatelessWidget {
     final double rectH = x;
     final double circle = 1.1 * x;
 
+    final double bottomRowTop = big + gap;
+    final double bottomRectBottom = bottomRowTop + rectH;
+    final double circleBottom = big + gap + (rectH / 2) + (circle / 2);
+
+    final double gridHeight = circleBottom > bottomRectBottom
+        ? circleBottom
+        : bottomRectBottom;
+
     return SizedBox(
       width: panelWidth,
-      height: big + gap + small + gap + rectH + gap + circle,
+      height: gridHeight,
       child: Stack(
         children: [
-          // Large 2x2 square (top left)
           Positioned(
             left: 0,
             top: 0,
@@ -298,7 +951,6 @@ class CustomSuggestionsGrid extends StatelessWidget {
               ),
             ),
           ),
-          // Top right small square
           Positioned(
             left: big + gap,
             top: 0,
@@ -310,7 +962,6 @@ class CustomSuggestionsGrid extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          // Top right rectangle (2x1)
           Positioned(
             left: big + gap + small + gap,
             top: 0,
@@ -322,7 +973,6 @@ class CustomSuggestionsGrid extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          // Middle row, first two small squares
           Positioned(
             left: big + gap,
             top: small + gap,
@@ -345,7 +995,6 @@ class CustomSuggestionsGrid extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          // Small square below previous rectangle
           Positioned(
             left: big + gap + 2 * (small + gap),
             top: rectH + gap,
@@ -357,7 +1006,6 @@ class CustomSuggestionsGrid extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          // Bottom left two small squares
           Positioned(
             left: 0,
             top: big + gap,
@@ -380,7 +1028,6 @@ class CustomSuggestionsGrid extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          // Bottom rectangle (2x1)
           Positioned(
             left: 2 * (small + gap),
             top: big + gap,
@@ -392,7 +1039,6 @@ class CustomSuggestionsGrid extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          // Circle, to the right of the 3rd row rectangle (aligned with it vertically)
           Positioned(
             left: 2 * (small + gap) + rectW + gap,
             top: big + gap + (rectH / 2) - (circle / 2),
