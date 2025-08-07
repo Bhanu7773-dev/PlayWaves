@@ -66,16 +66,44 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         _error = null;
       });
 
-      final songsResponse = await _apiService.searchSongs(
-        'arijit singh',
-        limit: 10,
-      );
+      // Use different search queries to get varied content
+      final List<String> songQueries = [
+        'trending hindi songs',
+        'bollywood hits',
+        'latest punjabi songs',
+        'romantic songs',
+        'party songs',
+      ];
+
+      final List<String> albumQueries = [
+        'latest albums',
+        'bollywood albums',
+        'punjabi albums',
+        'hindi albums',
+        'new releases',
+      ];
+
+      final List<String> bannerQueries = [
+        'top hits 2024',
+        'viral songs',
+        'trending now',
+        'popular music',
+        'chart toppers',
+      ];
+
+      // Randomly select queries for variety
+      final random = DateTime.now().millisecondsSinceEpoch;
+      final songQuery = songQueries[random % songQueries.length];
+      final albumQuery = albumQueries[random % albumQueries.length];
+      final bannerQuery = bannerQueries[random % bannerQueries.length];
+
+      final songsResponse = await _apiService.searchSongs(songQuery, limit: 10);
       final albumsResponse = await _apiService.searchAlbums(
-        'arijit singh',
+        albumQuery,
         limit: 5,
       );
       final bannerResponse = await _apiService.searchSongs(
-        'trending hindi songs',
+        bannerQuery,
         limit: 6,
       );
 
@@ -387,6 +415,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       onRefresh: _loadData,
       color: const Color(0xFFff7d78),
       backgroundColor: Colors.black,
+      displacement: 40.0,
+      strokeWidth: 3.0,
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
       child: FadeTransition(
         opacity: _fadeAnimation,
         child: SingleChildScrollView(
@@ -460,7 +491,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 imageUrl,
                 width: double.infinity,
                 height: double.infinity,
-                fit: BoxFit.cover,
+                fit: BoxFit.fitWidth,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     decoration: BoxDecoration(
