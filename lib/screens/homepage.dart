@@ -18,6 +18,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   List<Map<String, dynamic>> _trendingSongs = [];
   List<Map<String, dynamic>> _albums = [];
   List<Map<String, dynamic>> _bannerSongs = [];
+  List<Map<String, dynamic>> _artists = [];
   bool _isLoading = true;
   String? _error;
 
@@ -73,6 +74,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'latest punjabi songs',
         'romantic songs',
         'party songs',
+        'english hits',
+        'pop songs',
+        'rock music',
+        'hip hop',
+        'electronic music',
+        'indie songs',
+        'classical music',
       ];
 
       final List<String> albumQueries = [
@@ -81,6 +89,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'punjabi albums',
         'hindi albums',
         'new releases',
+        'english albums',
+        'pop albums',
+        'rock albums',
+        'hip hop albums',
+        'electronic albums',
       ];
 
       final List<String> bannerQueries = [
@@ -89,6 +102,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'trending now',
         'popular music',
         'chart toppers',
+        'global hits',
+        'billboard top',
+        'spotify viral',
+        'youtube trending',
       ];
 
       // Randomly select queries for variety
@@ -106,6 +123,51 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         bannerQuery,
         limit: 6,
       );
+
+      // Search for individual famous artists (both Hindi and English)
+      final List<String> famousArtists = [
+        'arijit singh',
+        'shreya ghoshal',
+        'atif aslam',
+        'neha kakkar',
+        'armaan malik',
+        'honey singh',
+        'badshah',
+        'guru randhawa',
+        'taylor swift',
+        'ed sheeran',
+        'ariana grande',
+        'justin bieber',
+        'billie eilish',
+        'the weeknd',
+        'dua lipa',
+        'bruno mars',
+      ];
+
+      // Get multiple individual artists
+      List<Map<String, dynamic>> allArtists = [];
+
+      // Shuffle the artists list for variety on each refresh
+      final shuffledArtists = List<String>.from(famousArtists)..shuffle();
+
+      for (int i = 0; i < 6; i++) {
+        try {
+          final artistName = shuffledArtists[i];
+          final artistResponse = await _apiService.searchArtists(
+            artistName,
+            limit: 1,
+          );
+
+          if (artistResponse['success'] == true &&
+              artistResponse['data'] != null &&
+              artistResponse['data']['results'] != null &&
+              artistResponse['data']['results'].isNotEmpty) {
+            allArtists.add(artistResponse['data']['results'][0]);
+          }
+        } catch (e) {
+          print('Error fetching artist: $e');
+        }
+      }
 
       if (songsResponse['success'] == true && songsResponse['data'] != null) {
         final songsData = songsResponse['data'];
@@ -140,6 +202,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
 
       setState(() {
+        _artists = allArtists;
         _isLoading = false;
       });
       _animationController.forward();
@@ -433,6 +496,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               if (_bannerSongs.isNotEmpty) _buildBannerSection(),
               const SizedBox(height: 20),
               if (_albums.isNotEmpty) _buildAlbumsSection(),
+              const SizedBox(height: 20),
+              if (_artists.isNotEmpty) _buildArtistsSection(),
               if (_trendingSongs.isNotEmpty) _buildSongsSection(),
             ],
           ),
@@ -471,17 +536,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFFff7d78).withOpacity(0.3),
-            const Color(0xFF9c27b0).withOpacity(0.3),
-          ],
-        ),
-      ),
       child: Stack(
         children: [
           if (imageUrl != null)
@@ -491,7 +545,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 imageUrl,
                 width: double.infinity,
                 height: double.infinity,
-                fit: BoxFit.fitWidth,
+                fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     decoration: BoxDecoration(
@@ -518,9 +572,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
           ),
           Positioned(
-            bottom: 16,
-            left: 16,
-            right: 80,
+            bottom: 20,
+            left: 20,
+            right: 20,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -531,7 +585,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
@@ -545,14 +599,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ),
           ),
           Positioned(
-            bottom: 16,
+            top: 16,
             right: 16,
             child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
                   colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
                 ),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFff7d78).withOpacity(0.3),
+                    blurRadius: 8,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
               child: IconButton(
                 icon: const Icon(Icons.play_arrow, color: Colors.white),
@@ -595,7 +656,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
         ),
         SizedBox(
-          height: 220,
+          height: 200,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -630,25 +691,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Expanded(
-            child: Container(
-              decoration: const BoxDecoration(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: imageUrl != null
-                  ? ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(16),
-                      ),
-                      child: Image.network(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
+                child: imageUrl != null
+                    ? Image.network(
                         imageUrl,
-                        width: double.infinity,
+                        width: 160,
+                        height: 120,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
+                            width: 160,
+                            height: 120,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
@@ -657,19 +718,201 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                 ],
                               ),
                             ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.album,
-                                color: Colors.white,
-                                size: 50,
-                              ),
+                            child: const Icon(
+                              Icons.album,
+                              color: Colors.white,
+                              size: 40,
                             ),
                           );
                         },
+                      )
+                    : Container(
+                        width: 160,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFff7d78).withOpacity(0.3),
+                              const Color(0xFF9c27b0).withOpacity(0.3),
+                            ],
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.album,
+                          color: Colors.white,
+                          size: 40,
+                        ),
                       ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 15,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFff7d78).withOpacity(0.3),
+                    blurRadius: 8,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(
+                  Icons.play_arrow,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                onPressed: () => _playAlbum(album),
+                padding: const EdgeInsets.all(8),
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArtistsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 24,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Popular Artists",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 140,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _artists.length,
+            itemBuilder: (context, index) {
+              final artist = _artists[index];
+              return _buildArtistCard(artist);
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildArtistCard(Map<String, dynamic> artist) {
+    final imageUrl = _getBestImageUrl(artist['image']);
+    final name = artist['name'] ?? artist['title'] ?? 'Unknown Artist';
+
+    return Container(
+      width: 100,
+      margin: const EdgeInsets.only(right: 16),
+      child: Column(
+        children: [
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFFff7d78).withOpacity(0.3),
+                  const Color(0xFF9c27b0).withOpacity(0.3),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 3,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFff7d78).withOpacity(0.2),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: imageUrl != null
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFFff7d78).withOpacity(0.3),
+                                const Color(0xFF9c27b0).withOpacity(0.3),
+                              ],
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 40,
+                          ),
+                        );
+                      },
                     )
                   : Container(
                       decoration: BoxDecoration(
+                        shape: BoxShape.circle,
                         gradient: LinearGradient(
                           colors: [
                             const Color(0xFFff7d78).withOpacity(0.3),
@@ -677,36 +920,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           ],
                         ),
                       ),
-                      child: const Center(
-                        child: Icon(Icons.album, color: Colors.white, size: 50),
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 40,
                       ),
                     ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+          const SizedBox(height: 10),
+          Text(
+            name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
             ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -910,6 +1142,45 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _playAlbum(Map<String, dynamic> album) async {
+    try {
+      final albumId = album['id'];
+      if (albumId != null) {
+        final albumDetails = await _apiService.getAlbum(id: albumId);
+        final songs = albumDetails['data']?['songs'];
+
+        if (songs != null && songs.isNotEmpty) {
+          final firstSong = songs[0];
+          final downloadUrl = firstSong['downloadUrl']?[0]?['link'];
+
+          if (downloadUrl != null) {
+            await _audioPlayer.setUrl(downloadUrl);
+            await _audioPlayer.play();
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Playing album: ${album['name']}'),
+                backgroundColor: const Color(0xFFff7d78),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error playing album: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
