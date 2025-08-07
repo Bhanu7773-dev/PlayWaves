@@ -1,1122 +1,895 @@
 import 'package:flutter/material.dart';
-import 'package:icons_plus/icons_plus.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:marquee/marquee.dart';
-import 'package:playwaves/widgets/animated_navbar_player.dart';
-import 'package:playwaves/widgets/music_player.dart';
-
-// Album Card Model (for future API use)
-class AlbumCardData {
-  final String title;
-  final String artist;
-  final String coverUrl;
-  AlbumCardData({
-    required this.title,
-    required this.artist,
-    required this.coverUrl,
-  });
-}
-
-// Artist Card Model (for future API use)
-class ArtistCardData {
-  final String name;
-  final String imageUrl;
-  ArtistCardData({required this.name, required this.imageUrl});
-}
-
-// Genre Model
-class GenreData {
-  final String name;
-  final IconData icon;
-  final Color color;
-  GenreData({required this.name, required this.icon, required this.color});
-}
+import 'dart:async';
+import '../services/jiosaavn_api_service.dart';
 
 class HomePage extends StatefulWidget {
-  final String username;
-  const HomePage({super.key, this.username = "User Name"});
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
-  final List<AlbumCardData> albums = [
-    AlbumCardData(
-      title: "Midnight Memories",
-      artist: "One Direction",
-      coverUrl:
-          "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80",
-    ),
-    AlbumCardData(
-      title: "Evermore",
-      artist: "Taylor Swift",
-      coverUrl:
-          "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80",
-    ),
-    AlbumCardData(
-      title: "Divide",
-      artist: "Ed Sheeran",
-      coverUrl:
-          "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80",
-    ),
-    AlbumCardData(
-      title: "After Hours",
-      artist: "The Weeknd",
-      coverUrl:
-          "https://images.unsplash.com/photo-1465101178521-c1a9136a03d4?auto=format&fit=crop&w=400&q=80",
-    ),
-  ];
+  final JioSaavnApiService _apiService = JioSaavnApiService();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  final PageController _bannerController = PageController();
 
-  final List<ArtistCardData> artists = [
-    ArtistCardData(
-      name: "Taylor Swift",
-      imageUrl: "https://randomuser.me/api/portraits/women/44.jpg",
-    ),
-    ArtistCardData(
-      name: "Ed Sheeran",
-      imageUrl: "https://randomuser.me/api/portraits/men/36.jpg",
-    ),
-    ArtistCardData(
-      name: "The Weeknd",
-      imageUrl: "https://randomuser.me/api/portraits/men/65.jpg",
-    ),
-    ArtistCardData(
-      name: "Ariana Grande",
-      imageUrl: "https://randomuser.me/api/portraits/women/68.jpg",
-    ),
-    ArtistCardData(
-      name: "Billie Eilish",
-      imageUrl: "https://randomuser.me/api/portraits/women/79.jpg",
-    ),
-    ArtistCardData(
-      name: "Drake",
-      imageUrl: "https://randomuser.me/api/portraits/men/41.jpg",
-    ),
-    ArtistCardData(
-      name: "Shawn Mendes",
-      imageUrl: "https://randomuser.me/api/portraits/men/29.jpg",
-    ),
-    ArtistCardData(
-      name: "Dua Lipa",
-      imageUrl: "https://randomuser.me/api/portraits/women/53.jpg",
-    ),
-  ];
+  List<Map<String, dynamic>> _trendingSongs = [];
+  List<Map<String, dynamic>> _albums = [];
+  List<Map<String, dynamic>> _bannerSongs = [];
+  bool _isLoading = true;
+  String? _error;
 
-  final List<GenreData> genres = [
-    GenreData(name: "Pop", icon: Icons.music_note, color: Colors.pinkAccent),
-    GenreData(name: "Rock", icon: Icons.rocket_launch, color: Colors.redAccent),
-    GenreData(name: "Hip-Hop", icon: Icons.headphones, color: Colors.orange),
-    GenreData(name: "Jazz", icon: Icons.spa, color: Colors.teal),
-    GenreData(name: "EDM", icon: Icons.graphic_eq, color: Colors.indigoAccent),
-    GenreData(
-      name: "Classical",
-      icon: Icons.library_music,
-      color: Colors.green,
-    ),
-    GenreData(name: "Indie", icon: Icons.star_border, color: Colors.deepPurple),
-    GenreData(name: "Country", icon: Icons.landscape, color: Colors.brown),
-    GenreData(name: "Reggae", icon: Icons.sunny, color: Colors.yellow[800]!),
-    GenreData(name: "Metal", icon: Icons.flash_on, color: Colors.grey),
-  ];
-
-  final PageController _albumPageController = PageController(
-    viewportFraction: 0.89,
-    initialPage: 0,
-  );
-  int _currentAlbumPage = 0;
-  late AnimationController _autoScrollController;
-
-  final List<AlbumCardData> trendingAlbums = [
-    AlbumCardData(
-      title: "Happier Than Ever",
-      artist: "Billie Eilish",
-      coverUrl:
-          "https://images.unsplash.com/photo-1453090927415-5f45085b65c0?auto=format&fit=crop&w=400&q=80",
-    ),
-    AlbumCardData(
-      title: "Future Nostalgia",
-      artist: "Dua Lipa",
-      coverUrl:
-          "https://images.unsplash.com/photo-1465101178521-c1a9136a03d4?auto=format&fit=crop&w=400&q=80",
-    ),
-    AlbumCardData(
-      title: "No.6 Collaborations Project",
-      artist: "Ed Sheeran",
-      coverUrl:
-          "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80",
-    ),
-    AlbumCardData(
-      title: "Positions",
-      artist: "Ariana Grande",
-      coverUrl:
-          "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80",
-    ),
-  ];
-
-  // --------- MUSIC PLAYER STATE & LOGIC FOR DEMO ---------
-  bool isPlaying = true;
-  String songTitle = "Midnight Memories";
-  String artistName = "One Direction";
-  String albumArtUrl =
-      "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80";
-  Duration currentPosition = Duration(seconds: 0);
-  Duration totalDuration = Duration(minutes: 3, seconds: 32);
-
-  int _selectedNavIndex = 0;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  Timer? _bannerTimer;
 
   @override
   void initState() {
     super.initState();
-    _albumPageController.addListener(() {
-      int page = _albumPageController.page?.round() ?? 0;
-      if (_currentAlbumPage != page) {
-        setState(() {
-          _currentAlbumPage = page;
-        });
-      }
-    });
-
-    _autoScrollController = AnimationController(
+    _animationController = AnimationController(
+      duration: const Duration(seconds: 2),
       vsync: this,
-      duration: Duration(seconds: 3),
     );
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startAutoScrollAlbums();
-    });
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _loadData();
+    _startBannerAutoScroll();
   }
 
-  void _startAutoScrollAlbums() {
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 3));
-      if (!mounted) return false;
-      int nextPage = (_currentAlbumPage + 1) % albums.length;
-      if (_albumPageController.hasClients) {
-        _albumPageController.animateToPage(
-          nextPage,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeIn,
-        );
+  void _startBannerAutoScroll() {
+    _bannerTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (_bannerController.hasClients && _bannerSongs.isNotEmpty) {
+        final nextPage = (_bannerController.page?.round() ?? 0) + 1;
+        if (nextPage >= _bannerSongs.length) {
+          _bannerController.animateToPage(
+            0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        } else {
+          _bannerController.nextPage(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
       }
-      return mounted;
     });
   }
 
-  @override
-  void dispose() {
-    _albumPageController.dispose();
-    _autoScrollController.dispose();
-    super.dispose();
-  }
+  Future<void> _loadData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
 
-  // --- MUSIC PLAYER CALLBACKS ---
-  void onPlayPause() => setState(() => isPlaying = !isPlaying);
-  void onNext() {
-    setState(() {
-      int nextIndex =
-          (albums.indexWhere((a) => a.title == songTitle) + 1) % albums.length;
-      songTitle = albums[nextIndex].title;
-      artistName = albums[nextIndex].artist;
-      albumArtUrl = albums[nextIndex].coverUrl;
-      currentPosition = Duration(seconds: 0);
-    });
-  }
-
-  void onPrevious() {
-    setState(() {
-      int prevIndex = (albums.indexWhere((a) => a.title == songTitle) - 1);
-      if (prevIndex < 0) prevIndex = albums.length - 1;
-      songTitle = albums[prevIndex].title;
-      artistName = albums[prevIndex].artist;
-      albumArtUrl = albums[prevIndex].coverUrl;
-      currentPosition = Duration(seconds: 0);
-    });
-  }
-
-  void onSeek(double value) {
-    setState(() {
-      currentPosition = Duration(
-        seconds: (totalDuration.inSeconds * value).round(),
+      final songsResponse = await _apiService.searchSongs(
+        'arijit singh',
+        limit: 10,
       );
-    });
-  }
+      final albumsResponse = await _apiService.searchAlbums(
+        'arijit singh',
+        limit: 5,
+      );
+      final bannerResponse = await _apiService.searchSongs(
+        'trending hindi songs',
+        limit: 6,
+      );
 
-  // --- OPEN FULL PLAYER PAGE ---
-  void openFullPlayer() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MusicPlayerPage(
-          songTitle: songTitle,
-          artistName: artistName,
-          albumArtUrl: albumArtUrl,
-          isPlaying: isPlaying,
-          currentPosition: currentPosition,
-          totalDuration: totalDuration,
-          onPlayPause: onPlayPause,
-          onNext: onNext,
-          onPrevious: onPrevious,
-          onSeek: onSeek,
-        ),
-      ),
-    );
+      if (songsResponse['success'] == true && songsResponse['data'] != null) {
+        final songsData = songsResponse['data'];
+        if (songsData['results'] != null) {
+          final songs = List<Map<String, dynamic>>.from(songsData['results']);
+          setState(() {
+            _trendingSongs = songs;
+          });
+        }
+      }
+
+      if (albumsResponse['success'] == true && albumsResponse['data'] != null) {
+        final albumsData = albumsResponse['data'];
+        if (albumsData['results'] != null) {
+          final albums = List<Map<String, dynamic>>.from(albumsData['results']);
+          setState(() {
+            _albums = albums;
+          });
+        }
+      }
+
+      if (bannerResponse['success'] == true && bannerResponse['data'] != null) {
+        final bannerData = bannerResponse['data'];
+        if (bannerData['results'] != null) {
+          final banners = List<Map<String, dynamic>>.from(
+            bannerData['results'],
+          );
+          setState(() {
+            _bannerSongs = banners;
+          });
+        }
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+      _animationController.forward();
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<_FeatureCardData> featureCards = [
-      _FeatureCardData(
-        title: "Most played",
-        icon: Clarity.play_line,
-        color: Colors.orangeAccent,
-      ),
-      _FeatureCardData(
-        title: "History",
-        icon: Clarity.history_line,
-        color: Colors.grey[400]!,
-      ),
-      _FeatureCardData(
-        title: "Favourite",
-        icon: Clarity.favorite_line,
-        color: Colors.pinkAccent,
-      ),
-      _FeatureCardData(
-        title: "Playlists",
-        icon: Clarity.folder_line,
-        color: Colors.blueAccent,
-      ),
-    ];
-
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Clarity.search_line, color: Colors.white),
-          onPressed: () {},
-        ),
-        title: RichText(
-          text: TextSpan(
-            children: [
-              const TextSpan(
-                text: 'Play',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 22,
-                ),
-              ),
-              TextSpan(
-                text: 'Waves',
-                style: TextStyle(
-                  color: Colors.blueAccent,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 22,
-                ),
-              ),
-            ],
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Clarity.devices_line, color: Colors.white),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Clarity.settings_line, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
-      ),
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Main Home Page Content
-          ListView(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(
-                  left: 22.0,
-                  top: 18.0,
-                  bottom: 8.0,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.account_circle_outlined,
-                      color: Colors.blueAccent,
-                      size: 45,
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Welcome,",
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            height: 1.0,
-                          ),
-                        ),
-                        Text(
-                          widget.username,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                height: 270,
-                child: Column(
-                  children: [
-                    SizedBox(
-                      height: 210,
-                      child: PageView.builder(
-                        controller: _albumPageController,
-                        itemCount: albums.length,
-                        itemBuilder: (context, index) {
-                          final album = albums[index];
-                          final isCurrent = index == _currentAlbumPage;
-                          return AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOut,
-                            margin: EdgeInsets.symmetric(
-                              horizontal: isCurrent ? 7 : 13,
-                              vertical: isCurrent ? 0 : 18,
-                            ),
-                            child: Material(
-                              elevation: isCurrent ? 9 : 0,
-                              borderRadius: BorderRadius.circular(28),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(28),
-                                  image: DecorationImage(
-                                    image: NetworkImage(album.coverUrl),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                child: Stack(
-                                  children: [
-                                    Positioned(
-                                      bottom: 0,
-                                      left: 0,
-                                      right: 0,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.vertical(
-                                            bottom: Radius.circular(28),
-                                          ),
-                                          color: Colors.black.withOpacity(0.55),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 12,
-                                          horizontal: 18,
-                                        ),
-                                        child: Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          children: [
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text(
-                                                    album.title,
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 18,
-                                                      letterSpacing: 1,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    album.artist,
-                                                    style: TextStyle(
-                                                      color: Colors.white
-                                                          .withOpacity(0.88),
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            // Play Button
-                                            IconButton(
-                                              icon: Container(
-                                                decoration: BoxDecoration(
-                                                  color: Colors.blueAccent,
-                                                  shape: BoxShape.circle,
-                                                  boxShadow: [
-                                                    BoxShadow(
-                                                      color: Colors.blueAccent
-                                                          .withOpacity(0.3),
-                                                      blurRadius: 8,
-                                                    ),
-                                                  ],
-                                                ),
-                                                child: const Icon(
-                                                  Icons.play_arrow_rounded,
-                                                  color: Colors.white,
-                                                  size: 38,
-                                                ),
-                                              ),
-                                              onPressed: () {
-                                                setState(() {
-                                                  isPlaying = true;
-                                                  songTitle = album.title;
-                                                  artistName = album.artist;
-                                                  albumArtUrl = album.coverUrl;
-                                                  currentPosition = Duration(
-                                                    seconds: 0,
-                                                  );
-                                                });
-                                              },
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    AlbumSliderDots(
-                      count: albums.length,
-                      current: _currentAlbumPage,
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18.0,
-                  vertical: 1.0,
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(child: _FeatureCard(data: featureCards[0])),
-                        const SizedBox(width: 12),
-                        Expanded(child: _FeatureCard(data: featureCards[1])),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: _FeatureCard(data: featureCards[2])),
-                        const SizedBox(width: 12),
-                        Expanded(child: _FeatureCard(data: featureCards[3])),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20.0,
-                  vertical: 6.0,
-                ),
-                child: Row(
-                  children: [
-                    const Text(
-                      "Suggestions",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(
-                        Clarity.refresh_line,
-                        color: Colors.white,
-                        size: 25,
-                      ),
-                      onPressed: () {},
-                    ),
-                  ],
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 18.0, vertical: 0.0),
-                child: CustomSuggestionsGrid(),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.only(left: 20.0, top: 0, bottom: 0),
-                child: const Text(
-                  "Top artists",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 120,
-                child: ListView.separated(
-                  padding: const EdgeInsets.only(left: 20, top: 0, bottom: 0),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: artists.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 22),
-                  itemBuilder: (context, index) {
-                    final artist = artists[index];
-                    return Column(
-                      children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.blueAccent.withOpacity(0.7),
-                              width: 2.5,
-                            ),
-                            image: DecorationImage(
-                              image: NetworkImage(artist.imageUrl),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 9),
-                        SizedBox(
-                          width: 80,
-                          child: Text(
-                            artist.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.only(left: 20.0, bottom: 6.0),
-                child: const Text(
-                  "Genres",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: 52,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(left: 20.0, right: 10.0),
-                  itemCount: genres.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 15),
-                  itemBuilder: (context, index) {
-                    final genre = genres[index];
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: genre.color.withOpacity(0.13),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: genre.color.withOpacity(0.34),
-                          width: 1.3,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(genre.icon, color: genre.color, size: 22),
-                          const SizedBox(width: 8),
-                          Text(
-                            genre.name,
-                            style: TextStyle(
-                              color: genre.color,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 28),
-              Padding(
-                padding: const EdgeInsets.only(left: 20.0, bottom: 8.0),
-                child: const Text(
-                  "Trending Albums",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: 188,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.only(left: 20, right: 10, top: 10),
-                  itemCount: trendingAlbums.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 16),
-                  itemBuilder: (context, index) {
-                    final album = trendingAlbums[index];
-                    return Container(
-                      width: 145,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        image: DecorationImage(
-                          image: NetworkImage(album.coverUrl),
-                          fit: BoxFit.cover,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.18),
-                            blurRadius: 18,
-                            offset: const Offset(2, 10),
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            height: 60,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.vertical(
-                                  bottom: Radius.circular(20),
-                                ),
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.black.withOpacity(0.85),
-                                    Colors.black.withOpacity(0.0),
-                                  ],
-                                  begin: Alignment.bottomCenter,
-                                  end: Alignment.topCenter,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: 12,
-                            bottom: 20,
-                            right: 12,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        album.title,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 15,
-                                          height: 1.1,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      Text(
-                                        album.artist,
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.82),
-                                          fontSize: 13,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Container(
-                                  margin: const EdgeInsets.only(bottom: 2),
-                                  child: IconButton(
-                                    icon: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.blueAccent,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.blueAccent
-                                                .withOpacity(0.36),
-                                            blurRadius: 7,
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Icon(
-                                        Icons.play_arrow_rounded,
-                                        color: Colors.white,
-                                        size: 26,
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        isPlaying = true;
-                                        songTitle = album.title;
-                                        artistName = album.artist;
-                                        albumArtUrl = album.coverUrl;
-                                        currentPosition = Duration(seconds: 0);
-                                      });
-                                    },
-                                    padding: EdgeInsets.zero,
-                                    constraints: BoxConstraints(),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 28),
-            ],
-          ),
-          // Floating Nav Bar At Bottom (transparent below)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: AnimatedPlayerNavBar(
-              isPlaying: isPlaying,
-              songTitle: songTitle,
-              albumArtUrl: albumArtUrl,
-              onPlayPause: onPlayPause,
-              selectedIndex: _selectedNavIndex,
-              onNavTap: (i) => setState(() => _selectedNavIndex = i),
-              onMiniPlayerTap: openFullPlayer,
-              navIcons: [
-                Icons.home,
-                Icons.search,
-                Icons.playlist_play,
-                Icons.bar_chart,
-                Icons.person_outline,
+          // Animated background
+          _buildAnimatedBackground(),
+          // Main content
+          SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                Expanded(child: _buildBody()),
               ],
-              navLabels: ["Home", "Search", "Playlist", "Usage", "Profile"],
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class AlbumSliderDots extends StatelessWidget {
-  final int count;
-  final int current;
-  const AlbumSliderDots({
-    super.key,
-    required this.count,
-    required this.current,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(count, (i) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: i == current ? 20 : 9,
-          height: 9,
-          decoration: BoxDecoration(
-            color: i == current ? Colors.blueAccent : Colors.white24,
-            borderRadius: BorderRadius.circular(9),
-          ),
-        );
-      }),
+  Widget _buildAnimatedBackground() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment.topLeft,
+          radius: 1.5,
+          colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
+        ),
+      ),
+      child: Stack(children: List.generate(15, (index) => _buildMeteor(index))),
     );
   }
-}
 
-class _FeatureCardData {
-  final String title;
-  final IconData icon;
-  final Color color;
-  _FeatureCardData({
-    required this.title,
-    required this.icon,
-    required this.color,
-  });
-}
-
-class _FeatureCard extends StatelessWidget {
-  final _FeatureCardData data;
-  const _FeatureCard({required this.data});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.07),
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
-        child: Row(
-          children: [
-            Icon(data.icon, color: data.color, size: 22),
-            const SizedBox(width: 10),
-            Text(
-              data.title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1,
+  Widget _buildMeteor(int index) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        return Positioned(
+          top: (index * 50.0) % MediaQuery.of(context).size.height,
+          left: (index * 80.0) % MediaQuery.of(context).size.width,
+          child: Transform.rotate(
+            angle: 3.14159 * 1.2,
+            child: Container(
+              width: 2,
+              height: 2,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.white.withOpacity(0.1),
+                    blurRadius: 1,
+                  ),
+                ],
+                gradient: const LinearGradient(
+                  colors: [Colors.white70, Colors.transparent],
+                ),
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                  ),
+                ),
+                child: const Icon(
+                  Icons.music_note,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                ).createShader(bounds),
+                child: const Text(
+                  'Play Waves',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          IconButton(
+            onPressed: () {
+              // Settings action
+            },
+            icon: const Icon(Icons.settings, color: Colors.white, size: 24),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCards() {
+    return GridView.count(
+      shrinkWrap: true,
+      crossAxisCount: 2,
+      childAspectRatio: 2.5,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      children: [
+        _buildActionCard(
+          'Hot',
+          'Trending',
+          'Discover what\'s trending right now.',
+          Colors.red,
+          Icons.local_fire_department,
+          () {},
+        ),
+        _buildActionCard(
+          'Popular',
+          'Most Played',
+          'Check out the most played songs.',
+          Colors.green,
+          Icons.play_circle_filled,
+          () {},
+        ),
+        _buildActionCard(
+          'Collection',
+          'Playlists',
+          'Browse curated playlists for every mood.',
+          Colors.purple,
+          Icons.playlist_play,
+          () {},
+        ),
+        _buildActionCard(
+          'Stars',
+          'Artists',
+          'Explore your favorite artists.',
+          Colors.blue,
+          Icons.person,
+          () {},
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard(
+    String tag,
+    String title,
+    String description,
+    Color color,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.white.withOpacity(0.05),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                color: color.withOpacity(0.15),
+              ),
+              child: Text(
+                tag.toUpperCase(),
+                style: TextStyle(
+                  color: color,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Icon(icon, color: Colors.white, size: 24),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
     );
   }
-}
 
-class CustomSuggestionsGrid extends StatelessWidget {
-  const CustomSuggestionsGrid({super.key});
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFff7d78)),
+            ),
+            SizedBox(height: 16),
+            Text('Loading music...', style: TextStyle(color: Colors.white70)),
+          ],
+        ),
+      );
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    final double panelWidth = MediaQuery.of(context).size.width - 2 * 18;
-    const double gap = 12;
-    final double x = (panelWidth - 4 * gap) / 5.1;
-    final double small = x;
-    final double big = 2 * x + gap;
-    final double rectW = 2 * x + gap;
-    final double rectH = x;
-    final double circle = 1.1 * x;
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              'Error: $_error',
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFff7d78),
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
 
-    final double bottomRowTop = big + gap;
-    final double bottomRectBottom = bottomRowTop + rectH;
-    final double circleBottom = big + gap + (rectH / 2) + (circle / 2);
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      color: const Color(0xFFff7d78),
+      backgroundColor: Colors.black,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _buildActionCards(),
+              ),
+              const SizedBox(height: 20),
+              if (_bannerSongs.isNotEmpty) _buildBannerSection(),
+              const SizedBox(height: 20),
+              if (_albums.isNotEmpty) _buildAlbumsSection(),
+              if (_trendingSongs.isNotEmpty) _buildSongsSection(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-    final double gridHeight = circleBottom > bottomRectBottom
-        ? circleBottom
-        : bottomRectBottom;
-
+  Widget _buildBannerSection() {
     return SizedBox(
-      width: panelWidth,
-      height: gridHeight,
+      height: 180,
+      child: PageView.builder(
+        controller: _bannerController,
+        itemCount: _bannerSongs.length,
+        itemBuilder: (context, index) {
+          final song = _bannerSongs[index];
+          return _buildBannerCard(song);
+        },
+      ),
+    );
+  }
+
+  Widget _buildBannerCard(Map<String, dynamic> song) {
+    final imageUrl = _getBestImageUrl(song['image']);
+    final title = song['name'] ?? song['title'] ?? 'Unknown Song';
+
+    String artist = 'Unknown Artist';
+    if (song['artists'] != null) {
+      final artists = song['artists'];
+      if (artists['primary'] != null && artists['primary'].isNotEmpty) {
+        artist = artists['primary'][0]['name'] ?? 'Unknown Artist';
+      }
+    } else if (song['subtitle'] != null) {
+      artist = song['subtitle'];
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFFff7d78).withOpacity(0.3),
+            const Color(0xFF9c27b0).withOpacity(0.3),
+          ],
+        ),
+      ),
       child: Stack(
         children: [
-          Positioned(
-            left: 0,
-            top: 0,
-            width: big,
-            height: big,
-            child: _SuggestionCover(
-              borderRadius: BorderRadius.circular(18),
-              gradient: [Colors.blueGrey[900]!, Colors.blue[800]!],
-              child: Padding(
-                padding: const EdgeInsets.all(14.0),
-                child: Text(
-                  "New\nMusic\nMix",
-                  style: TextStyle(
-                    color: Colors.lightBlue[100],
-                    fontWeight: FontWeight.bold,
-                    fontSize: 19,
-                    height: 1.1,
-                  ),
-                ),
+          if (imageUrl != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                imageUrl,
+                width: double.infinity,
+                height: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFff7d78).withOpacity(0.3),
+                          const Color(0xFF9c27b0).withOpacity(0.3),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
               ),
             ),
           ),
           Positioned(
-            left: big + gap,
-            top: 0,
-            width: small,
-            height: small,
-            child: _SuggestionCover(
-              image:
-                  "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80",
-              borderRadius: BorderRadius.circular(12),
+            bottom: 16,
+            left: 16,
+            right: 80,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  artist,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
           Positioned(
-            left: big + gap + small + gap,
-            top: 0,
-            width: rectW,
-            height: rectH,
-            child: _SuggestionCover(
-              image:
-                  "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80",
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-          Positioned(
-            left: big + gap,
-            top: small + gap,
-            width: small,
-            height: small,
-            child: _SuggestionCover(
-              image:
-                  "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80",
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          Positioned(
-            left: big + gap + small + gap,
-            top: small + gap,
-            width: small,
-            height: small,
-            child: _SuggestionCover(
-              image:
-                  "https://images.unsplash.com/photo-1465101178521-c1a9136a03d4?auto=format&fit=crop&w=400&q=80",
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          Positioned(
-            left: big + gap + 2 * (small + gap),
-            top: rectH + gap,
-            width: small,
-            height: small,
-            child: _SuggestionCover(
-              image:
-                  "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=400&q=80",
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            top: big + gap,
-            width: small,
-            height: small,
-            child: _SuggestionCover(
-              image:
-                  "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80",
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          Positioned(
-            left: small + gap,
-            top: big + gap,
-            width: small,
-            height: small,
-            child: _SuggestionCover(
-              image:
-                  "https://images.unsplash.com/photo-1465101178521-c1a9136a03d4?auto=format&fit=crop&w=400&q=80",
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          Positioned(
-            left: 2 * (small + gap),
-            top: big + gap,
-            width: rectW,
-            height: rectH,
-            child: _SuggestionCover(
-              image:
-                  "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80",
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-          Positioned(
-            left: 2 * (small + gap) + rectW + gap,
-            top: big + gap + (rectH / 2) - (circle / 2),
-            width: circle,
-            height: circle,
-            child: _SuggestionCover(
-              isCircle: true,
-              image:
-                  "https://images.unsplash.com/photo-1465101178521-c1a9136a03d4?auto=format&fit=crop&w=400&q=80",
+            bottom: 16,
+            right: 16,
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.play_arrow, color: Colors.white),
+                onPressed: () => _playSong(song),
+              ),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _SuggestionCover extends StatelessWidget {
-  final double? width;
-  final double? height;
-  final Widget? child;
-  final List<Color>? gradient;
-  final String? image;
-  final bool isCircle;
-  final BorderRadius? borderRadius;
+  Widget _buildAlbumsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 24,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Featured Albums",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 220,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _albums.length,
+            itemBuilder: (context, index) {
+              final album = _albums[index];
+              return _buildAlbumCard(album);
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
-  const _SuggestionCover({
-    this.width,
-    this.height,
-    this.child,
-    this.gradient,
-    this.image,
-    this.isCircle = false,
-    this.borderRadius,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bool hasImage = image != null && image!.isNotEmpty;
-    final bool hasGradient = gradient != null && gradient!.isNotEmpty;
+  Widget _buildAlbumCard(Map<String, dynamic> album) {
+    final imageUrl = _getBestImageUrl(album['image']);
+    final title = album['name'] ?? album['title'] ?? 'Unknown Album';
+    final subtitle = album['subtitle'] ?? album['artist'] ?? 'Unknown Artist';
 
     return Container(
-      width: width,
-      height: height,
+      width: 160,
+      margin: const EdgeInsets.only(right: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: isCircle
-            ? null
-            : (borderRadius ?? BorderRadius.circular(13)),
-        gradient: hasGradient
-            ? LinearGradient(
-                colors: gradient!,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : null,
-        image: hasImage
-            ? DecorationImage(image: NetworkImage(image!), fit: BoxFit.cover)
-            : null,
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.1),
+            Colors.white.withOpacity(0.05),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
-      child: child,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: imageUrl != null
+                  ? ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                      child: Image.network(
+                        imageUrl,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  const Color(0xFFff7d78).withOpacity(0.3),
+                                  const Color(0xFF9c27b0).withOpacity(0.3),
+                                ],
+                              ),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.album,
+                                color: Colors.white,
+                                size: 50,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFFff7d78).withOpacity(0.3),
+                            const Color(0xFF9c27b0).withOpacity(0.3),
+                          ],
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.album, color: Colors.white, size: 50),
+                      ),
+                    ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildSongsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 24,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Trending Songs",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: _trendingSongs.length,
+          itemBuilder: (context, index) {
+            final song = _trendingSongs[index];
+            return _buildSongTile(song, index);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSongTile(Map<String, dynamic> song, int index) {
+    final imageUrl = _getBestImageUrl(song['image']);
+    final title = song['name'] ?? song['title'] ?? 'Unknown Song';
+
+    String subtitle = 'Unknown Artist';
+    if (song['artists'] != null) {
+      final artists = song['artists'];
+      if (artists['primary'] != null && artists['primary'].isNotEmpty) {
+        subtitle = artists['primary'][0]['name'] ?? 'Unknown Artist';
+      }
+    } else if (song['subtitle'] != null) {
+      subtitle = song['subtitle'];
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withOpacity(0.05),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(12),
+        leading: Stack(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFFff7d78).withOpacity(0.3),
+                    const Color(0xFF9c27b0).withOpacity(0.3),
+                  ],
+                ),
+              ),
+              child: imageUrl != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.music_note,
+                            color: Colors.white,
+                          );
+                        },
+                      ),
+                    )
+                  : const Icon(Icons.music_note, color: Colors.white),
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFff7d78),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '${index + 1}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(color: Colors.white70),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+            ),
+            shape: BoxShape.circle,
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.play_arrow, color: Colors.white),
+            onPressed: () => _playSong(song),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _getBestImageUrl(dynamic images) {
+    if (images is List && images.isNotEmpty) {
+      for (var img in images.reversed) {
+        if (img is Map && img['link'] != null) {
+          return img['link'];
+        }
+        if (img is Map && img['url'] != null) {
+          return img['url'];
+        }
+      }
+    } else if (images is String) {
+      return images;
+    }
+    return null;
+  }
+
+  Future<void> _playSong(Map<String, dynamic> song) async {
+    try {
+      final songId = song['id'];
+      if (songId != null) {
+        final songDetails = await _apiService.getSongById(songId);
+        final downloadUrl =
+            songDetails['data']?[0]?['downloadUrl']?[0]?['link'];
+
+        if (downloadUrl != null) {
+          await _audioPlayer.setUrl(downloadUrl);
+          await _audioPlayer.play();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Playing: ${song['name']}'),
+              backgroundColor: const Color(0xFFff7d78),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error playing song: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _bannerTimer?.cancel();
+    _bannerController.dispose();
+    _animationController.dispose();
+    _audioPlayer.dispose();
+    super.dispose();
   }
 }

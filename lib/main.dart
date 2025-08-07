@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../screens/homepage.dart';
-import 'package:just_audio/just_audio.dart';
+import 'screens/homepage.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,7 +15,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'PlayWaves',
       theme: ThemeData.dark(),
-      home: HomePage(),
+      home: const HomePage(),
     );
   }
 }
