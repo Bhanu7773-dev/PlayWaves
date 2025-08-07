@@ -38,7 +38,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         : 0.0;
 
     return Scaffold(
-      backgroundColor: Color(0xFF181A20),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

@@ -49,6 +49,19 @@ class AnimatedPlayerNavBar extends StatelessWidget {
     );
     double selectedWidth = selectedLabelWidth + 28 + 6 + 24;
 
+    // Main nav bar background color (minimal, modern)
+    final Color navBarColor = const Color(0xFF23262A);
+
+    // Pills colors
+    final Color pillSelectedColor = Colors.white.withOpacity(
+      0.08,
+    ); // Compliment: subtle light pill
+    final Color pillUnselectedColor = navBarColor; // Match nav bar background
+
+    // Icon colors for contrast
+    final Color iconSelectedColor = Colors.white;
+    final Color iconUnselectedColor = Colors.white.withOpacity(0.7);
+
     return SafeArea(
       child: Material(
         color: Colors.transparent,
@@ -59,8 +72,9 @@ class AnimatedPlayerNavBar extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
           decoration: BoxDecoration(
-            color: Colors.black,
+            color: navBarColor, // lighter than page background
             borderRadius: BorderRadius.circular(48),
+            border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
           ),
           height: isPlaying ? 170 : 80,
           child: Column(
@@ -103,11 +117,15 @@ class AnimatedPlayerNavBar extends StatelessWidget {
                           height: 48,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white54, width: 3),
+                            color: navBarColor, // match nav bar background
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.18),
+                              width: 3,
+                            ),
                           ),
                           child: Icon(
                             isPlaying ? Icons.pause : Icons.play_arrow,
-                            color: Colors.white70,
+                            color: iconSelectedColor,
                             size: 28,
                           ),
                         ),
@@ -150,18 +168,26 @@ class AnimatedPlayerNavBar extends StatelessWidget {
                                   ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? Colors.grey[850]
-                                  : Colors.black87,
+                                  ? pillSelectedColor
+                                  : pillUnselectedColor,
                               borderRadius: BorderRadius.circular(30),
                             ),
                             child: selected
                                 ? Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(
-                                        icons[i],
-                                        color: Colors.white,
-                                        size: 28,
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: navBarColor,
+                                        ),
+                                        width: 28,
+                                        height: 28,
+                                        child: Icon(
+                                          icons[i],
+                                          color: iconSelectedColor,
+                                          size: 20,
+                                        ),
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
@@ -177,10 +203,18 @@ class AnimatedPlayerNavBar extends StatelessWidget {
                                     ],
                                   )
                                 : Center(
-                                    child: Icon(
-                                      icons[i],
-                                      color: Colors.white,
-                                      size: 24,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: navBarColor,
+                                      ),
+                                      width: 28,
+                                      height: 28,
+                                      child: Icon(
+                                        icons[i],
+                                        color: iconUnselectedColor,
+                                        size: 20,
+                                      ),
                                     ),
                                   ),
                           ),
@@ -221,8 +255,8 @@ class AnimatedPlayerNavBar extends StatelessWidget {
                                       ),
                                 decoration: BoxDecoration(
                                   color: selected
-                                      ? Colors.grey[850]
-                                      : Colors.black87,
+                                      ? pillSelectedColor
+                                      : pillUnselectedColor,
                                   borderRadius: BorderRadius.circular(30),
                                 ),
                                 child: selected
@@ -230,10 +264,18 @@ class AnimatedPlayerNavBar extends StatelessWidget {
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
-                                          Icon(
-                                            icons[i],
-                                            color: Colors.white,
-                                            size: 28,
+                                          Container(
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: navBarColor,
+                                            ),
+                                            width: 28,
+                                            height: 28,
+                                            child: Icon(
+                                              icons[i],
+                                              color: iconSelectedColor,
+                                              size: 20,
+                                            ),
                                           ),
                                           const SizedBox(width: 6),
                                           Text(
@@ -249,10 +291,18 @@ class AnimatedPlayerNavBar extends StatelessWidget {
                                         ],
                                       )
                                     : Center(
-                                        child: Icon(
-                                          icons[i],
-                                          color: Colors.white,
-                                          size: 24,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: navBarColor,
+                                          ),
+                                          width: 28,
+                                          height: 28,
+                                          child: Icon(
+                                            icons[i],
+                                            color: iconUnselectedColor,
+                                            size: 20,
+                                          ),
                                         ),
                                       ),
                               ),
