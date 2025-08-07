@@ -103,6 +103,7 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
 
               return Positioned(
                 left: currentPosition + 16,
+
                 top: 6,
                 child: Container(
                   width: itemWidth - 32,

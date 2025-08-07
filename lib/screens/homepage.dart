@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:just_audio/just_audio.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../widgets/animated_navbar.dart';
+import '../widgets/music_player.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -31,18 +32,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   bool _isLoading = true;
   String? _error;
 
+  Map<String, dynamic>? _currentSong;
+  bool _isPlaying = false;
+
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
-    );
+    )..repeat();
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+
     _loadData();
     _startBannerAutoScroll();
+
+    // Listen to audio player state changes
+    _audioPlayer.playingStream.listen((playing) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = playing;
+        });
+      }
+    });
   }
 
   void _startBannerAutoScroll() {
@@ -236,6 +251,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ],
             ),
           ),
+          // Mini Music Player (when song is loaded)
+          if (_currentSong != null)
+            Positioned(
+              bottom: 100, // Above navbar
+              left: 16,
+              right: 16,
+              child: _buildMiniPlayer(),
+            ),
           // Animated Navigation Bar
           Positioned(
             bottom: 0,
@@ -480,15 +503,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFff7d78)),
-            ),
-            SizedBox(height: 16),
-            Text('Loading music...', style: TextStyle(color: Colors.white70)),
-          ],
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFff7d78)),
         ),
       );
     }
@@ -498,21 +514,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const Icon(Icons.error, color: Colors.red, size: 48),
             const SizedBox(height: 16),
             Text(
               'Error: $_error',
-              style: const TextStyle(color: Colors.red),
+              style: const TextStyle(color: Colors.white),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFff7d78),
-              ),
-              child: const Text('Retry'),
-            ),
+            ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
           ],
         ),
       );
@@ -529,21 +539,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         opacity: _fadeAnimation,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _buildActionCards(),
-              ),
-              const SizedBox(height: 20),
-              if (_bannerSongs.isNotEmpty) _buildBannerSection(),
-              const SizedBox(height: 20),
-              if (_albums.isNotEmpty) _buildAlbumsSection(),
-              const SizedBox(height: 20),
-              if (_artists.isNotEmpty) _buildArtistsSection(),
-              if (_trendingSongs.isNotEmpty) _buildSongsSection(),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.only(
+              bottom: 100,
+            ), // Add padding for navbar
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _buildActionCards(),
+                ),
+                const SizedBox(height: 20),
+                if (_bannerSongs.isNotEmpty) _buildBannerSection(),
+                const SizedBox(height: 20),
+                if (_albums.isNotEmpty) _buildAlbumsSection(),
+                const SizedBox(height: 20),
+                if (_artists.isNotEmpty) _buildArtistsSection(),
+                if (_trendingSongs.isNotEmpty) _buildSongsSection(),
+              ],
+            ),
           ),
         ),
       ),
@@ -1155,37 +1170,74 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Future<void> _playSong(Map<String, dynamic> song) async {
     try {
+      print('Attempting to play song: ${song['name']}');
+      print('Song ID: ${song['id']}');
+
+      setState(() {
+        _currentSong = song;
+      });
+
       final songId = song['id'];
       if (songId != null) {
+        print('Fetching song details for ID: $songId');
         final songDetails = await _apiService.getSongById(songId);
-        final downloadUrl =
-            songDetails['data']?[0]?['downloadUrl']?[0]?['link'];
+        print('Song details response: $songDetails');
 
-        if (downloadUrl != null) {
-          await _audioPlayer.setUrl(downloadUrl);
-          await _audioPlayer.play();
+        // Try multiple possible paths for download URL
+        String? downloadUrl;
+        final songData = songDetails['data']?[0];
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Playing: ${song['name']}'),
-              backgroundColor: const Color(0xFFff7d78),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          );
+        if (songData != null) {
+          print('Available keys in song data: ${songData.keys.toList()}');
+
+          // Check for downloadUrl array
+          if (songData['downloadUrl'] != null &&
+              songData['downloadUrl'] is List) {
+            final downloadUrls = songData['downloadUrl'] as List;
+            if (downloadUrls.isNotEmpty) {
+              // Try to get the highest quality URL (usually the last one)
+              final urlData = downloadUrls.last;
+              downloadUrl = urlData['url'] ?? urlData['link'];
+            }
+          }
+
+          // Fallback options
+          if (downloadUrl == null) {
+            downloadUrl =
+                songData['media_preview_url'] ??
+                songData['media_url'] ??
+                songData['preview_url'] ??
+                songData['stream_url'];
+          }
         }
+
+        print('Final download URL: $downloadUrl');
+
+        if (downloadUrl != null && downloadUrl.isNotEmpty) {
+          // Clean the URL if needed
+          if (downloadUrl.contains('preview.saavncdn.com') ||
+              downloadUrl.contains('aac.saavncdn.com')) {
+            print('Setting audio URL: $downloadUrl');
+            await _audioPlayer.setUrl(downloadUrl);
+            await _audioPlayer.play();
+            setState(() {}); // Update UI
+            // Removed the SnackBar from here
+          } else {
+            throw Exception('Invalid audio URL format');
+          }
+        } else {
+          throw Exception('No download URL found in response');
+        }
+      } else {
+        throw Exception('No song ID found');
       }
     } catch (e) {
+      print('Error playing song: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error playing song: $e'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
         ),
       );
     }
@@ -1228,6 +1280,127 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
       );
     }
+  }
+
+  Widget _buildMiniPlayer() {
+    return GestureDetector(
+      onTap: () {
+        // Navigate to full music player
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MusicPlayerPage(
+              songTitle: _currentSong?['name'] ?? 'Unknown',
+              artistName: _currentSong?['primaryArtists'] ?? 'Unknown Artist',
+              albumArtUrl: _currentSong?['image']?[2]?['link'] ?? '',
+              isPlaying: _audioPlayer.playing,
+              currentPosition: _audioPlayer.position,
+              totalDuration: _audioPlayer.duration ?? Duration.zero,
+              onPlayPause: () {
+                if (_audioPlayer.playing) {
+                  _audioPlayer.pause();
+                } else {
+                  _audioPlayer.play();
+                }
+                setState(() {});
+              },
+              onNext: () {}, // Implement next song logic
+              onPrevious: () {}, // Implement previous song logic
+              onSeek: (value) {
+                final position = _audioPlayer.duration! * value;
+                _audioPlayer.seek(position);
+              },
+            ),
+          ),
+        );
+      },
+      child: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1a1a2e), Color(0xFF16213e)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Album art
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                _currentSong?['image']?[1]?['link'] ?? '',
+                width: 50,
+                height: 50,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: 50,
+                    height: 50,
+                    color: Colors.grey[800],
+                    child: const Icon(Icons.music_note, color: Colors.white),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Song info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _currentSong?['name'] ?? 'Unknown',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    _currentSong?['primaryArtists'] ?? 'Unknown Artist',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 12,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            // Play/Pause button
+            IconButton(
+              onPressed: () {
+                if (_audioPlayer.playing) {
+                  _audioPlayer.pause();
+                } else {
+                  _audioPlayer.play();
+                }
+                setState(() {});
+              },
+              icon: Icon(
+                _audioPlayer.playing ? Icons.pause : Icons.play_arrow,
+                color: const Color(0xFFff7d78),
+                size: 28,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override

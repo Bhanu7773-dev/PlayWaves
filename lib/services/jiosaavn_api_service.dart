@@ -106,16 +106,18 @@ class JioSaavnApiService {
   }
 
   // ---- GET SONG BY ID (with optional lyrics) ----
-  Future<Map<String, dynamic>> getSongById(
-    String songId, {
-    bool lyrics = false,
-  }) async {
-    final url = Uri.parse('$baseUrl/songs/$songId?lyrics=$lyrics');
+  Future<Map<String, dynamic>> getSongById(String songId) async {
+    final url = Uri.parse('$baseUrl/songs?ids=$songId');
+    print('Fetching song from URL: $url');
+
     final response = await http.get(url);
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
+
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
-      throw Exception('Fetching song by ID failed');
+      throw Exception('Failed to fetch song details: ${response.statusCode}');
     }
   }
 
