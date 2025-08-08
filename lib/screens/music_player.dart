@@ -5,6 +5,7 @@ class MusicPlayerPage extends StatefulWidget {
   final String artistName;
   final String albumArtUrl;
   final bool isPlaying;
+  final bool isLoading;
   final Duration currentPosition;
   final Duration totalDuration;
   final VoidCallback onPlayPause;
@@ -18,6 +19,7 @@ class MusicPlayerPage extends StatefulWidget {
     required this.artistName,
     required this.albumArtUrl,
     required this.isPlaying,
+    this.isLoading = false,
     required this.currentPosition,
     required this.totalDuration,
     required this.onPlayPause,
@@ -138,12 +140,48 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(32),
-                    child: Image.network(
-                      widget.albumArtUrl,
-                      width: 280,
-                      height: 280,
-                      fit: BoxFit.cover,
-                    ),
+                    child: widget.albumArtUrl.isNotEmpty
+                        ? Image.network(
+                            widget.albumArtUrl,
+                            width: 280,
+                            height: 280,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                width: 280,
+                                height: 280,
+                                color: Colors.grey[800],
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFFff7d78),
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 280,
+                                height: 280,
+                                color: Colors.grey[800],
+                                child: const Icon(
+                                  Icons.music_note,
+                                  color: Colors.white,
+                                  size: 80,
+                                ),
+                              );
+                            },
+                          )
+                        : Container(
+                            width: 280,
+                            height: 280,
+                            color: Colors.grey[800],
+                            child: const Icon(
+                              Icons.music_note,
+                              color: Colors.white,
+                              size: 80,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -305,12 +343,23 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                         ],
                       ),
                       child: IconButton(
-                        icon: Icon(
-                          widget.isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: Colors.white,
-                          size: 40,
-                        ),
-                        onPressed: widget.onPlayPause,
+                        icon: widget.isLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(
+                                widget.isPlaying
+                                    ? Icons.pause
+                                    : Icons.play_arrow,
+                                color: Colors.white,
+                                size: 40,
+                              ),
+                        onPressed: widget.isLoading ? null : widget.onPlayPause,
                         padding: const EdgeInsets.all(16),
                       ),
                     ),

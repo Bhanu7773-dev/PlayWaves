@@ -32,6 +32,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   List<Map<String, dynamic>> _currentPlaylist = [];
 
   bool _isLoading = true;
+  bool _isSongLoading = false;
   String? _error;
 
   Map<String, dynamic>? _currentSong;
@@ -57,6 +58,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       if (mounted) {
         setState(() {
           _isPlaying = playing;
+          // Clear loading when song starts playing
+          if (playing) {
+            _isSongLoading = false;
+          }
+        });
+      }
+    });
+
+    // Listen to player state to clear loading when ready
+    _audioPlayer.playerStateStream.listen((state) {
+      if (mounted && state.processingState == ProcessingState.ready) {
+        setState(() {
+          _isSongLoading = false;
         });
       }
     });
@@ -256,7 +270,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           // Mini Music Player (when song is loaded)
           if (_currentSong != null)
             Positioned(
-              bottom: 100, // Above navbar
+              bottom: 70, // Above navbar
               left: 16,
               right: 16,
               child: _buildMiniPlayer(),
@@ -1175,10 +1189,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       print('Attempting to play song: ${song['name']}');
       print('Song ID: ${song['id']}');
 
+      // Set loading state
+      setState(() {
+        _isSongLoading = true;
+      });
+
+      // Stop current playback and reset position immediately
+      await _audioPlayer.stop();
+      await _audioPlayer.seek(Duration.zero);
+
       // Update current song immediately with all available data
       setState(() {
         _currentSong = Map<String, dynamic>.from(song);
-        // Set current playlist to trending songs for next/previous functionality
         _currentPlaylist = _trendingSongs;
         _currentSongIndex = _trendingSongs.indexWhere(
           (s) => s['id'] == song['id'],
@@ -1192,30 +1214,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         final songDetails = await _apiService.getSongById(songId);
         print('Song details response: $songDetails');
 
-        // Try multiple possible paths for download URL
         String? downloadUrl;
         final songData = songDetails['data']?[0];
 
         if (songData != null) {
           print('Available keys in song data: ${songData.keys.toList()}');
 
-          // Update current song with detailed data from API
           setState(() {
             _currentSong = Map<String, dynamic>.from(songData);
           });
 
-          // Check for downloadUrl array
           if (songData['downloadUrl'] != null &&
               songData['downloadUrl'] is List) {
             final downloadUrls = songData['downloadUrl'] as List;
             if (downloadUrls.isNotEmpty) {
-              // Try to get the highest quality URL (usually the last one)
               final urlData = downloadUrls.last;
               downloadUrl = urlData['url'] ?? urlData['link'];
             }
           }
 
-          // Fallback options
           if (downloadUrl == null) {
             downloadUrl =
                 songData['media_preview_url'] ??
@@ -1228,13 +1245,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         print('Final download URL: $downloadUrl');
 
         if (downloadUrl != null && downloadUrl.isNotEmpty) {
-          // Clean the URL if needed
           if (downloadUrl.contains('preview.saavncdn.com') ||
               downloadUrl.contains('aac.saavncdn.com')) {
             print('Setting audio URL: $downloadUrl');
             await _audioPlayer.setUrl(downloadUrl);
             await _audioPlayer.play();
-            setState(() {}); // Update UI
+            // Loading will be cleared by playerStateStream listener
           } else {
             throw Exception('Invalid audio URL format');
           }
@@ -1246,6 +1262,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
     } catch (e) {
       print('Error playing song: $e');
+      setState(() {
+        _isSongLoading = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error playing song: $e'),
@@ -1364,6 +1383,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                           artistName: currentArtistName,
                           albumArtUrl: currentAlbumArtUrl,
                           isPlaying: playingSnapshot.data ?? false,
+                          isLoading: _isSongLoading,
                           currentPosition:
                               positionSnapshot.data ?? Duration.zero,
                           totalDuration: durationSnapshot.data ?? Duration.zero,
@@ -1559,6 +1579,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     if (_currentPlaylist.isNotEmpty &&
         _currentSongIndex < _currentPlaylist.length - 1) {
       _currentSongIndex++;
+      // Reset audio player state immediately
+      _audioPlayer.stop();
       _playSong(_currentPlaylist[_currentSongIndex]);
     }
   }
@@ -1566,6 +1588,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void _playPreviousSong() {
     if (_currentPlaylist.isNotEmpty && _currentSongIndex > 0) {
       _currentSongIndex--;
+      // Reset audio player state immediately
+      _audioPlayer.stop();
       _playSong(_currentPlaylist[_currentSongIndex]);
     }
   }
