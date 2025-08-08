@@ -63,11 +63,23 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
     return Container(
       padding: EdgeInsets.only(
         top: 6,
-        bottom: MediaQuery.of(context).padding.bottom + 0,
+        bottom: MediaQuery.of(context).padding.bottom + 6,
         left: 0,
         right: 0,
       ),
-      decoration: const BoxDecoration(color: Colors.transparent),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            Colors.black,
+            Color(0x88000000),
+            Color(0x44000000),
+            Colors.transparent,
+          ],
+          stops: [0.3, 0.6, 0.9, 1.0],
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: List.generate(icons.length, (index) {
@@ -96,7 +108,10 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
                                 end: Alignment.bottomRight,
                               ).createShader(bounds)
                             : const LinearGradient(
-                                colors: [Colors.white60, Colors.white60],
+                                colors: [
+                                  Color.fromARGB(255, 255, 255, 255),
+                                  Colors.white60,
+                                ],
                               ).createShader(bounds),
                         child: Icon(
                           icons[index],
