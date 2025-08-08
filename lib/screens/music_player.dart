@@ -120,101 +120,119 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
 
               const SizedBox(height: 20),
 
-              // Album Art with Glow Effect
+              // Album Art with Glow Effect and Hero Animation
               Center(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(32),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFff7d78).withOpacity(0.3),
-                        blurRadius: 40,
-                        spreadRadius: 10,
-                      ),
-                      BoxShadow(
-                        color: const Color(0xFF9c27b0).withOpacity(0.2),
-                        blurRadius: 60,
-                        spreadRadius: 15,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(32),
-                    child: widget.albumArtUrl.isNotEmpty
-                        ? Image.network(
-                            widget.albumArtUrl,
-                            width: 280,
-                            height: 280,
-                            fit: BoxFit.cover,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Container(
-                                width: 280,
-                                height: 280,
-                                color: Colors.grey[800],
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    color: Color(0xFFff7d78),
+                child: Hero(
+                  tag: 'album_art_${widget.songTitle}_${widget.artistName}',
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFff7d78).withOpacity(0.3),
+                          blurRadius: 40,
+                          spreadRadius: 10,
+                        ),
+                        BoxShadow(
+                          color: const Color(0xFF9c27b0).withOpacity(0.2),
+                          blurRadius: 60,
+                          spreadRadius: 15,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(32),
+                      child: widget.albumArtUrl.isNotEmpty
+                          ? Image.network(
+                              widget.albumArtUrl,
+                              width: 280,
+                              height: 280,
+                              fit: BoxFit.cover,
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Container(
+                                      width: 280,
+                                      height: 280,
+                                      color: Colors.grey[800],
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          color: Color(0xFFff7d78),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  width: 280,
+                                  height: 280,
+                                  color: Colors.grey[800],
+                                  child: const Icon(
+                                    Icons.music_note,
+                                    color: Colors.white,
+                                    size: 80,
                                   ),
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                width: 280,
-                                height: 280,
-                                color: Colors.grey[800],
-                                child: const Icon(
-                                  Icons.music_note,
-                                  color: Colors.white,
-                                  size: 80,
-                                ),
-                              );
-                            },
-                          )
-                        : Container(
-                            width: 280,
-                            height: 280,
-                            color: Colors.grey[800],
-                            child: const Icon(
-                              Icons.music_note,
-                              color: Colors.white,
-                              size: 80,
+                                );
+                              },
+                            )
+                          : Container(
+                              width: 280,
+                              height: 280,
+                              color: Colors.grey[800],
+                              child: const Icon(
+                                Icons.music_note,
+                                color: Colors.white,
+                                size: 80,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
               ),
 
               const SizedBox(height: 40),
 
-              // Song Info
+              // Song Info with Hero Animation
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32.0),
                 child: Column(
                   children: [
-                    Text(
-                      widget.songTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
+                    Hero(
+                      tag:
+                          'song_title_${widget.songTitle}_${widget.artistName}',
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Text(
+                          widget.songTitle,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      widget.artistName,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
+                    Hero(
+                      tag:
+                          'artist_name_${widget.songTitle}_${widget.artistName}',
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Text(
+                          widget.artistName,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),

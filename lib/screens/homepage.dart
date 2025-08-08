@@ -1334,169 +1334,209 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       albumArtUrl = _getBestImageUrl(_currentSong!['image']) ?? '';
     }
 
-    // Get song title
-    String songTitle =
+    final songTitle =
         _currentSong?['name'] ?? _currentSong?['title'] ?? 'Unknown';
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => StreamBuilder<Duration>(
-              stream: _audioPlayer.positionStream,
-              builder: (context, positionSnapshot) {
-                return StreamBuilder<Duration?>(
-                  stream: _audioPlayer.durationStream,
-                  builder: (context, durationSnapshot) {
-                    return StreamBuilder<bool>(
-                      stream: _audioPlayer.playingStream,
-                      builder: (context, playingSnapshot) {
-                        // Get current song data dynamically
-                        String currentSongTitle =
-                            _currentSong?['name'] ??
-                            _currentSong?['title'] ??
-                            'Unknown';
-                        String currentArtistName = 'Unknown Artist';
-                        if (_currentSong?['artists'] != null) {
-                          final artists = _currentSong!['artists'];
-                          if (artists['primary'] != null &&
-                              artists['primary'].isNotEmpty) {
-                            currentArtistName =
-                                artists['primary'][0]['name'] ??
-                                'Unknown Artist';
-                          }
-                        } else if (_currentSong?['primaryArtists'] != null) {
-                          currentArtistName = _currentSong!['primaryArtists'];
-                        } else if (_currentSong?['subtitle'] != null) {
-                          currentArtistName = _currentSong!['subtitle'];
-                        }
-
-                        String currentAlbumArtUrl = '';
-                        if (_currentSong?['image'] != null) {
-                          currentAlbumArtUrl =
-                              _getBestImageUrl(_currentSong!['image']) ?? '';
-                        }
-
-                        return MusicPlayerPage(
-                          songTitle: currentSongTitle,
-                          artistName: currentArtistName,
-                          albumArtUrl: currentAlbumArtUrl,
-                          isPlaying: playingSnapshot.data ?? false,
-                          isLoading: _isSongLoading,
-                          currentPosition:
-                              positionSnapshot.data ?? Duration.zero,
-                          totalDuration: durationSnapshot.data ?? Duration.zero,
-                          onPlayPause: () {
-                            if (_audioPlayer.playing) {
-                              _audioPlayer.pause();
-                            } else {
-                              _audioPlayer.play();
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) {
+              return StreamBuilder<Duration>(
+                stream: _audioPlayer.positionStream,
+                builder: (context, positionSnapshot) {
+                  return StreamBuilder<Duration?>(
+                    stream: _audioPlayer.durationStream,
+                    builder: (context, durationSnapshot) {
+                      return StreamBuilder<bool>(
+                        stream: _audioPlayer.playingStream,
+                        builder: (context, playingSnapshot) {
+                          String currentSongTitle =
+                              _currentSong?['name'] ??
+                              _currentSong?['title'] ??
+                              'Unknown';
+                          String currentArtistName = 'Unknown Artist';
+                          if (_currentSong?['artists'] != null) {
+                            final artists = _currentSong!['artists'];
+                            if (artists['primary'] != null &&
+                                artists['primary'].isNotEmpty) {
+                              currentArtistName =
+                                  artists['primary'][0]['name'] ??
+                                  'Unknown Artist';
                             }
-                          },
-                          onNext: _playNextSong,
-                          onPrevious: _playPreviousSong,
-                          onSeek: (value) {
-                            final position =
-                                (durationSnapshot.data ?? Duration.zero) *
-                                value;
-                            _audioPlayer.seek(position);
-                          },
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
+                          } else if (_currentSong?['primaryArtists'] != null) {
+                            currentArtistName = _currentSong!['primaryArtists'];
+                          } else if (_currentSong?['subtitle'] != null) {
+                            currentArtistName = _currentSong!['subtitle'];
+                          }
+
+                          String currentAlbumArtUrl = '';
+                          if (_currentSong?['image'] != null) {
+                            currentAlbumArtUrl =
+                                _getBestImageUrl(_currentSong!['image']) ?? '';
+                          }
+
+                          return MusicPlayerPage(
+                            songTitle: currentSongTitle,
+                            artistName: currentArtistName,
+                            albumArtUrl: currentAlbumArtUrl,
+                            isPlaying: playingSnapshot.data ?? false,
+                            isLoading: _isSongLoading,
+                            currentPosition:
+                                positionSnapshot.data ?? Duration.zero,
+                            totalDuration:
+                                durationSnapshot.data ?? Duration.zero,
+                            onPlayPause: () {
+                              if (_audioPlayer.playing) {
+                                _audioPlayer.pause();
+                              } else {
+                                _audioPlayer.play();
+                              }
+                            },
+                            onNext: _playNextSong,
+                            onPrevious: _playPreviousSong,
+                            onSeek: (value) {
+                              final position =
+                                  (durationSnapshot.data ?? Duration.zero) *
+                                  value;
+                              _audioPlayer.seek(position);
+                            },
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              );
+            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return SlideTransition(
+                    position:
+                        Tween<Offset>(
+                          begin: const Offset(0.0, 1.0),
+                          end: Offset.zero,
+                        ).animate(
+                          CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeInOut,
+                          ),
+                        ),
+                    child: child,
+                  );
+                },
+            transitionDuration: const Duration(milliseconds: 400),
           ),
         );
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
+        height: 70,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.grey[900],
-          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withOpacity(0.1),
+              Colors.white.withOpacity(0.05),
+            ],
+          ),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
+              color: const Color(0xFFff7d78).withOpacity(0.2),
               blurRadius: 10,
-              offset: const Offset(0, 4),
+              spreadRadius: 2,
             ),
           ],
         ),
-        child: Container(
-          height: 70,
-          padding: const EdgeInsets.all(12),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
           child: Row(
             children: [
-              // Album Art
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: albumArtUrl.isNotEmpty
-                    ? Image.network(
-                        albumArtUrl,
-                        width: 46,
-                        height: 46,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[700],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+              // Album Art with Hero Animation
+              Hero(
+                tag: 'album_art_${_currentSong?['id'] ?? 'current'}',
+                child: Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFff7d78).withOpacity(0.3),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: albumArtUrl.isNotEmpty
+                        ? Image.network(
+                            albumArtUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey[800],
+                                child: const Icon(
+                                  Icons.music_note,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              );
+                            },
+                          )
+                        : Container(
+                            color: Colors.grey[800],
                             child: const Icon(
                               Icons.music_note,
                               color: Colors.white,
                               size: 24,
                             ),
-                          );
-                        },
-                      )
-                    : Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[700],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.music_note,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
+                          ),
+                  ),
+                ),
               ),
-              const SizedBox(width: 14),
-              // Song info
+              const SizedBox(width: 12),
+              // Song Info with Hero Animation
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      songTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                    Hero(
+                      tag: 'song_title_${_currentSong?['id'] ?? 'current'}',
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Text(
+                          songTitle,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      artistName,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
+                    Hero(
+                      tag: 'artist_name_${_currentSong?['id'] ?? 'current'}',
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Text(
+                          artistName,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -1505,18 +1545,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Previous button
-                  IconButton(
-                    onPressed: () {
-                      // Implement previous logic
-                    },
-                    icon: const Icon(
-                      Icons.skip_previous,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                    padding: const EdgeInsets.all(4),
-                  ),
                   // Play/Pause button
                   StreamBuilder<bool>(
                     stream: _audioPlayer.playingStream,
@@ -1538,18 +1566,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         padding: const EdgeInsets.all(4),
                       );
                     },
-                  ),
-                  // Next button
-                  IconButton(
-                    onPressed: () {
-                      // Implement next logic
-                    },
-                    icon: const Icon(
-                      Icons.skip_next,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                    padding: const EdgeInsets.all(4),
                   ),
                   // Close button
                   IconButton(
