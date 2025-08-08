@@ -23,11 +23,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Timer? _bannerTimer;
   int _selectedNavIndex = 0;
+  int _currentSongIndex = 0;
 
   List<Map<String, dynamic>> _trendingSongs = [];
   List<Map<String, dynamic>> _albums = [];
   List<Map<String, dynamic>> _artists = [];
   List<Map<String, dynamic>> _bannerSongs = [];
+  List<Map<String, dynamic>> _currentPlaylist = [];
 
   bool _isLoading = true;
   String? _error;
@@ -1176,6 +1178,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       // Update current song immediately with all available data
       setState(() {
         _currentSong = Map<String, dynamic>.from(song);
+        // Set current playlist to trending songs for next/previous functionality
+        _currentPlaylist = _trendingSongs;
+        _currentSongIndex = _trendingSongs.indexWhere(
+          (s) => s['id'] == song['id'],
+        );
+        if (_currentSongIndex == -1) _currentSongIndex = 0;
       });
 
       final songId = song['id'];
@@ -1316,26 +1324,43 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => MusicPlayerPage(
-              songTitle: songTitle,
-              artistName: artistName,
-              albumArtUrl: albumArtUrl,
-              isPlaying: _audioPlayer.playing,
-              currentPosition: _audioPlayer.position,
-              totalDuration: _audioPlayer.duration ?? Duration.zero,
-              onPlayPause: () {
-                if (_audioPlayer.playing) {
-                  _audioPlayer.pause();
-                } else {
-                  _audioPlayer.play();
-                }
-                setState(() {});
-              },
-              onNext: () {},
-              onPrevious: () {},
-              onSeek: (value) {
-                final position = _audioPlayer.duration! * value;
-                _audioPlayer.seek(position);
+            builder: (context) => StreamBuilder<Duration>(
+              stream: _audioPlayer.positionStream,
+              builder: (context, positionSnapshot) {
+                return StreamBuilder<Duration?>(
+                  stream: _audioPlayer.durationStream,
+                  builder: (context, durationSnapshot) {
+                    return StreamBuilder<bool>(
+                      stream: _audioPlayer.playingStream,
+                      builder: (context, playingSnapshot) {
+                        return MusicPlayerPage(
+                          songTitle: songTitle,
+                          artistName: artistName,
+                          albumArtUrl: albumArtUrl,
+                          isPlaying: playingSnapshot.data ?? false,
+                          currentPosition:
+                              positionSnapshot.data ?? Duration.zero,
+                          totalDuration: durationSnapshot.data ?? Duration.zero,
+                          onPlayPause: () {
+                            if (_audioPlayer.playing) {
+                              _audioPlayer.pause();
+                            } else {
+                              _audioPlayer.play();
+                            }
+                          },
+                          onNext: _playNextSong,
+                          onPrevious: _playPreviousSong,
+                          onSeek: (value) {
+                            final position =
+                                (durationSnapshot.data ?? Duration.zero) *
+                                value;
+                            _audioPlayer.seek(position);
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
               },
             ),
           ),
@@ -1502,6 +1527,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  void _playNextSong() {
+    if (_currentPlaylist.isNotEmpty &&
+        _currentSongIndex < _currentPlaylist.length - 1) {
+      _currentSongIndex++;
+      _playSong(_currentPlaylist[_currentSongIndex]);
+    }
+  }
+
+  void _playPreviousSong() {
+    if (_currentPlaylist.isNotEmpty && _currentSongIndex > 0) {
+      _currentSongIndex--;
+      _playSong(_currentPlaylist[_currentSongIndex]);
+    }
   }
 
   @override

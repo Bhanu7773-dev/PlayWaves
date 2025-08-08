@@ -31,11 +31,17 @@ class MusicPlayerPage extends StatefulWidget {
 }
 
 class _MusicPlayerPageState extends State<MusicPlayerPage> {
+  bool _isDragging = false;
+  double _dragValue = 0.0;
+
   @override
   Widget build(BuildContext context) {
     double progress = widget.totalDuration.inSeconds > 0
         ? widget.currentPosition.inSeconds / widget.totalDuration.inSeconds
         : 0.0;
+
+    // Use drag value when dragging, otherwise use actual progress
+    double displayProgress = _isDragging ? _dragValue : progress;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -183,38 +189,41 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 32.0),
                 child: Column(
                   children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFFff7d78).withOpacity(0.3),
-                            blurRadius: 8,
-                          ),
-                        ],
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 6,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 8,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 16,
+                        ),
+                        activeTrackColor: const Color(0xFFff7d78),
+                        inactiveTrackColor: Colors.white.withOpacity(0.2),
+                        thumbColor: Colors.white,
+                        overlayColor: const Color(0xFFff7d78).withOpacity(0.2),
                       ),
-                      child: SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 6,
-                          thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 8,
-                          ),
-                          overlayShape: const RoundSliderOverlayShape(
-                            overlayRadius: 16,
-                          ),
-                          activeTrackColor: const Color(0xFFff7d78),
-                          inactiveTrackColor: Colors.white.withOpacity(0.2),
-                          thumbColor: Colors.white,
-                          overlayColor: const Color(
-                            0xFFff7d78,
-                          ).withOpacity(0.2),
-                        ),
-                        child: Slider(
-                          value: progress,
-                          min: 0.0,
-                          max: 1.0,
-                          onChanged: (value) => widget.onSeek(value),
-                        ),
+                      child: Slider(
+                        value: displayProgress.clamp(0.0, 1.0),
+                        min: 0.0,
+                        max: 1.0,
+                        onChangeStart: (value) {
+                          setState(() {
+                            _isDragging = true;
+                            _dragValue = value;
+                          });
+                        },
+                        onChanged: (value) {
+                          setState(() {
+                            _dragValue = value;
+                          });
+                        },
+                        onChangeEnd: (value) {
+                          setState(() {
+                            _isDragging = false;
+                          });
+                          widget.onSeek(value);
+                        },
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -222,7 +231,16 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          _formatDuration(widget.currentPosition),
+                          _formatDuration(
+                            _isDragging
+                                ? Duration(
+                                    seconds:
+                                        (_dragValue *
+                                                widget.totalDuration.inSeconds)
+                                            .round(),
+                                  )
+                                : widget.currentPosition,
+                          ),
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.7),
                             fontSize: 12,
@@ -327,10 +345,10 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     );
   }
 
-  String _formatDuration(Duration d) {
+  String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(d.inMinutes.remainder(60));
-    final seconds = twoDigits(d.inSeconds.remainder(60));
-    return "$minutes:$seconds";
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$minutes:$seconds';
   }
 }
