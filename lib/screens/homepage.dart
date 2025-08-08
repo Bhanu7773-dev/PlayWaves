@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math';
 import 'package:just_audio/just_audio.dart';
+import 'package:provider/provider.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../widgets/animated_navbar.dart';
+import '../widgets/mini_player.dart';
 import 'music_player.dart';
 import 'search_page.dart';
+import '../services/player_state_provider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -24,20 +26,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Timer? _bannerTimer;
   int _selectedNavIndex = 0;
-  int _currentSongIndex = 0;
 
   List<Map<String, dynamic>> _trendingSongs = [];
   List<Map<String, dynamic>> _albums = [];
   List<Map<String, dynamic>> _artists = [];
   List<Map<String, dynamic>> _bannerSongs = [];
-  List<Map<String, dynamic>> _currentPlaylist = [];
 
   bool _isLoading = true;
-  bool _isSongLoading = false;
   String? _error;
-
-  Map<String, dynamic>? _currentSong;
-  bool _isPlaying = false;
 
   @override
   void initState() {
@@ -54,25 +50,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _loadData();
     _startBannerAutoScroll();
 
-    // Listen to audio player state changes
+    // Listen to audio player state and update provider accordingly
     _audioPlayer.playingStream.listen((playing) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = playing;
-          // Clear loading when song starts playing
-          if (playing) {
-            _isSongLoading = false;
-          }
-        });
+      final playerState = Provider.of<PlayerStateProvider>(
+        context,
+        listen: false,
+      );
+      playerState.setPlaying(playing);
+      if (playing) {
+        playerState.setSongLoading(false);
       }
     });
 
-    // Listen to player state to clear loading when ready
     _audioPlayer.playerStateStream.listen((state) {
-      if (mounted && state.processingState == ProcessingState.ready) {
-        setState(() {
-          _isSongLoading = false;
-        });
+      final playerState = Provider.of<PlayerStateProvider>(
+        context,
+        listen: false,
+      );
+      if (state.processingState == ProcessingState.ready) {
+        playerState.setSongLoading(false);
       }
     });
   }
@@ -104,9 +100,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         _error = null;
       });
 
-      // Add a known song with lyrics for testing
       final testSongWithLyrics = {
-        'id': '3IoDK8qI', // Different song ID that should exist
+        'id': '3IoDK8qI',
         'name': 'Tum Hi Ho',
         'subtitle': 'Arijit Singh',
         'image': [
@@ -123,7 +118,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         },
       };
 
-      // Use different search queries to get varied content
       final List<String> songQueries = [
         'trending hindi songs',
         'bollywood hits',
@@ -164,7 +158,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'youtube trending',
       ];
 
-      // Randomly select queries for variety
       final random = DateTime.now().millisecondsSinceEpoch;
       final songQuery = songQueries[random % songQueries.length];
       final albumQuery = albumQueries[random % albumQueries.length];
@@ -175,14 +168,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         albumQuery,
         limit: 5,
       );
-
-      // For banner, include the test song with lyrics
       final bannerResponse = await _apiService.searchSongs(
         bannerQuery,
         limit: 5,
       );
 
-      // Search for individual famous artists (both Hindi and English)
       final List<String> famousArtists = [
         'arijit singh',
         'shreya ghoshal',
@@ -202,10 +192,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'bruno mars',
       ];
 
-      // Get multiple individual artists
       List<Map<String, dynamic>> allArtists = [];
-
-      // Shuffle the artists list for variety on each refresh
       final shuffledArtists = List<String>.from(famousArtists)..shuffle();
 
       for (int i = 0; i < 6; i++) {
@@ -247,17 +234,27 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         }
       }
 
-      // For banner, add the test song with lyrics as first item
       List<Map<String, dynamic>> bannerSongs = [testSongWithLyrics];
 
-      if (bannerResponse['success'] == true && bannerResponse['data'] != null) {
-        final bannerData = bannerResponse['data'];
-        if (bannerData['results'] != null) {
-          final banners = List<Map<String, dynamic>>.from(
-            bannerData['results'],
-          );
-          bannerSongs.addAll(banners.take(4)); // Add 4 more songs
+      try {
+        await Future.delayed(const Duration(milliseconds: 500));
+        final bannerResponse = await _apiService.searchSongs(
+          'trending songs',
+          limit: 5,
+        );
+
+        if (bannerResponse['success'] == true &&
+            bannerResponse['data'] != null) {
+          final bannerData = bannerResponse['data'];
+          if (bannerData['results'] != null) {
+            final banners = List<Map<String, dynamic>>.from(
+              bannerData['results'],
+            );
+            bannerSongs.addAll(banners);
+          }
         }
+      } catch (e) {
+        print('Banner query failed, using fallback: $e');
       }
 
       setState(() {
@@ -276,13 +273,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final playerState = Provider.of<PlayerStateProvider>(context);
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Animated background
           _buildAnimatedBackground(),
-          // Main content
           SafeArea(
             child: Column(
               children: [
@@ -291,15 +287,129 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ],
             ),
           ),
-          // Mini Music Player (when song is loaded)
-          if (_currentSong != null)
+          // MiniPlayer uses provider
+          if (playerState.currentSong != null)
             Positioned(
-              bottom: 70, // Above navbar
+              bottom: 70,
               left: 16,
               right: 16,
-              child: _buildMiniPlayer(),
+              child: MiniPlayer(
+                currentSong: playerState.currentSong,
+                audioPlayer: _audioPlayer,
+                isSongLoading: playerState.isSongLoading,
+                onPlayPause: () {
+                  if (_audioPlayer.playing) {
+                    _audioPlayer.pause();
+                  } else {
+                    _audioPlayer.play();
+                  }
+                },
+                onClose: () {
+                  _audioPlayer.stop();
+                  playerState.clearSong();
+                },
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) {
+                        final song = playerState.currentSong;
+                        return StreamBuilder<Duration>(
+                          stream: _audioPlayer.positionStream,
+                          builder: (context, positionSnapshot) {
+                            return StreamBuilder<Duration?>(
+                              stream: _audioPlayer.durationStream,
+                              builder: (context, durationSnapshot) {
+                                return StreamBuilder<bool>(
+                                  stream: _audioPlayer.playingStream,
+                                  builder: (context, playingSnapshot) {
+                                    String currentSongTitle =
+                                        song?['name'] ??
+                                        song?['title'] ??
+                                        'Unknown';
+                                    String currentArtistName = 'Unknown Artist';
+                                    if (song?['artists'] != null) {
+                                      final artists = song!['artists'];
+                                      if (artists['primary'] != null &&
+                                          artists['primary'].isNotEmpty) {
+                                        currentArtistName =
+                                            artists['primary'][0]['name'] ??
+                                            'Unknown Artist';
+                                      }
+                                    } else if (song?['primaryArtists'] !=
+                                        null) {
+                                      currentArtistName =
+                                          song!['primaryArtists'];
+                                    } else if (song?['subtitle'] != null) {
+                                      currentArtistName = song!['subtitle'];
+                                    }
+
+                                    String currentAlbumArtUrl = '';
+                                    if (song?['image'] != null) {
+                                      currentAlbumArtUrl = _getBestImageUrl(
+                                        song!['image'],
+                                      );
+                                    }
+
+                                    return MusicPlayerPage(
+                                      songTitle: currentSongTitle,
+                                      artistName: currentArtistName,
+                                      albumArtUrl: currentAlbumArtUrl,
+                                      songId: song?['id'],
+                                      isPlaying: playingSnapshot.data ?? false,
+                                      isLoading: playerState.isSongLoading,
+                                      currentPosition:
+                                          positionSnapshot.data ??
+                                          Duration.zero,
+                                      totalDuration:
+                                          durationSnapshot.data ??
+                                          Duration.zero,
+                                      onPlayPause: () {
+                                        if (_audioPlayer.playing) {
+                                          _audioPlayer.pause();
+                                        } else {
+                                          _audioPlayer.play();
+                                        }
+                                      },
+                                      onNext: _playNextSong,
+                                      onPrevious: _playPreviousSong,
+                                      onSeek: (value) {
+                                        final position =
+                                            (durationSnapshot.data ??
+                                                Duration.zero) *
+                                            value;
+                                        _audioPlayer.seek(position);
+                                      },
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                      transitionsBuilder:
+                          (context, animation, secondaryAnimation, child) {
+                            return SlideTransition(
+                              position:
+                                  Tween<Offset>(
+                                    begin: const Offset(0.0, 1.0),
+                                    end: Offset.zero,
+                                  ).animate(
+                                    CurvedAnimation(
+                                      parent: animation,
+                                      curve: Curves.easeInOut,
+                                    ),
+                                  ),
+                              child: child,
+                            );
+                          },
+                      transitionDuration: const Duration(milliseconds: 400),
+                    ),
+                  );
+                },
+              ),
             ),
-          // Animated Navigation Bar
           Positioned(
             bottom: 0,
             left: 0,
@@ -330,19 +440,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     switch (index) {
       case 0:
-        // Home - already here, do nothing
         break;
       case 1:
-        // Navigate to Search with slide transition
         Navigator.push(
           context,
           PageRouteBuilder(
             pageBuilder: (context, animation, secondaryAnimation) => SearchPage(
               onNavTap: _onNavTap,
               selectedNavIndex: _selectedNavIndex,
-              currentSong: _currentSong,
               audioPlayer: _audioPlayer,
-              isSongLoading: _isSongLoading,
               onPlayPause: () {
                 if (_audioPlayer.playing) {
                   _audioPlayer.pause();
@@ -352,14 +458,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               },
               onNext: _playNextSong,
               onPrevious: _playPreviousSong,
-              onSongChanged: (song) {
-                if (mounted) {
-                  setState(() {
-                    _currentSong = song;
-                    _isSongLoading = true; // Set loading when song changes
-                  });
-                }
-              },
             ),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
@@ -388,10 +486,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         });
         break;
       case 2:
-        // Navigate to Playlist
         break;
       case 3:
-        // Navigate to Profile
         break;
     }
   }
@@ -464,7 +560,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
             ],
           ),
-          // Removed the search button - now handled by nav bar
         ],
       ),
     );
@@ -614,9 +709,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Padding(
-            padding: const EdgeInsets.only(
-              bottom: 100,
-            ), // Add padding for navbar
+            padding: const EdgeInsets.only(bottom: 100),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -657,8 +750,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final imageUrl = _getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
     final songId = song['id'];
-
-    // Check if this is our test song with lyrics
     final hasLyrics = songId == 'PIzj2ULl';
 
     String artist = 'Unknown Artist';
@@ -698,8 +789,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 },
               ),
             ),
-
-          // Lyrics indicator badge
           if (hasLyrics)
             Positioned(
               top: 12,
@@ -727,8 +816,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
             ),
-
-          // Gradient overlay and content
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
@@ -739,8 +826,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
             ),
           ),
-
-          // Play button and song info
           Positioned(
             bottom: 16,
             left: 16,
@@ -1253,14 +1338,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
           child: IconButton(
             icon: const Icon(Icons.play_arrow, color: Colors.white),
-            onPressed: () => _playSong(song),
+            onPressed: () => _playSong(song, index),
           ),
         ),
       ),
     );
   }
 
-  String? _getBestImageUrl(dynamic images) {
+  String _getBestImageUrl(dynamic images) {
     if (images is List && images.isNotEmpty) {
       for (var img in images.reversed) {
         if (img is Map && img['link'] != null) {
@@ -1273,48 +1358,41 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     } else if (images is String) {
       return images;
     }
-    return null;
+    return '';
   }
 
-  Future<void> _playSong(Map<String, dynamic> song) async {
+  Future<void> _playSong(Map<String, dynamic> song, [int? index]) async {
+    final playerState = Provider.of<PlayerStateProvider>(
+      context,
+      listen: false,
+    );
     try {
-      print('Attempting to play song: ${song['name']}');
-      print('Song ID: ${song['id']}');
+      playerState.setSongLoading(true);
 
-      // Set loading state
-      setState(() {
-        _isSongLoading = true;
-      });
-
-      // Stop current playback and reset position immediately
       await _audioPlayer.stop();
       await _audioPlayer.seek(Duration.zero);
 
-      // Update current song immediately with all available data
-      setState(() {
-        _currentSong = Map<String, dynamic>.from(song);
-        _currentPlaylist = _trendingSongs;
-        _currentSongIndex = _trendingSongs.indexWhere(
+      // Set playlist and song index in provider
+      playerState.setPlaylist(_trendingSongs);
+      if (index != null) {
+        playerState.setSongIndex(index);
+      } else {
+        final songIndex = _trendingSongs.indexWhere(
           (s) => s['id'] == song['id'],
         );
-        if (_currentSongIndex == -1) _currentSongIndex = 0;
-      });
+        playerState.setSongIndex(songIndex == -1 ? 0 : songIndex);
+      }
+
+      playerState.setSong(Map<String, dynamic>.from(song));
 
       final songId = song['id'];
       if (songId != null) {
-        print('Fetching song details for ID: $songId');
         final songDetails = await _apiService.getSongById(songId);
-        print('Song details response: $songDetails');
-
         String? downloadUrl;
         final songData = songDetails['data']?[0];
 
         if (songData != null) {
-          print('Available keys in song data: ${songData.keys.toList()}');
-
-          setState(() {
-            _currentSong = Map<String, dynamic>.from(songData);
-          });
+          playerState.setSong(Map<String, dynamic>.from(songData));
 
           if (songData['downloadUrl'] != null &&
               songData['downloadUrl'] is List) {
@@ -1334,15 +1412,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           }
         }
 
-        print('Final download URL: $downloadUrl');
-
         if (downloadUrl != null && downloadUrl.isNotEmpty) {
           if (downloadUrl.contains('preview.saavncdn.com') ||
               downloadUrl.contains('aac.saavncdn.com')) {
-            print('Setting audio URL: $downloadUrl');
             await _audioPlayer.setUrl(downloadUrl);
             await _audioPlayer.play();
-            // Loading will be cleared by playerStateStream listener
           } else {
             throw Exception('Invalid audio URL format');
           }
@@ -1353,10 +1427,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         throw Exception('No song ID found');
       }
     } catch (e) {
-      print('Error playing song: $e');
-      setState(() {
-        _isSongLoading = false;
-      });
+      playerState.setSongLoading(false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error playing song: $e'),
@@ -1406,300 +1477,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
-  Widget _buildMiniPlayer() {
-    // Extract artist name properly from current song data
-    String artistName = 'Unknown Artist';
-    if (_currentSong?['artists'] != null) {
-      final artists = _currentSong!['artists'];
-      if (artists['primary'] != null && artists['primary'].isNotEmpty) {
-        artistName = artists['primary'][0]['name'] ?? 'Unknown Artist';
-      }
-    } else if (_currentSong?['primaryArtists'] != null) {
-      artistName = _currentSong!['primaryArtists'];
-    } else if (_currentSong?['subtitle'] != null) {
-      artistName = _currentSong!['subtitle'];
-    }
-
-    // Get album art URL with fallback options
-    String albumArtUrl = '';
-    if (_currentSong?['image'] != null) {
-      albumArtUrl = _getBestImageUrl(_currentSong!['image']) ?? '';
-    }
-
-    final songTitle =
-        _currentSong?['name'] ?? _currentSong?['title'] ?? 'Unknown';
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) {
-              return StreamBuilder<Duration>(
-                stream: _audioPlayer.positionStream,
-                builder: (context, positionSnapshot) {
-                  return StreamBuilder<Duration?>(
-                    stream: _audioPlayer.durationStream,
-                    builder: (context, durationSnapshot) {
-                      return StreamBuilder<bool>(
-                        stream: _audioPlayer.playingStream,
-                        builder: (context, playingSnapshot) {
-                          String currentSongTitle =
-                              _currentSong?['name'] ??
-                              _currentSong?['title'] ??
-                              'Unknown';
-                          String currentArtistName = 'Unknown Artist';
-                          if (_currentSong?['artists'] != null) {
-                            final artists = _currentSong!['artists'];
-                            if (artists['primary'] != null &&
-                                artists['primary'].isNotEmpty) {
-                              currentArtistName =
-                                  artists['primary'][0]['name'] ??
-                                  'Unknown Artist';
-                            }
-                          } else if (_currentSong?['primaryArtists'] != null) {
-                            currentArtistName = _currentSong!['primaryArtists'];
-                          } else if (_currentSong?['subtitle'] != null) {
-                            currentArtistName = _currentSong!['subtitle'];
-                          }
-
-                          String currentAlbumArtUrl = '';
-                          if (_currentSong?['image'] != null) {
-                            currentAlbumArtUrl =
-                                _getBestImageUrl(_currentSong!['image']) ?? '';
-                          }
-
-                          return MusicPlayerPage(
-                            songTitle: currentSongTitle,
-                            artistName: currentArtistName,
-                            albumArtUrl: currentAlbumArtUrl,
-                            songId: _currentSong?['id'], // Add this line
-                            isPlaying: playingSnapshot.data ?? false,
-                            isLoading: _isSongLoading,
-                            currentPosition:
-                                positionSnapshot.data ?? Duration.zero,
-                            totalDuration:
-                                durationSnapshot.data ?? Duration.zero,
-                            onPlayPause: () {
-                              if (_audioPlayer.playing) {
-                                _audioPlayer.pause();
-                              } else {
-                                _audioPlayer.play();
-                              }
-                            },
-                            onNext: _playNextSong,
-                            onPrevious: _playPreviousSong,
-                            onSeek: (value) {
-                              final position =
-                                  (durationSnapshot.data ?? Duration.zero) *
-                                  value;
-                              _audioPlayer.seek(position);
-                            },
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              );
-            },
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-                  return SlideTransition(
-                    position:
-                        Tween<Offset>(
-                          begin: const Offset(0.0, 1.0),
-                          end: Offset.zero,
-                        ).animate(
-                          CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeInOut,
-                          ),
-                        ),
-                    child: child,
-                  );
-                },
-            transitionDuration: const Duration(milliseconds: 400),
-          ),
-        );
-      },
-      child: Container(
-        height: 70,
-        margin: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: [
-              Colors.white.withOpacity(0.1),
-              Colors.white.withOpacity(0.05),
-            ],
-          ),
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFff7d78).withOpacity(0.2),
-              blurRadius: 10,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            children: [
-              // Album Art with Hero Animation
-              Hero(
-                tag: 'album_art_${_currentSong?['id'] ?? 'current'}',
-                child: Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFff7d78).withOpacity(0.3),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: albumArtUrl.isNotEmpty
-                        ? Image.network(
-                            albumArtUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.grey[800],
-                                child: const Icon(
-                                  Icons.music_note,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              );
-                            },
-                          )
-                        : Container(
-                            color: Colors.grey[800],
-                            child: const Icon(
-                              Icons.music_note,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Song Info with Hero Animation
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Hero(
-                      tag: 'song_title_${_currentSong?['id'] ?? 'current'}',
-                      child: Material(
-                        color: Colors.transparent,
-                        child: Text(
-                          songTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Hero(
-                      tag: 'artist_name_${_currentSong?['id'] ?? 'current'}',
-                      child: Material(
-                        color: Colors.transparent,
-                        child: Text(
-                          artistName,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w400,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Control buttons
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Play/Pause button
-                  StreamBuilder<bool>(
-                    stream: _audioPlayer.playingStream,
-                    builder: (context, snapshot) {
-                      final isPlaying = snapshot.data ?? false;
-                      return IconButton(
-                        onPressed: () {
-                          if (isPlaying) {
-                            _audioPlayer.pause();
-                          } else {
-                            _audioPlayer.play();
-                          }
-                        },
-                        icon: Icon(
-                          isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: const Color(0xFFff7d78),
-                          size: 28,
-                        ),
-                        padding: const EdgeInsets.all(4),
-                      );
-                    },
-                  ),
-                  // Close button
-                  IconButton(
-                    onPressed: () {
-                      _audioPlayer.stop();
-                      setState(() {
-                        _currentSong = null;
-                      });
-                    },
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
-                    padding: const EdgeInsets.all(4),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _playNextSong() {
-    if (_currentPlaylist.isNotEmpty &&
-        _currentSongIndex < _currentPlaylist.length - 1) {
-      _currentSongIndex++;
-      // Reset audio player state immediately
-      _audioPlayer.stop();
-      _playSong(_currentPlaylist[_currentSongIndex]);
+    final playerState = Provider.of<PlayerStateProvider>(
+      context,
+      listen: false,
+    );
+    final playlist = playerState.currentPlaylist;
+    final songIndex = playerState.currentSongIndex;
+    if (playlist.isNotEmpty && songIndex < playlist.length - 1) {
+      final nextSong = playlist[songIndex + 1];
+      _playSong(nextSong, songIndex + 1);
     }
   }
 
   void _playPreviousSong() {
-    if (_currentPlaylist.isNotEmpty && _currentSongIndex > 0) {
-      _currentSongIndex--;
-      // Reset audio player state immediately
-      _audioPlayer.stop();
-      _playSong(_currentPlaylist[_currentSongIndex]);
+    final playerState = Provider.of<PlayerStateProvider>(
+      context,
+      listen: false,
+    );
+    final playlist = playerState.currentPlaylist;
+    final songIndex = playerState.currentSongIndex;
+    if (playlist.isNotEmpty && songIndex > 0) {
+      final prevSong = playlist[songIndex - 1];
+      _playSong(prevSong, songIndex - 1);
     }
   }
 

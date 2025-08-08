@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/jiosaavn_api_service.dart';
+import 'package:provider/provider.dart';
+import '../services/player_state_provider.dart';
 
 class MusicPlayerPage extends StatefulWidget {
   final String songTitle;
@@ -13,7 +15,7 @@ class MusicPlayerPage extends StatefulWidget {
   final VoidCallback onNext;
   final VoidCallback onPrevious;
   final ValueChanged<double> onSeek;
-  final String? songId; // Add songId parameter
+  final String? songId;
 
   const MusicPlayerPage({
     Key? key,
@@ -28,7 +30,7 @@ class MusicPlayerPage extends StatefulWidget {
     required this.onNext,
     required this.onPrevious,
     required this.onSeek,
-    this.songId, // Add this
+    this.songId,
   }) : super(key: key);
 
   @override
@@ -49,17 +51,13 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
   @override
   void initState() {
     super.initState();
-    print('MusicPlayer initialized with songId: ${widget.songId}');
     if (widget.songId != null) {
       _fetchLyrics();
-    } else {
-      print('No songId provided, skipping lyrics fetch');
     }
   }
 
   Future<void> _fetchLyrics() async {
     if (widget.songId == null) {
-      print('No song ID provided for lyrics');
       if (mounted) {
         setState(() {
           _lyrics = [
@@ -71,8 +69,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       return;
     }
 
-    print('Fetching lyrics for song ID: ${widget.songId}');
-
     if (mounted) {
       setState(() {
         _lyricsLoading = true;
@@ -81,7 +77,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     }
 
     try {
-      // First check if song has lyrics by getting song details
       final songResponse = await _apiService.getSongById(widget.songId!);
       final songData = songResponse['data'];
 
@@ -89,8 +84,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         final song = songData[0];
         final hasLyrics = song['hasLyrics'] ?? false;
         final lyricsId = song['lyricsId'];
-
-        print('Song hasLyrics: $hasLyrics, lyricsId: $lyricsId');
 
         if (!hasLyrics || lyricsId == null) {
           if (mounted) {
@@ -105,16 +98,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         }
       }
 
-      // Try to fetch lyrics
       final response = await _apiService.getSongLyrics(widget.songId!);
-      print('Lyrics API response: $response');
-
       final lyricsData = response['data'];
-      print('Lyrics data: $lyricsData');
 
       if (lyricsData != null && lyricsData['lyrics'] != null) {
         final lyricsText = lyricsData['lyrics'] as String;
-        print('Raw lyrics text: $lyricsText');
 
         if (lyricsText.trim().isEmpty) {
           if (mounted) {
@@ -129,7 +117,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         }
 
         final lines = lyricsText.split('\n');
-        print('Split lyrics lines: ${lines.length} lines');
 
         if (mounted) {
           setState(() {
@@ -147,10 +134,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
             _lyricsLoading = false;
           });
         }
-
-        print('Processed lyrics: ${_lyrics.length} lines');
       } else {
-        print('No lyrics found in response');
         if (mounted) {
           setState(() {
             _lyrics = [
@@ -161,7 +145,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         }
       }
     } catch (e) {
-      print('Error fetching lyrics: $e');
       if (mounted) {
         setState(() {
           _lyricsError = 'Failed to load lyrics: $e';
@@ -182,6 +165,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
 
   @override
   Widget build(BuildContext context) {
+    final playerState = Provider.of<PlayerStateProvider>(context);
     double progress = widget.totalDuration.inSeconds > 0
         ? widget.currentPosition.inSeconds / widget.totalDuration.inSeconds
         : 0.0;
@@ -202,7 +186,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // App Bar
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Row(
@@ -229,9 +212,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                   ],
                 ),
               ),
-              // Space between App Bar and Cover/Lyrics
               const SizedBox(height: 16),
-              // Cover/Lyrics swipeable area
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32.0),
                 child: SizedBox(
@@ -240,7 +221,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                     controller: _pageController,
                     physics: const BouncingScrollPhysics(),
                     children: [
-                      // Album Art Page
                       Center(
                         child: AspectRatio(
                           aspectRatio: 1,
@@ -277,13 +257,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                           ),
                         ),
                       ),
-                      // Lyrics Page
                       _buildLyricsView(),
                     ],
                   ),
                 ),
               ),
-              // Title and artist below cover/lyrics
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32.0),
                 child: Column(
@@ -330,7 +308,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                   ],
                 ),
               ),
-              // Pills Lyrics/Cover toggle button (centred, smaller width)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Center(
@@ -388,9 +365,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                   ),
                 ),
               ),
-              // Spacer to push slider and controls to bottom
               const Spacer(),
-              // Progress Bar at bottom
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32.0),
                 child: Column(
@@ -467,7 +442,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                   ],
                 ),
               ),
-              // Control Buttons at bottom
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 40.0,

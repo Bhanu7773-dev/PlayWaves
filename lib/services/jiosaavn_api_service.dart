@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class JioSaavnApiService {
-  static const String baseUrl = 'https://saavn.dev/api';
+  static const String baseUrl = 'https://jiosaavn-api-vercel.vercel.app/api';
 
   // ---- GLOBAL SEARCH (songs, albums, artists, playlists, topQuery) ----
   Future<Map<String, dynamic>> globalSearch(String query) async {
