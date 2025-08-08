@@ -22,7 +22,6 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
     with SingleTickerProviderStateMixin {
   late AnimationController _slideController;
   late Animation<double> _slideAnimation;
-  int _previousIndex = 0;
 
   @override
   void initState() {
@@ -34,14 +33,12 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
     _slideAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _slideController, curve: Curves.easeInOut),
     );
-    _previousIndex = widget.selectedIndex;
   }
 
   @override
   void didUpdateWidget(AnimatedNavBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedIndex != widget.selectedIndex) {
-      _previousIndex = oldWidget.selectedIndex;
       _slideController.forward(from: 0.0);
     }
   }
@@ -87,6 +84,7 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
           return Expanded(
             child: GestureDetector(
               onTap: () => widget.onNavTap(index),
+              behavior: HitTestBehavior.opaque,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -96,8 +94,8 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOut,
                       transform: Matrix4.identity()
                         ..scale(isSelected ? 1.2 : 1.0),
                       child: ShaderMask(
@@ -108,10 +106,7 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
                                 end: Alignment.bottomRight,
                               ).createShader(bounds)
                             : const LinearGradient(
-                                colors: [
-                                  Color.fromARGB(255, 255, 255, 255),
-                                  Colors.white60,
-                                ],
+                                colors: [Colors.white60, Colors.white60],
                               ).createShader(bounds),
                         child: Icon(
                           icons[index],
@@ -122,7 +117,7 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
                     ),
                     const SizedBox(height: 4),
                     AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 300),
+                      duration: const Duration(milliseconds: 150),
                       style: TextStyle(
                         color: isSelected
                             ? Colors.white
