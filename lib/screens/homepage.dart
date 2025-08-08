@@ -9,6 +9,8 @@ import '../widgets/mini_player.dart';
 import 'music_player.dart';
 import 'search_page.dart';
 import '../services/player_state_provider.dart';
+import 'package:swipe_cards/swipe_cards.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 // Helper function: pick N random (non-repeating) songs from a list, skipping recently shown
 Future<Set<String>> loadShownIdsFromStorage() async {
@@ -126,24 +128,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         _error = null;
       });
 
-      final testSongWithLyrics = {
-        'id': '3IoDK8qI',
-        'name': 'Tum Hi Ho',
-        'subtitle': 'Arijit Singh',
-        'image': [
-          {
-            'quality': '500x500',
-            'link':
-                'https://c.saavncdn.com/191/Aashiqui-2-Hindi-2013-500x500.jpg',
-          },
-        ],
-        'artists': {
-          'primary': [
-            {'name': 'Arijit Singh'},
-          ],
-        },
-      };
-
       final List<String> songQueries = [
         'trending hindi songs',
         'bollywood hits',
@@ -162,7 +146,39 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'viral songs',
         'spotify viral',
         'youtube trending',
+        'folk music',
+        'old hindi songs',
+        'retro hits',
+        'dance hits',
+        'chill music',
+        'instrumental hits',
+        'workout songs',
+        'study music',
+        '90s hits',
+        '2000s hits',
+        'international hits',
+        'regional hits',
+        'desi pop',
+        'love songs',
+        'sad songs',
+        'happy songs',
+        'motivational songs',
+        'indian rap',
+        'ghazals',
+        'sufi music',
+        'devotional songs',
+        'wedding songs',
+        'festival songs',
+        'summer hits',
+        'winter hits',
+        'road trip songs',
+        'kids songs',
+        'bollywood remixes',
+        'cover songs',
+        'mashup songs',
+        'melancholic music',
       ];
+
       final List<String> albumQueries = [
         'latest albums',
         'bollywood albums',
@@ -174,7 +190,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'rock albums',
         'hip hop albums',
         'electronic albums',
+        'international albums',
+        'regional albums',
+        'indie albums',
+        'remix albums',
+        'soundtrack albums',
+        'compilation albums',
+        'award winning albums',
+        'top albums',
+        'classical albums',
+        'romantic albums',
+        'party albums',
+        'folk albums',
+        'devotional albums',
+        'ghazal albums',
+        'sufi albums',
       ];
+
       final List<String> bannerQueries = [
         'top hits 2024',
         'viral songs',
@@ -185,6 +217,24 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'billboard top',
         'spotify viral',
         'youtube trending',
+        'featured bollywood',
+        'editor picks',
+        'top charts',
+        'playlist favorites',
+        'international top charts',
+        'festival special',
+        'new music friday',
+        'weekly top 20',
+        'hot 100',
+        'ultimate party mix',
+        'best of 2023',
+        'on repeat',
+        'radio hits',
+        'summer vibes',
+        'winter anthems',
+        'road trip playlist',
+        'club bangers',
+        'bollywood superhits',
       ];
 
       final random = Random();
@@ -279,12 +329,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           });
         }
       }
-      List<Map<String, dynamic>> bannerSongs = [testSongWithLyrics];
+      List<Map<String, dynamic>> bannerSongs = [];
       try {
-        await Future.delayed(const Duration(milliseconds: 500));
+        // Use random banner query instead of fixed "trending songs"
         final bannerSongsResponse = await _apiService.searchSongs(
-          'trending songs',
-          limit: 5,
+          bannerQuery,
+          limit: 6,
         );
         if (bannerSongsResponse['success'] == true &&
             bannerSongsResponse['data'] != null) {
@@ -296,8 +346,35 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             bannerSongs.addAll(banners);
           }
         }
+
+        // If we don't have enough banners, add from a different random query
+        if (bannerSongs.length < 5) {
+          final fallbackQuery =
+              bannerQueries[random.nextInt(bannerQueries.length)];
+          final fallbackResponse = await _apiService.searchSongs(
+            fallbackQuery,
+            limit: 5,
+          );
+          if (fallbackResponse['success'] == true &&
+              fallbackResponse['data'] != null) {
+            final fallbackData = fallbackResponse['data'];
+            if (fallbackData['results'] != null) {
+              final fallbackBanners = List<Map<String, dynamic>>.from(
+                fallbackData['results'],
+              );
+              bannerSongs.addAll(fallbackBanners);
+            }
+          }
+        }
+
+        // Remove duplicates and limit to 5
+        final uniqueBanners = {
+          for (var s in bannerSongs) s['id']: s,
+        }.values.toList();
+        bannerSongs = uniqueBanners.take(5).toList();
       } catch (e) {
-        print('Banner query failed, using fallback: $e');
+        print('Banner query failed: $e');
+        // Fallback to test song only if everything fails
       }
 
       setState(() {
@@ -1146,16 +1223,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   Widget _buildArtistCard(Map<String, dynamic> artist) {
     final imageUrl = _getBestImageUrl(artist['image']);
-    final name = artist['name'] ?? artist['title'] ?? 'Unknown Artist';
+    final name = artist['name'] ?? 'Unknown Artist';
 
     return Container(
-      width: 100,
+      width: 120,
       margin: const EdgeInsets.only(right: 16),
       child: Column(
         children: [
           Container(
-            width: 90,
-            height: 90,
+            width: 80,
+            height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
@@ -1164,17 +1241,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   const Color(0xFF9c27b0).withOpacity(0.3),
                 ],
               ),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.3),
-                width: 3,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFff7d78).withOpacity(0.2),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-              ],
             ),
             child: ClipOval(
               child: imageUrl != null
@@ -1182,49 +1248,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [
-                                const Color(0xFFff7d78).withOpacity(0.3),
-                                const Color(0xFF9c27b0).withOpacity(0.3),
-                              ],
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.person,
-                            color: Colors.white,
-                            size: 40,
-                          ),
+                        return const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 40,
                         );
                       },
                     )
-                  : Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFFff7d78).withOpacity(0.3),
-                            const Color(0xFF9c27b0).withOpacity(0.3),
-                          ],
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                        size: 40,
-                      ),
-                    ),
+                  : const Icon(Icons.person, color: Colors.white, size: 40),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             name,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -1236,6 +1276,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildRandomSongsSection() {
+    List<SwipeItem> _swipeItems = [];
+    MatchEngine _matchEngine;
+
+    // Fill swipe items with songs
+    for (var i = 0; i < _randomSongs.length; i++) {
+      final song = _randomSongs[i];
+      _swipeItems.add(
+        SwipeItem(
+          content: song,
+          likeAction: () {},
+          nopeAction: () {},
+          superlikeAction: () {},
+        ),
+      );
+    }
+    _matchEngine = MatchEngine(swipeItems: _swipeItems);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1264,16 +1321,190 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ],
           ),
         ),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          itemCount: _randomSongs.length,
-          itemBuilder: (context, index) {
-            final song = _randomSongs[index];
-            return _buildSongTile(song, index, true);
-          },
-        ),
+        if (_randomSongs.isNotEmpty)
+          SizedBox(
+            height: 360,
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                return SwipeCards(
+                  matchEngine: _matchEngine,
+                  itemBuilder: (context, index) {
+                    final song = _randomSongs[index];
+                    final imageUrl = _getBestImageUrl(song['image']);
+                    final title =
+                        song['name'] ?? song['title'] ?? 'Unknown Song';
+                    final artist =
+                        song['artists']?['primary']?[0]?['name'] ??
+                        song['subtitle'] ??
+                        'Unknown Artist';
+                    return Card(
+                      elevation: 8,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      color: const Color.fromARGB(
+                        255,
+                        17,
+                        17,
+                        17,
+                      ).withOpacity(1.0),
+                      child: Stack(
+                        children: [
+                          Column(
+                            children: [
+                              ClipRRect(
+                                borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(22),
+                                ),
+                                child: imageUrl != null
+                                    ? Image.network(
+                                        imageUrl,
+                                        width: double.infinity,
+                                        height: 180,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          width: double.infinity,
+                                          height: 180,
+                                          color: Colors.grey[800],
+                                          child: const Icon(
+                                            Icons.music_note,
+                                            color: Colors.white54,
+                                            size: 48,
+                                          ),
+                                        ),
+                                      )
+                                    : Container(
+                                        width: double.infinity,
+                                        height: 180,
+                                        color: Colors.grey[800],
+                                        child: const Icon(
+                                          Icons.music_note,
+                                          color: Colors.white54,
+                                          size: 48,
+                                        ),
+                                      ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      title,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      artist,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 14,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Spacer(),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16.0),
+                                child: CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: const Color(0xFFff7d78),
+                                  child: IconButton(
+                                    icon: const Icon(
+                                      Icons.play_arrow,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: () =>
+                                        _playSong(song, index, true),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          // Magic text overlay
+                          Positioned(
+                            top: 12,
+                            right: 12,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.deepPurple.withOpacity(0.84),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: const [
+                                  Icon(
+                                    Icons.auto_awesome,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    "Swipe to see magic!",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  onStackFinished: () {
+                    // Restart the stack from the beginning!
+                    Future.delayed(const Duration(milliseconds: 400), () {
+                      setState(() {
+                        _swipeItems.clear();
+                        for (var i = 0; i < _randomSongs.length; i++) {
+                          final song = _randomSongs[i];
+                          _swipeItems.add(
+                            SwipeItem(
+                              content: song,
+                              likeAction: () {},
+                              nopeAction: () {},
+                              superlikeAction: () {},
+                            ),
+                          );
+                        }
+                        _matchEngine = MatchEngine(swipeItems: _swipeItems);
+                      });
+                    });
+                  },
+                  upSwipeAllowed: false,
+                  fillSpace: true,
+                );
+              },
+            ),
+          ),
+        if (_randomSongs.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 30),
+            child: Center(
+              child: Text(
+                "No random songs available",
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1307,17 +1538,106 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ],
           ),
         ),
-        ListView.builder(
+        MasonryGridView.count(
           shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          physics: NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           itemCount: _trendingSongs.length,
           itemBuilder: (context, index) {
             final song = _trendingSongs[index];
-            return _buildSongTile(song, index, false);
+            return _buildMasonrySongCard(song, index);
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildMasonrySongCard(Map<String, dynamic> song, int index) {
+    final imageUrl = _getBestImageUrl(song['image']);
+    final title = song['name'] ?? song['title'] ?? 'Unknown Song';
+    String artist = 'Unknown Artist';
+    if (song['artists'] != null) {
+      final artists = song['artists'];
+      if (artists['primary'] != null && artists['primary'].isNotEmpty) {
+        artist = artists['primary'][0]['name'] ?? 'Unknown Artist';
+      }
+    } else if (song['subtitle'] != null) {
+      artist = song['subtitle'];
+    }
+
+    return GestureDetector(
+      onTap: () => _playSong(song, index, false),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.white.withOpacity(0.05),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
+              child: AspectRatio(
+                aspectRatio: 1.0,
+                child: imageUrl != null
+                    ? Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey[800],
+                            child: const Icon(
+                              Icons.music_note,
+                              color: Colors.white54,
+                              size: 40,
+                            ),
+                          );
+                        },
+                      )
+                    : Container(
+                        color: Colors.grey[800],
+                        child: const Icon(
+                          Icons.music_note,
+                          color: Colors.white54,
+                          size: 40,
+                        ),
+                      ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    artist,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1522,31 +1842,86 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Future<void> _playAlbum(Map<String, dynamic> album) async {
+    final playerState = Provider.of<PlayerStateProvider>(
+      context,
+      listen: false,
+    );
     try {
+      playerState.setSongLoading(true);
+      await _audioPlayer.stop();
+      await _audioPlayer.seek(Duration.zero);
+
       final albumId = album['id'];
       if (albumId != null) {
         final albumDetails = await _apiService.getAlbum(id: albumId);
         final songs = albumDetails['data']?['songs'];
         if (songs != null && songs.isNotEmpty) {
-          final firstSong = songs[0];
-          final downloadUrl = firstSong['downloadUrl']?[0]?['link'];
-          if (downloadUrl != null) {
-            await _audioPlayer.setUrl(downloadUrl);
-            await _audioPlayer.play();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Playing album: ${album['name']}'),
-                backgroundColor: const Color(0xFFff7d78),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            );
+          final albumSongs = List<Map<String, dynamic>>.from(songs);
+          final firstSong = albumSongs[0];
+
+          // Set up playlist and player state
+          playerState.setPlaylist(albumSongs);
+          playerState.setSongIndex(0);
+          playerState.setSong(Map<String, dynamic>.from(firstSong));
+
+          // Get song details and play
+          final songId = firstSong['id'];
+          if (songId != null) {
+            final songDetails = await _apiService.getSongById(songId);
+            String? downloadUrl;
+            final songData = songDetails['data']?[0];
+
+            if (songData != null) {
+              playerState.setSong(Map<String, dynamic>.from(songData));
+              if (songData['downloadUrl'] != null &&
+                  songData['downloadUrl'] is List) {
+                final downloadUrls = songData['downloadUrl'] as List;
+                if (downloadUrls.isNotEmpty) {
+                  final urlData = downloadUrls.last;
+                  downloadUrl = urlData['url'] ?? urlData['link'];
+                }
+              }
+              if (downloadUrl == null) {
+                downloadUrl =
+                    songData['media_preview_url'] ??
+                    songData['media_url'] ??
+                    songData['preview_url'] ??
+                    songData['stream_url'];
+              }
+            }
+
+            if (downloadUrl != null && downloadUrl.isNotEmpty) {
+              if (downloadUrl.contains('preview.saavncdn.com') ||
+                  downloadUrl.contains('aac.saavncdn.com')) {
+                await _audioPlayer.setUrl(downloadUrl);
+                await _audioPlayer.play();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Playing album: ${album['name']}'),
+                    backgroundColor: const Color(0xFFff7d78),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                );
+              } else {
+                throw Exception('Invalid audio URL format');
+              }
+            } else {
+              throw Exception('No download URL found');
+            }
+          } else {
+            throw Exception('No song ID found');
           }
+        } else {
+          throw Exception('No songs found in album');
         }
+      } else {
+        throw Exception('No album ID found');
       }
     } catch (e) {
+      playerState.setSongLoading(false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error playing album: $e'),

@@ -78,7 +78,7 @@ class MiniPlayer extends StatelessWidget {
           border: Border.all(color: Colors.white.withOpacity(0.2)),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFff7d78).withOpacity(0.2),
+              color: const Color.fromARGB(255, 21, 21, 21).withOpacity(0.8),
               blurRadius: 10,
               spreadRadius: 2,
             ),
@@ -98,7 +98,12 @@ class MiniPlayer extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFff7d78).withOpacity(0.3),
+                        color: const Color.fromARGB(
+                          255,
+                          19,
+                          19,
+                          19,
+                        ).withOpacity(1.0),
                         blurRadius: 8,
                         spreadRadius: 1,
                       ),
