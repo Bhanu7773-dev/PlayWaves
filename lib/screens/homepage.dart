@@ -5,6 +5,7 @@ import 'package:just_audio/just_audio.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../widgets/animated_navbar.dart';
 import 'music_player.dart';
+import 'search_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -103,6 +104,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         _error = null;
       });
 
+      // Add a known song with lyrics for testing
+      final testSongWithLyrics = {
+        'id': '3IoDK8qI', // Different song ID that should exist
+        'name': 'Tum Hi Ho',
+        'subtitle': 'Arijit Singh',
+        'image': [
+          {
+            'quality': '500x500',
+            'link':
+                'https://c.saavncdn.com/191/Aashiqui-2-Hindi-2013-500x500.jpg',
+          },
+        ],
+        'artists': {
+          'primary': [
+            {'name': 'Arijit Singh'},
+          ],
+        },
+      };
+
       // Use different search queries to get varied content
       final List<String> songQueries = [
         'trending hindi songs',
@@ -155,9 +175,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         albumQuery,
         limit: 5,
       );
+
+      // For banner, include the test song with lyrics
       final bannerResponse = await _apiService.searchSongs(
         bannerQuery,
-        limit: 6,
+        limit: 5,
       );
 
       // Search for individual famous artists (both Hindi and English)
@@ -225,19 +247,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         }
       }
 
+      // For banner, add the test song with lyrics as first item
+      List<Map<String, dynamic>> bannerSongs = [testSongWithLyrics];
+
       if (bannerResponse['success'] == true && bannerResponse['data'] != null) {
         final bannerData = bannerResponse['data'];
         if (bannerData['results'] != null) {
           final banners = List<Map<String, dynamic>>.from(
             bannerData['results'],
           );
-          setState(() {
-            _bannerSongs = banners;
-          });
+          bannerSongs.addAll(banners.take(4)); // Add 4 more songs
         }
       }
 
       setState(() {
+        _bannerSongs = bannerSongs;
         _artists = allArtists;
         _isLoading = false;
       });
@@ -298,17 +322,70 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   void _onNavTap(int index) {
+    if (_selectedNavIndex == index) return;
+
     setState(() {
       _selectedNavIndex = index;
     });
 
-    // Handle navigation logic here
     switch (index) {
       case 0:
-        // Home - already here
+        // Home - already here, do nothing
         break;
       case 1:
-        // Navigate to Search
+        // Navigate to Search with slide transition
+        Navigator.push(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => SearchPage(
+              onNavTap: _onNavTap,
+              selectedNavIndex: _selectedNavIndex,
+              currentSong: _currentSong,
+              audioPlayer: _audioPlayer,
+              isSongLoading: _isSongLoading,
+              onPlayPause: () {
+                if (_audioPlayer.playing) {
+                  _audioPlayer.pause();
+                } else {
+                  _audioPlayer.play();
+                }
+              },
+              onNext: _playNextSong,
+              onPrevious: _playPreviousSong,
+              onSongChanged: (song) {
+                if (mounted) {
+                  setState(() {
+                    _currentSong = song;
+                    _isSongLoading = true; // Set loading when song changes
+                  });
+                }
+              },
+            ),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return SlideTransition(
+                    position:
+                        Tween<Offset>(
+                          begin: const Offset(1.0, 0.0),
+                          end: Offset.zero,
+                        ).animate(
+                          CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeInOut,
+                          ),
+                        ),
+                    child: child,
+                  );
+                },
+            transitionDuration: const Duration(milliseconds: 300),
+          ),
+        ).then((_) {
+          if (mounted) {
+            setState(() {
+              _selectedNavIndex = 0;
+            });
+          }
+        });
         break;
       case 2:
         // Navigate to Playlist
@@ -364,49 +441,30 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildHeader() {
-    return Container(
+    return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                  ),
-                ),
-                child: const Icon(
-                  Icons.music_note,
-                  color: Colors.white,
-                  size: 24,
-                ),
+              Text(
+                'Good ${_getGreeting()}',
+                style: TextStyle(color: Colors.grey[400], fontSize: 16),
               ),
-              const SizedBox(width: 12),
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                ).createShader(bounds),
-                child: const Text(
-                  'Play Waves',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+              const SizedBox(height: 4),
+              const Text(
+                'PlayWaves',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-          IconButton(
-            onPressed: () {
-              // Settings action
-            },
-            icon: const Icon(Icons.settings, color: Colors.white, size: 24),
-          ),
+          // Removed the search button - now handled by nav bar
         ],
       ),
     );
@@ -598,6 +656,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget _buildBannerCard(Map<String, dynamic> song) {
     final imageUrl = _getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
+    final songId = song['id'];
+
+    // Check if this is our test song with lyrics
+    final hasLyrics = songId == 'PIzj2ULl';
 
     String artist = 'Unknown Artist';
     if (song['artists'] != null) {
@@ -636,6 +698,37 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 },
               ),
             ),
+
+          // Lyrics indicator badge
+          if (hasLyrics)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.lyrics, color: Colors.white, size: 12),
+                    SizedBox(width: 4),
+                    Text(
+                      'Lyrics',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Gradient overlay and content
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
@@ -646,54 +739,53 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
             ),
           ),
+
+          // Play button and song info
           Positioned(
-            bottom: 20,
-            left: 20,
-            right: 20,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            bottom: 16,
+            left: 16,
+            right: 16,
+            child: Row(
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        artist,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  artist,
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.play_arrow, color: Colors.white),
+                    onPressed: () => _playSong(song),
+                  ),
                 ),
               ],
-            ),
-          ),
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFff7d78).withOpacity(0.3),
-                    blurRadius: 8,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.play_arrow, color: Colors.white),
-                onPressed: () => _playSong(song),
-              ),
             ),
           ),
         ],
@@ -1381,6 +1473,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             songTitle: currentSongTitle,
                             artistName: currentArtistName,
                             albumArtUrl: currentAlbumArtUrl,
+                            songId: _currentSong?['id'], // Add this line
                             isPlaying: playingSnapshot.data ?? false,
                             isLoading: _isSongLoading,
                             currentPosition:
@@ -1617,5 +1710,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _animationController.dispose();
     _audioPlayer.dispose();
     super.dispose();
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Morning';
+    } else if (hour < 17) {
+      return 'Afternoon';
+    } else {
+      return 'Evening';
+    }
   }
 }
