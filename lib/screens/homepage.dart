@@ -1333,10 +1333,36 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     return StreamBuilder<bool>(
                       stream: _audioPlayer.playingStream,
                       builder: (context, playingSnapshot) {
+                        // Get current song data dynamically
+                        String currentSongTitle =
+                            _currentSong?['name'] ??
+                            _currentSong?['title'] ??
+                            'Unknown';
+                        String currentArtistName = 'Unknown Artist';
+                        if (_currentSong?['artists'] != null) {
+                          final artists = _currentSong!['artists'];
+                          if (artists['primary'] != null &&
+                              artists['primary'].isNotEmpty) {
+                            currentArtistName =
+                                artists['primary'][0]['name'] ??
+                                'Unknown Artist';
+                          }
+                        } else if (_currentSong?['primaryArtists'] != null) {
+                          currentArtistName = _currentSong!['primaryArtists'];
+                        } else if (_currentSong?['subtitle'] != null) {
+                          currentArtistName = _currentSong!['subtitle'];
+                        }
+
+                        String currentAlbumArtUrl = '';
+                        if (_currentSong?['image'] != null) {
+                          currentAlbumArtUrl =
+                              _getBestImageUrl(_currentSong!['image']) ?? '';
+                        }
+
                         return MusicPlayerPage(
-                          songTitle: songTitle,
-                          artistName: artistName,
-                          albumArtUrl: albumArtUrl,
+                          songTitle: currentSongTitle,
+                          artistName: currentArtistName,
+                          albumArtUrl: currentAlbumArtUrl,
                           isPlaying: playingSnapshot.data ?? false,
                           currentPosition:
                               positionSnapshot.data ?? Duration.zero,
