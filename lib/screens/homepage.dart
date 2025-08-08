@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math';
 import 'package:just_audio/just_audio.dart';
 import 'package:provider/provider.dart';
 import '../services/jiosaavn_api_service.dart';
@@ -8,6 +9,31 @@ import '../widgets/mini_player.dart';
 import 'music_player.dart';
 import 'search_page.dart';
 import '../services/player_state_provider.dart';
+
+// Helper function: pick N random (non-repeating) songs from a list, skipping recently shown
+Future<Set<String>> loadShownIdsFromStorage() async {
+  // TODO: Implement persistent storage (SharedPreferences/Hive etc.)
+  // For now, just return an empty set.
+  return <String>{};
+}
+
+Future<void> saveShownIdsToStorage(Set<String> ids) async {
+  // TODO: Implement persistent storage
+}
+
+List<Map<String, dynamic>> getUnseenRandomSongs(
+  List<Map<String, dynamic>> songsList,
+  int count,
+  Set<String> shownSongIds,
+) {
+  final unseen = songsList
+      .where((song) => !shownSongIds.contains(song['id']))
+      .toList();
+  unseen.shuffle(Random());
+  final selected = unseen.take(count).toList();
+  shownSongIds.addAll(selected.map((s) => s['id']));
+  return selected;
+}
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -31,6 +57,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   List<Map<String, dynamic>> _albums = [];
   List<Map<String, dynamic>> _artists = [];
   List<Map<String, dynamic>> _bannerSongs = [];
+  List<Map<String, dynamic>> _randomSongs = [];
 
   bool _isLoading = true;
   String? _error;
@@ -42,7 +69,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
-
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
@@ -131,8 +157,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'electronic music',
         'indie songs',
         'classical music',
+        'top hits',
+        'billboard top',
+        'viral songs',
+        'spotify viral',
+        'youtube trending',
       ];
-
       final List<String> albumQueries = [
         'latest albums',
         'bollywood albums',
@@ -145,7 +175,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'hip hop albums',
         'electronic albums',
       ];
-
       final List<String> bannerQueries = [
         'top hits 2024',
         'viral songs',
@@ -158,12 +187,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'youtube trending',
       ];
 
-      final random = DateTime.now().millisecondsSinceEpoch;
-      final songQuery = songQueries[random % songQueries.length];
-      final albumQuery = albumQueries[random % albumQueries.length];
-      final bannerQuery = bannerQueries[random % bannerQueries.length];
+      final random = Random();
+      final songQuery = songQueries[random.nextInt(songQueries.length)];
+      final albumQuery = albumQueries[random.nextInt(albumQueries.length)];
+      final bannerQuery = bannerQueries[random.nextInt(bannerQueries.length)];
 
-      final songsResponse = await _apiService.searchSongs(songQuery, limit: 10);
+      // Fetch trending songs
+      final songsResponse = await _apiService.searchSongs(songQuery, limit: 18);
       final albumsResponse = await _apiService.searchAlbums(
         albumQuery,
         limit: 5,
@@ -173,6 +203,25 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         limit: 5,
       );
 
+      // Fetch random songs from multiple queries for true randomness and non-repeat
+      Set<String> shownSongIds = await loadShownIdsFromStorage();
+      List<Map<String, dynamic>> allSongs = [];
+      final shuffledQueries = List<String>.from(songQueries)..shuffle();
+      for (var q in shuffledQueries) {
+        final response = await _apiService.searchSongs(q, limit: 12);
+        if (response['success'] == true && response['data'] != null) {
+          final songs = List<Map<String, dynamic>>.from(
+            response['data']['results'] ?? [],
+          );
+          allSongs.addAll(songs);
+        }
+      }
+      // Remove duplicates by song ID
+      final uniqueSongs = {for (var s in allSongs) s['id']: s}.values.toList();
+      final randomSongs = getUnseenRandomSongs(uniqueSongs, 12, shownSongIds);
+      await saveShownIdsToStorage(shownSongIds);
+
+      // Artists logic
       final List<String> famousArtists = [
         'arijit singh',
         'shreya ghoshal',
@@ -191,18 +240,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'dua lipa',
         'bruno mars',
       ];
-
       List<Map<String, dynamic>> allArtists = [];
       final shuffledArtists = List<String>.from(famousArtists)..shuffle();
-
-      for (int i = 0; i < 6; i++) {
+      for (int i = 0; i < 6 && i < shuffledArtists.length; i++) {
         try {
           final artistName = shuffledArtists[i];
           final artistResponse = await _apiService.searchArtists(
             artistName,
             limit: 1,
           );
-
           if (artistResponse['success'] == true &&
               artistResponse['data'] != null &&
               artistResponse['data']['results'] != null &&
@@ -214,6 +260,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         }
       }
 
+      // Trending songs, albums, banners
       if (songsResponse['success'] == true && songsResponse['data'] != null) {
         final songsData = songsResponse['data'];
         if (songsData['results'] != null) {
@@ -223,7 +270,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           });
         }
       }
-
       if (albumsResponse['success'] == true && albumsResponse['data'] != null) {
         final albumsData = albumsResponse['data'];
         if (albumsData['results'] != null) {
@@ -233,19 +279,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           });
         }
       }
-
       List<Map<String, dynamic>> bannerSongs = [testSongWithLyrics];
-
       try {
         await Future.delayed(const Duration(milliseconds: 500));
-        final bannerResponse = await _apiService.searchSongs(
+        final bannerSongsResponse = await _apiService.searchSongs(
           'trending songs',
           limit: 5,
         );
-
-        if (bannerResponse['success'] == true &&
-            bannerResponse['data'] != null) {
-          final bannerData = bannerResponse['data'];
+        if (bannerSongsResponse['success'] == true &&
+            bannerSongsResponse['data'] != null) {
+          final bannerData = bannerSongsResponse['data'];
           if (bannerData['results'] != null) {
             final banners = List<Map<String, dynamic>>.from(
               bannerData['results'],
@@ -260,6 +303,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       setState(() {
         _bannerSongs = bannerSongs;
         _artists = allArtists;
+        _randomSongs = randomSongs;
         _isLoading = false;
       });
       _animationController.forward();
@@ -287,7 +331,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ],
             ),
           ),
-          // MiniPlayer uses provider
           if (playerState.currentSong != null)
             Positioned(
               bottom: 70,
@@ -343,18 +386,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                     } else if (song?['subtitle'] != null) {
                                       currentArtistName = song!['subtitle'];
                                     }
-
-                                    String currentAlbumArtUrl = '';
+                                    String? currentAlbumArtUrl = '';
                                     if (song?['image'] != null) {
                                       currentAlbumArtUrl = _getBestImageUrl(
                                         song!['image'],
                                       );
                                     }
-
                                     return MusicPlayerPage(
                                       songTitle: currentSongTitle,
                                       artistName: currentArtistName,
-                                      albumArtUrl: currentAlbumArtUrl,
+                                      albumArtUrl: currentAlbumArtUrl ?? '',
                                       songId: song?['id'],
                                       isPlaying: playingSnapshot.data ?? false,
                                       isLoading: playerState.isSongLoading,
@@ -433,11 +474,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   void _onNavTap(int index) {
     if (_selectedNavIndex == index) return;
-
     setState(() {
       _selectedNavIndex = index;
     });
-
     switch (index) {
       case 0:
         break;
@@ -677,7 +716,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
       );
     }
-
     if (_error != null) {
       return Center(
         child: Column(
@@ -696,7 +734,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
       );
     }
-
     return RefreshIndicator(
       onRefresh: _loadData,
       color: const Color(0xFFff7d78),
@@ -723,6 +760,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 if (_albums.isNotEmpty) _buildAlbumsSection(),
                 const SizedBox(height: 20),
                 if (_artists.isNotEmpty) _buildArtistsSection(),
+                if (_randomSongs.isNotEmpty) _buildRandomSongsSection(),
                 if (_trendingSongs.isNotEmpty) _buildSongsSection(),
               ],
             ),
@@ -867,7 +905,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   ),
                   child: IconButton(
                     icon: const Icon(Icons.play_arrow, color: Colors.white),
-                    onPressed: () => _playSong(song),
+                    onPressed: () => _playSong(song, null, false),
                   ),
                 ),
               ],
@@ -1197,6 +1235,49 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildRandomSongsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 24,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Random Picks",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: _randomSongs.length,
+          itemBuilder: (context, index) {
+            final song = _randomSongs[index];
+            return _buildSongTile(song, index, true);
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildSongsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1233,17 +1314,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           itemCount: _trendingSongs.length,
           itemBuilder: (context, index) {
             final song = _trendingSongs[index];
-            return _buildSongTile(song, index);
+            return _buildSongTile(song, index, false);
           },
         ),
       ],
     );
   }
 
-  Widget _buildSongTile(Map<String, dynamic> song, int index) {
+  Widget _buildSongTile(Map<String, dynamic> song, int index, bool useRandom) {
     final imageUrl = _getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
-
     String subtitle = 'Unknown Artist';
     if (song['artists'] != null) {
       final artists = song['artists'];
@@ -1253,7 +1333,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     } else if (song['subtitle'] != null) {
       subtitle = song['subtitle'];
     }
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -1338,14 +1417,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
           child: IconButton(
             icon: const Icon(Icons.play_arrow, color: Colors.white),
-            onPressed: () => _playSong(song, index),
+            onPressed: () => _playSong(song, index, useRandom),
           ),
         ),
       ),
     );
   }
 
-  String _getBestImageUrl(dynamic images) {
+  String? _getBestImageUrl(dynamic images) {
     if (images is List && images.isNotEmpty) {
       for (var img in images.reversed) {
         if (img is Map && img['link'] != null) {
@@ -1358,28 +1437,34 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     } else if (images is String) {
       return images;
     }
-    return '';
+    return null;
   }
 
-  Future<void> _playSong(Map<String, dynamic> song, [int? index]) async {
+  Future<void> _playSong(
+    Map<String, dynamic> song,
+    int? index,
+    bool useRandom,
+  ) async {
     final playerState = Provider.of<PlayerStateProvider>(
       context,
       listen: false,
     );
     try {
       playerState.setSongLoading(true);
-
       await _audioPlayer.stop();
       await _audioPlayer.seek(Duration.zero);
 
-      // Set playlist and song index in provider
-      playerState.setPlaylist(_trendingSongs);
+      // Pick playlist: trending or random
+      final playlist = useRandom
+          ? List<Map<String, dynamic>>.from(_randomSongs)
+          : List<Map<String, dynamic>>.from(_trendingSongs);
+
+      playerState.setPlaylist(playlist);
+
       if (index != null) {
         playerState.setSongIndex(index);
       } else {
-        final songIndex = _trendingSongs.indexWhere(
-          (s) => s['id'] == song['id'],
-        );
+        final songIndex = playlist.indexWhere((s) => s['id'] == song['id']);
         playerState.setSongIndex(songIndex == -1 ? 0 : songIndex);
       }
 
@@ -1393,7 +1478,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
         if (songData != null) {
           playerState.setSong(Map<String, dynamic>.from(songData));
-
           if (songData['downloadUrl'] != null &&
               songData['downloadUrl'] is List) {
             final downloadUrls = songData['downloadUrl'] as List;
@@ -1402,7 +1486,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               downloadUrl = urlData['url'] ?? urlData['link'];
             }
           }
-
           if (downloadUrl == null) {
             downloadUrl =
                 songData['media_preview_url'] ??
@@ -1444,15 +1527,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       if (albumId != null) {
         final albumDetails = await _apiService.getAlbum(id: albumId);
         final songs = albumDetails['data']?['songs'];
-
         if (songs != null && songs.isNotEmpty) {
           final firstSong = songs[0];
           final downloadUrl = firstSong['downloadUrl']?[0]?['link'];
-
           if (downloadUrl != null) {
             await _audioPlayer.setUrl(downloadUrl);
             await _audioPlayer.play();
-
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Playing album: ${album['name']}'),
@@ -1486,7 +1566,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final songIndex = playerState.currentSongIndex;
     if (playlist.isNotEmpty && songIndex < playlist.length - 1) {
       final nextSong = playlist[songIndex + 1];
-      _playSong(nextSong, songIndex + 1);
+      bool useRandom = ListEquality().equals(playlist, _randomSongs);
+      _playSong(nextSong, songIndex + 1, useRandom);
     }
   }
 
@@ -1499,7 +1580,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final songIndex = playerState.currentSongIndex;
     if (playlist.isNotEmpty && songIndex > 0) {
       final prevSong = playlist[songIndex - 1];
-      _playSong(prevSong, songIndex - 1);
+      bool useRandom = ListEquality().equals(playlist, _randomSongs);
+      _playSong(prevSong, songIndex - 1, useRandom);
     }
   }
 
@@ -1521,5 +1603,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     } else {
       return 'Evening';
     }
+  }
+}
+
+// For deep equality of lists
+class ListEquality {
+  bool equals(List<Map<String, dynamic>> a, List<Map<String, dynamic>> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i]['id'] != b[i]['id']) return false;
+    }
+    return true;
   }
 }
