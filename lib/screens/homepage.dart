@@ -12,7 +12,6 @@ import '../screens/playlist_storage.dart'; // Make sure this import is correct!
 import '../services/player_state_provider.dart';
 import 'package:swipe_cards/swipe_cards.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import '../screens/playlist_storage.dart';
 
 // Helper function: pick N random (non-repeating) songs from a list, skipping recently shown
 Future<Set<String>> loadShownIdsFromStorage() async {
@@ -69,6 +68,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   bool _isLoading = true;
   String? _error;
+
+  bool _isMusicPlayerPageOpen = false;
 
   @override
   void initState() {
@@ -409,12 +410,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
-  // ------------------ Navigation logic fix: use slide animation per page ------------------
   void _onNavTap(int index) {
     if (_selectedNavIndex == index) return;
     _prevNavIndex = _selectedNavIndex;
 
-    // Animate direction: left if forward, right if backward
     _pageOffsetAnimation =
         Tween<Offset>(
           begin: Offset(index > _selectedNavIndex ? 1.0 : -1.0, 0),
@@ -437,7 +436,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final playerState = Provider.of<PlayerStateProvider>(context);
 
-    // Pages for animation
     final List<Widget> pages = [
       _buildBody(),
       SearchPage(
@@ -490,7 +488,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ],
             ),
           ),
-          if (playerState.currentSong != null)
+          if (playerState.currentSong != null && !_isMusicPlayerPageOpen)
             Positioned(
               bottom: 70,
               left: 16,
@@ -511,6 +509,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   playerState.clearSong();
                 },
                 onTap: () {
+                  setState(() {
+                    _isMusicPlayerPageOpen = true;
+                  });
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -523,11 +524,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               return StreamBuilder<bool>(
                                 stream: _audioPlayer.playingStream,
                                 builder: (context, playingSnapshot) {
+                                  final song = playerState.currentSong;
+                                  final songTitle =
+                                      song?['name'] ??
+                                      song?['title'] ??
+                                      'Unknown';
+                                  final artistName = song != null
+                                      ? (song['artists'] != null
+                                            ? (song['artists']['primary'] !=
+                                                          null &&
+                                                      song['artists']['primary']
+                                                          .isNotEmpty
+                                                  ? song['artists']['primary'][0]['name'] ??
+                                                        'Unknown Artist'
+                                                  : 'Unknown Artist')
+                                            : (song['primaryArtists'] ??
+                                                  song['subtitle'] ??
+                                                  'Unknown Artist'))
+                                      : 'Unknown Artist';
+                                  final albumArtUrl = song?['image'] != null
+                                      ? _getBestImageUrl(song!['image']) ?? ''
+                                      : '';
                                   return MusicPlayerPage(
-                                    songTitle: 'Unknown',
-                                    artistName: 'Unknown Artist',
-                                    albumArtUrl: '',
-                                    songId: playerState.currentSong?['id'],
+                                    songTitle: songTitle,
+                                    artistName: artistName,
+                                    albumArtUrl: albumArtUrl,
+                                    songId: song?['id'],
                                     isPlaying: playingSnapshot.data ?? false,
                                     isLoading: playerState.isSongLoading,
                                     currentPosition:
@@ -560,7 +582,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         },
                       ),
                     ),
-                  );
+                  ).then((_) {
+                    setState(() {
+                      _isMusicPlayerPageOpen = false;
+                    });
+                  });
                 },
               ),
             ),
@@ -584,7 +610,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       ),
     );
   }
-  // ---------------------------------------------------------------------------
 
   Widget _buildAnimatedBackground() {
     return Container(
@@ -1257,7 +1282,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     List<SwipeItem> _swipeItems = [];
     MatchEngine _matchEngine;
 
-    // Fill swipe items with songs
     for (var i = 0; i < _randomSongs.length; i++) {
       final song = _randomSongs[i];
       _swipeItems.add(
@@ -1410,7 +1434,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               ),
                             ],
                           ),
-                          // Magic text overlay
                           Positioned(
                             top: 12,
                             right: 12,
@@ -1448,7 +1471,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     );
                   },
                   onStackFinished: () {
-                    // Restart the stack from the beginning!
                     Future.delayed(const Duration(milliseconds: 400), () {
                       setState(() {
                         _swipeItems.clear();
@@ -1735,7 +1757,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     } else if (images is String) {
       return images;
     }
-    return '';
+    return null;
   }
 
   Future<void> _playSong(
@@ -1752,12 +1774,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       await _audioPlayer.stop();
       await _audioPlayer.seek(Duration.zero);
 
-      // Pick playlist: trending or random - but don't modify the original lists
       final playlist = useRandom
           ? List<Map<String, dynamic>>.from(_randomSongs)
           : List<Map<String, dynamic>>.from(_trendingSongs);
 
-      // Only set playlist if it's different from current
       if (playerState.currentPlaylist.isEmpty ||
           !ListEquality().equals(playerState.currentPlaylist, playlist)) {
         playerState.setPlaylist(playlist);
@@ -1842,12 +1862,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           final albumSongs = List<Map<String, dynamic>>.from(songs);
           final firstSong = albumSongs[0];
 
-          // Set up playlist and player state
           playerState.setPlaylist(albumSongs);
           playerState.setSongIndex(0);
           playerState.setSong(Map<String, dynamic>.from(firstSong));
 
-          // Get song details and play
           final songId = firstSong['id'];
           if (songId != null) {
             final songDetails = await _apiService.getSongById(songId);
@@ -1976,7 +1994,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 }
 
-// For deep equality of lists
 class ListEquality {
   bool equals(List<Map<String, dynamic>> a, List<Map<String, dynamic>> b) {
     if (identical(a, b)) return true;

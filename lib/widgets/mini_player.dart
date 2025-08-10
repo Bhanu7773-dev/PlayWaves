@@ -62,6 +62,14 @@ class MiniPlayer extends StatelessWidget {
     final songTitle =
         currentSong?['name'] ?? currentSong?['title'] ?? 'Unknown';
 
+    // Use the SAME Hero tags as MusicPlayerPage for animation!
+    final String heroAlbumArtTag =
+        'album_art_${currentSong?['id'] ?? songTitle}_${artistName}';
+    final String heroTitleTag =
+        'song_title_${currentSong?['id'] ?? songTitle}_${artistName}';
+    final String heroArtistTag =
+        'artist_name_${currentSong?['id'] ?? songTitle}_${artistName}';
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -88,9 +96,9 @@ class MiniPlayer extends StatelessWidget {
           padding: const EdgeInsets.all(8.0),
           child: Row(
             children: [
-              // Album Art with Hero Animation
+              // Album Art with Hero Animation (same tag as MusicPlayerPage)
               Hero(
-                tag: 'album_art_${currentSong?['id'] ?? 'current'}',
+                tag: heroAlbumArtTag,
                 child: Container(
                   width: 54,
                   height: 54,
@@ -138,14 +146,14 @@ class MiniPlayer extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              // Song Info with Hero Animation
+              // Song Info with Hero Animation (same tags as MusicPlayerPage)
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Hero(
-                      tag: 'song_title_${currentSong?['id'] ?? 'current'}',
+                      tag: heroTitleTag,
                       child: Material(
                         color: Colors.transparent,
                         child: Text(
@@ -162,7 +170,7 @@ class MiniPlayer extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Hero(
-                      tag: 'artist_name_${currentSong?['id'] ?? 'current'}',
+                      tag: heroArtistTag,
                       child: Material(
                         color: Colors.transparent,
                         child: Text(
@@ -184,7 +192,6 @@ class MiniPlayer extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Play/Pause button
                   StreamBuilder<bool>(
                     stream: audioPlayer.playingStream,
                     builder: (context, snapshot) {
@@ -200,7 +207,6 @@ class MiniPlayer extends StatelessWidget {
                       );
                     },
                   ),
-                  // Close button
                   IconButton(
                     onPressed: onClose,
                     icon: const Icon(
