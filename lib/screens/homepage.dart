@@ -8,9 +8,11 @@ import '../widgets/animated_navbar.dart';
 import '../widgets/mini_player.dart';
 import 'music_player.dart';
 import 'search_page.dart';
+import '../screens/playlist_storage.dart'; // Make sure this import is correct!
 import '../services/player_state_provider.dart';
 import 'package:swipe_cards/swipe_cards.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import '../screens/playlist_storage.dart';
 
 // Helper function: pick N random (non-repeating) songs from a list, skipping recently shown
 Future<Set<String>> loadShownIdsFromStorage() async {
@@ -52,8 +54,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  late AnimationController _pageTransitionController;
+  late Animation<Offset> _pageOffsetAnimation;
+
   Timer? _bannerTimer;
   int _selectedNavIndex = 0;
+  int _prevNavIndex = 0;
 
   List<Map<String, dynamic>> _trendingSongs = [];
   List<Map<String, dynamic>> _albums = [];
@@ -74,6 +80,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+
+    _pageTransitionController = AnimationController(
+      duration: const Duration(milliseconds: 350),
+      vsync: this,
+    );
+    _pageOffsetAnimation = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _pageTransitionController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
     _loadData();
     _startBannerAutoScroll();
@@ -184,7 +202,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         'bollywood albums',
         'punjabi albums',
         'hindi albums',
-        'new releases',
         'english albums',
         'pop albums',
         'rock albums',
@@ -243,7 +260,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       final bannerQuery = bannerQueries[random.nextInt(bannerQueries.length)];
 
       // Fetch trending songs
-      final songsResponse = await _apiService.searchSongs(songQuery, limit: 18);
+      final songsResponse = await _apiService.searchSongs(songQuery, limit: 25);
       final albumsResponse = await _apiService.searchAlbums(
         albumQuery,
         limit: 5,
@@ -258,7 +275,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       List<Map<String, dynamic>> allSongs = [];
       final shuffledQueries = List<String>.from(songQueries)..shuffle();
       for (var q in shuffledQueries) {
-        final response = await _apiService.searchSongs(q, limit: 12);
+        final response = await _apiService.searchSongs(q, limit: 15);
         if (response['success'] == true && response['data'] != null) {
           final songs = List<Map<String, dynamic>>.from(
             response['data']['results'] ?? [],
@@ -268,7 +285,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
       // Remove duplicates by song ID
       final uniqueSongs = {for (var s in allSongs) s['id']: s}.values.toList();
-      final randomSongs = getUnseenRandomSongs(uniqueSongs, 12, shownSongIds);
+      final randomSongs = getUnseenRandomSongs(uniqueSongs, 20, shownSongIds);
       await saveShownIdsToStorage(shownSongIds);
 
       // Artists logic
@@ -392,9 +409,61 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
+  // ------------------ Navigation logic fix: use slide animation per page ------------------
+  void _onNavTap(int index) {
+    if (_selectedNavIndex == index) return;
+    _prevNavIndex = _selectedNavIndex;
+
+    // Animate direction: left if forward, right if backward
+    _pageOffsetAnimation =
+        Tween<Offset>(
+          begin: Offset(index > _selectedNavIndex ? 1.0 : -1.0, 0),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: _pageTransitionController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+
+    setState(() {
+      _selectedNavIndex = index;
+    });
+
+    _pageTransitionController.forward(from: 0.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final playerState = Provider.of<PlayerStateProvider>(context);
+
+    // Pages for animation
+    final List<Widget> pages = [
+      _buildBody(),
+      SearchPage(
+        onNavTap: _onNavTap,
+        selectedNavIndex: _selectedNavIndex,
+        audioPlayer: _audioPlayer,
+        onPlayPause: () {
+          if (_audioPlayer.playing) {
+            _audioPlayer.pause();
+          } else {
+            _audioPlayer.play();
+          }
+        },
+        onNext: _playNextSong,
+        onPrevious: _playPreviousSong,
+      ),
+      LibraryScreen(onNavTap: _onNavTap, selectedNavIndex: _selectedNavIndex),
+      Container(
+        alignment: Alignment.center,
+        child: Text(
+          'Profile tab coming soon!',
+          style: TextStyle(color: Colors.white, fontSize: 20),
+        ),
+      ),
+    ];
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -403,8 +472,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           SafeArea(
             child: Column(
               children: [
-                _buildHeader(),
-                Expanded(child: _buildBody()),
+                if (_selectedNavIndex == 0) _buildHeader(),
+                Expanded(
+                  child: AnimatedBuilder(
+                    animation: _pageTransitionController,
+                    builder: (context, child) {
+                      return SlideTransition(
+                        position: _pageOffsetAnimation,
+                        child: IndexedStack(
+                          index: _selectedNavIndex,
+                          children: pages,
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
           ),
@@ -431,98 +513,52 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 onTap: () {
                   Navigator.push(
                     context,
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) {
-                        final song = playerState.currentSong;
-                        return StreamBuilder<Duration>(
-                          stream: _audioPlayer.positionStream,
-                          builder: (context, positionSnapshot) {
-                            return StreamBuilder<Duration?>(
-                              stream: _audioPlayer.durationStream,
-                              builder: (context, durationSnapshot) {
-                                return StreamBuilder<bool>(
-                                  stream: _audioPlayer.playingStream,
-                                  builder: (context, playingSnapshot) {
-                                    String currentSongTitle =
-                                        song?['name'] ??
-                                        song?['title'] ??
-                                        'Unknown';
-                                    String currentArtistName = 'Unknown Artist';
-                                    if (song?['artists'] != null) {
-                                      final artists = song!['artists'];
-                                      if (artists['primary'] != null &&
-                                          artists['primary'].isNotEmpty) {
-                                        currentArtistName =
-                                            artists['primary'][0]['name'] ??
-                                            'Unknown Artist';
+                    MaterialPageRoute(
+                      builder: (context) => StreamBuilder<Duration>(
+                        stream: _audioPlayer.positionStream,
+                        builder: (context, positionSnapshot) {
+                          return StreamBuilder<Duration?>(
+                            stream: _audioPlayer.durationStream,
+                            builder: (context, durationSnapshot) {
+                              return StreamBuilder<bool>(
+                                stream: _audioPlayer.playingStream,
+                                builder: (context, playingSnapshot) {
+                                  return MusicPlayerPage(
+                                    songTitle: 'Unknown',
+                                    artistName: 'Unknown Artist',
+                                    albumArtUrl: '',
+                                    songId: playerState.currentSong?['id'],
+                                    isPlaying: playingSnapshot.data ?? false,
+                                    isLoading: playerState.isSongLoading,
+                                    currentPosition:
+                                        positionSnapshot.data ?? Duration.zero,
+                                    totalDuration:
+                                        durationSnapshot.data ?? Duration.zero,
+                                    onPlayPause: () {
+                                      if (_audioPlayer.playing) {
+                                        _audioPlayer.pause();
+                                      } else {
+                                        _audioPlayer.play();
                                       }
-                                    } else if (song?['primaryArtists'] !=
-                                        null) {
-                                      currentArtistName =
-                                          song!['primaryArtists'];
-                                    } else if (song?['subtitle'] != null) {
-                                      currentArtistName = song!['subtitle'];
-                                    }
-                                    String? currentAlbumArtUrl = '';
-                                    if (song?['image'] != null) {
-                                      currentAlbumArtUrl = _getBestImageUrl(
-                                        song!['image'],
-                                      );
-                                    }
-                                    return MusicPlayerPage(
-                                      songTitle: currentSongTitle,
-                                      artistName: currentArtistName,
-                                      albumArtUrl: currentAlbumArtUrl ?? '',
-                                      songId: song?['id'],
-                                      isPlaying: playingSnapshot.data ?? false,
-                                      isLoading: playerState.isSongLoading,
-                                      currentPosition:
-                                          positionSnapshot.data ??
-                                          Duration.zero,
-                                      totalDuration:
-                                          durationSnapshot.data ??
-                                          Duration.zero,
-                                      onPlayPause: () {
-                                        if (_audioPlayer.playing) {
-                                          _audioPlayer.pause();
-                                        } else {
-                                          _audioPlayer.play();
-                                        }
-                                      },
-                                      onNext: _playNextSong,
-                                      onPrevious: _playPreviousSong,
-                                      onSeek: (value) {
-                                        final position =
-                                            (durationSnapshot.data ??
-                                                Duration.zero) *
-                                            value;
-                                        _audioPlayer.seek(position);
-                                      },
-                                    );
-                                  },
-                                );
-                              },
-                            );
-                          },
-                        );
-                      },
-                      transitionsBuilder:
-                          (context, animation, secondaryAnimation, child) {
-                            return SlideTransition(
-                              position:
-                                  Tween<Offset>(
-                                    begin: const Offset(0.0, 1.0),
-                                    end: Offset.zero,
-                                  ).animate(
-                                    CurvedAnimation(
-                                      parent: animation,
-                                      curve: Curves.easeInOut,
-                                    ),
-                                  ),
-                              child: child,
-                            );
-                          },
-                      transitionDuration: const Duration(milliseconds: 400),
+                                    },
+                                    onNext: _playNextSong,
+                                    onPrevious: _playPreviousSong,
+                                    onJumpToSong: (index) =>
+                                        _jumpToSongAtIndex(index),
+                                    onSeek: (value) {
+                                      final position =
+                                          (durationSnapshot.data ??
+                                              Duration.zero) *
+                                          value;
+                                      _audioPlayer.seek(position);
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
                     ),
                   );
                 },
@@ -541,72 +577,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 Icons.playlist_play,
                 Icons.person_outline,
               ],
-              navLabels: const ['Home', 'Search', 'Playlist', 'Profile'],
+              navLabels: const ['Home', 'Search', 'Library', 'Profile'],
             ),
           ),
         ],
       ),
     );
   }
-
-  void _onNavTap(int index) {
-    if (_selectedNavIndex == index) return;
-    setState(() {
-      _selectedNavIndex = index;
-    });
-    switch (index) {
-      case 0:
-        break;
-      case 1:
-        Navigator.push(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => SearchPage(
-              onNavTap: _onNavTap,
-              selectedNavIndex: _selectedNavIndex,
-              audioPlayer: _audioPlayer,
-              onPlayPause: () {
-                if (_audioPlayer.playing) {
-                  _audioPlayer.pause();
-                } else {
-                  _audioPlayer.play();
-                }
-              },
-              onNext: _playNextSong,
-              onPrevious: _playPreviousSong,
-            ),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-                  return SlideTransition(
-                    position:
-                        Tween<Offset>(
-                          begin: const Offset(1.0, 0.0),
-                          end: Offset.zero,
-                        ).animate(
-                          CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeInOut,
-                          ),
-                        ),
-                    child: child,
-                  );
-                },
-            transitionDuration: const Duration(milliseconds: 300),
-          ),
-        ).then((_) {
-          if (mounted) {
-            setState(() {
-              _selectedNavIndex = 0;
-            });
-          }
-        });
-        break;
-      case 2:
-        break;
-      case 3:
-        break;
-    }
-  }
+  // ---------------------------------------------------------------------------
 
   Widget _buildAnimatedBackground() {
     return Container(
@@ -1757,7 +1735,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     } else if (images is String) {
       return images;
     }
-    return null;
+    return '';
   }
 
   Future<void> _playSong(
@@ -1774,12 +1752,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       await _audioPlayer.stop();
       await _audioPlayer.seek(Duration.zero);
 
-      // Pick playlist: trending or random
+      // Pick playlist: trending or random - but don't modify the original lists
       final playlist = useRandom
           ? List<Map<String, dynamic>>.from(_randomSongs)
           : List<Map<String, dynamic>>.from(_trendingSongs);
 
-      playerState.setPlaylist(playlist);
+      // Only set playlist if it's different from current
+      if (playerState.currentPlaylist.isEmpty ||
+          !ListEquality().equals(playerState.currentPlaylist, playlist)) {
+        playerState.setPlaylist(playlist);
+      }
 
       if (index != null) {
         playerState.setSongIndex(index);
@@ -1820,6 +1802,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               downloadUrl.contains('aac.saavncdn.com')) {
             await _audioPlayer.setUrl(downloadUrl);
             await _audioPlayer.play();
+            playerState.setPlaying(true);
           } else {
             throw Exception('Invalid audio URL format');
           }
@@ -1960,12 +1943,24 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
+  void _jumpToSongAtIndex(int index) {
+    final playerState = Provider.of<PlayerStateProvider>(
+      context,
+      listen: false,
+    );
+    final playlist = playerState.currentPlaylist;
+    final song = playlist[index];
+    bool useRandom = ListEquality().equals(playlist, _randomSongs);
+    _playSong(song, index, useRandom);
+  }
+
   @override
   void dispose() {
     _bannerTimer?.cancel();
     _bannerController.dispose();
     _animationController.dispose();
     _audioPlayer.dispose();
+    _pageTransitionController.dispose();
     super.dispose();
   }
 
