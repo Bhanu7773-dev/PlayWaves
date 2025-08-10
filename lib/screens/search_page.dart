@@ -844,13 +844,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                             color: Colors.white.withOpacity(0.2),
                           ),
                         ),
-                        child: IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(
-                            Icons.arrow_back_ios_rounded,
-                            color: Colors.white,
-                          ),
-                        ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(

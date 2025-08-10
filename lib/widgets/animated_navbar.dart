@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../screens/settings_page.dart';
 
 class AnimatedNavBar extends StatefulWidget {
   final int selectedIndex;

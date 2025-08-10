@@ -2,18 +2,14 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 
-// Import your animated navbar widget
 import '../widgets/animated_navbar.dart'; // <-- Make sure this path is correct!
 
 class LibraryScreen extends StatefulWidget {
   final Function(int)? onNavTap;
   final int selectedNavIndex;
 
-  const LibraryScreen({
-    Key? key,
-    this.onNavTap,
-    this.selectedNavIndex = 2, // Default to "Playlist" tab, change as needed
-  }) : super(key: key);
+  const LibraryScreen({Key? key, this.onNavTap, this.selectedNavIndex = 2})
+    : super(key: key);
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -44,24 +40,20 @@ class _LibraryScreenState extends State<LibraryScreen>
       duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
-
     _floatController = AnimationController(
       duration: const Duration(seconds: 6),
       vsync: this,
     );
-
     _rippleController = AnimationController(
       duration: const Duration(seconds: 4),
       vsync: this,
     );
-
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _masterController,
         curve: const Interval(0.0, 0.8, curve: Curves.easeOutQuart),
       ),
     );
-
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
           CurvedAnimation(
@@ -69,11 +61,9 @@ class _LibraryScreenState extends State<LibraryScreen>
             curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
           ),
         );
-
     _floatAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
     );
-
     _rippleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _rippleController, curve: Curves.easeOut),
     );
@@ -94,7 +84,6 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   void _onNavTap(int index) {
-    // If the tab is Home, just pop. Otherwise, use the provided callback.
     if (index == 0) {
       Navigator.pop(context);
     } else {
@@ -166,9 +155,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                   physics: const BouncingScrollPhysics(),
                   slivers: [
                     SliverToBoxAdapter(child: _buildHeader()),
-                    SliverToBoxAdapter(child: _buildStats()),
                     SliverToBoxAdapter(child: _buildSearchBar()),
-                    SliverToBoxAdapter(child: _buildCategoryFilter()),
+                    SliverToBoxAdapter(child: _buildCategoryFilter(context)),
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
                       sliver: SliverList(
@@ -184,7 +172,6 @@ class _LibraryScreenState extends State<LibraryScreen>
               ),
             ),
           ),
-          // --- BOTTOM NAV BAR ---
           Positioned(
             bottom: 0,
             left: 0,
@@ -220,7 +207,6 @@ class _LibraryScreenState extends State<LibraryScreen>
           ),
           child: Stack(
             children: [
-              // Floating orbs inspired by your meteor design
               _buildFloatingOrb(
                 100 + math.sin(_floatAnimation.value * 2 * math.pi) * 30,
                 150,
@@ -239,7 +225,6 @@ class _LibraryScreenState extends State<LibraryScreen>
                 const Color(0xFF667eea).withOpacity(0.12),
                 35,
               ),
-              // Ripple effect
               AnimatedBuilder(
                 animation: _rippleAnimation,
                 builder: (context, child) {
@@ -297,164 +282,33 @@ class _LibraryScreenState extends State<LibraryScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your Library',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 16,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ).createShader(bounds),
-                    child: const Text(
-                      'Music Collection',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: -0.5,
-                        height: 1.1,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFff7d78).withOpacity(0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Text(
-                    'B',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStats() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 32, 20, 0),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            colors: [
-              Colors.white.withOpacity(0.08),
-              Colors.white.withOpacity(0.04),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Row(
-              children: [
-                _buildStatItem("2.4K", "Songs", Icons.music_note),
-                _buildStatDivider(),
-                _buildStatItem("18", "Playlists", Icons.queue_music),
-                _buildStatDivider(),
-                _buildStatItem("247h", "Played", Icons.access_time),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String value, String label, IconData icon) {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-              ),
-            ),
-            child: Icon(icon, color: Colors.white, size: 18),
-          ),
-          const SizedBox(height: 12),
           Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
+            'Your Library',
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 16,
+              fontWeight: FontWeight.w400,
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+          ShaderMask(
+            shaderCallback: (bounds) => const LinearGradient(
+              colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ).createShader(bounds),
+            child: const Text(
+              'Music Collection',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: -0.5,
+                height: 1.1,
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildStatDivider() {
-    return Container(
-      width: 1,
-      height: 40,
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            Colors.white.withOpacity(0.2),
-            Colors.transparent,
-          ],
-        ),
       ),
     );
   }
@@ -533,62 +387,69 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  Widget _buildCategoryFilter() {
+  /// ----------- Pill Layout without scroll, wrapping in row ------------
+  Widget _buildCategoryFilter(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: SizedBox(
-        height: 44,
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          itemCount: _categories.length,
-          itemBuilder: (context, index) {
-            final isSelected = _selectedCategory == index;
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _selectedCategory = index;
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                margin: const EdgeInsets.only(right: 12),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  gradient: isSelected
-                      ? const LinearGradient(
-                          colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                        )
-                      : null,
-                  color: isSelected ? null : Colors.white.withOpacity(0.08),
-                  border: Border.all(
-                    color: isSelected
-                        ? Colors.transparent
-                        : Colors.white.withOpacity(0.15),
-                    width: 1,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Calculate pill widths so they fit within constraints.maxWidth
+          final pillSpacing = 12.0;
+          final totalSpacing = pillSpacing * (_categories.length - 1);
+          final pillWidth =
+              (constraints.maxWidth - totalSpacing) / _categories.length;
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(_categories.length, (index) {
+              final isSelected = _selectedCategory == index;
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedCategory = index;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: pillWidth,
+                  margin: EdgeInsets.only(
+                    right: index < _categories.length - 1 ? pillSpacing : 0,
                   ),
-                ),
-                child: Center(
-                  child: Text(
-                    _categories[index],
-                    style: TextStyle(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    gradient: isSelected
+                        ? const LinearGradient(
+                            colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                          )
+                        : null,
+                    color: isSelected ? null : Colors.white.withOpacity(0.08),
+                    border: Border.all(
                       color: isSelected
-                          ? Colors.white
-                          : Colors.white.withOpacity(0.7),
-                      fontSize: 14,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w500,
+                          ? Colors.transparent
+                          : Colors.white.withOpacity(0.15),
+                      width: 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _categories[index],
+                      style: TextStyle(
+                        color: isSelected
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.7),
+                        fontSize: 14,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
-        ),
+              );
+            }),
+          );
+        },
       ),
     );
   }

@@ -10,6 +10,7 @@ import 'music_player.dart';
 import 'search_page.dart';
 import '../screens/playlist_storage.dart'; // Make sure this import is correct!
 import '../services/player_state_provider.dart';
+import '../screens/settings_page.dart';
 import 'package:swipe_cards/swipe_cards.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
@@ -453,12 +454,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         onPrevious: _playPreviousSong,
       ),
       LibraryScreen(onNavTap: _onNavTap, selectedNavIndex: _selectedNavIndex),
-      Container(
-        alignment: Alignment.center,
-        child: Text(
-          'Profile tab coming soon!',
-          style: TextStyle(color: Colors.white, fontSize: 20),
-        ),
+      SettingsPage(
+        onLogout: () {
+          // Implement your logout logic here
+          // For example: Navigator.pushReplacementNamed(context, '/login');
+        },
+        onNavTap: _onNavTap,
+        selectedNavIndex: _selectedNavIndex,
       ),
     ];
 
