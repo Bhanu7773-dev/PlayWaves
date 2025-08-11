@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/player_state_provider.dart';
+import '../services/pitch_black_theme_provider.dart'; // <-- Import the provider
 
 class SettingsPage extends StatefulWidget {
   final VoidCallback onLogout;
@@ -25,14 +27,12 @@ class _SettingsPageState extends State<SettingsPage>
   bool useSystemTheme = true;
   bool useDynamicColors = false;
   bool offlineMode = false;
-  bool pitchBlack = false; // <-- Pitch Black toggle variable
 
   final List<String> audioQualities = [
     'Low (96 kbps)',
     'Medium (160 kbps)',
     'High (320 kbps)',
   ];
-
   final List<String> downloadQualities = [
     'Low (96 kbps)',
     'Medium (160 kbps)',
@@ -59,13 +59,31 @@ class _SettingsPageState extends State<SettingsPage>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-
     _meteorsController = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat();
 
     _animationController.forward();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      useSystemTheme = prefs.getBool('useSystemTheme') ?? true;
+      useDynamicColors = prefs.getBool('useDynamicColors') ?? false;
+      offlineMode = prefs.getBool('offlineMode') ?? false;
+      // REMOVE pitchBlack from local state: we use provider below!
+    });
+  }
+
+  Future<void> _saveSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setBool('useSystemTheme', useSystemTheme);
+    prefs.setBool('useDynamicColors', useDynamicColors);
+    prefs.setBool('offlineMode', offlineMode);
+    // REMOVE pitchBlack from local state: we use provider below!
   }
 
   Future<void> _launchURL(String url) async {
@@ -89,11 +107,14 @@ class _SettingsPageState extends State<SettingsPage>
 
   @override
   Widget build(BuildContext context) {
+    final isPitchBlack = context
+        .watch<PitchBlackThemeProvider>()
+        .isPitchBlack; // <-- Read from provider
     return Scaffold(
-      backgroundColor: pitchBlack ? Colors.black : Colors.black,
+      backgroundColor: isPitchBlack ? Colors.black : Colors.black,
       body: Stack(
         children: [
-          _buildAnimatedBackground(),
+          _buildAnimatedBackground(isPitchBlack: isPitchBlack),
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -110,7 +131,7 @@ class _SettingsPageState extends State<SettingsPage>
                             const SizedBox(height: 20),
                             _buildMusicStatsCard(),
                             const SizedBox(height: 24),
-                            _buildThemeSection(),
+                            _buildThemeSection(context),
                             const SizedBox(height: 20),
                             _buildAudioSection(),
                             const SizedBox(height: 20),
@@ -132,32 +153,34 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildAnimatedBackground() {
+  Widget _buildAnimatedBackground({required bool isPitchBlack}) {
     return Container(
       decoration: BoxDecoration(
-        gradient: pitchBlack
+        gradient: isPitchBlack
             ? null
-            : const BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.topRight,
-                  radius: 1.5,
-                  colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
-                ),
-              ).gradient,
-        color: pitchBlack ? Colors.black : null,
+            : const RadialGradient(
+                center: Alignment.topRight,
+                radius: 1.5,
+                colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
+              ),
+        color: isPitchBlack ? Colors.black : null,
       ),
-      child: Stack(children: List.generate(20, (index) => _buildMeteor(index))),
+      child: Stack(
+        children: List.generate(
+          20,
+          (index) => _buildMeteor(index, isPitchBlack: isPitchBlack),
+        ),
+      ),
     );
   }
 
-  Widget _buildMeteor(int index) {
+  Widget _buildMeteor(int index, {required bool isPitchBlack}) {
     return AnimatedBuilder(
       animation: _meteorsController,
       builder: (context, child) {
         final double progress = _meteorsController.value;
         final double staggeredProgress = ((progress + (index * 0.1)) % 1.0)
             .clamp(0.0, 1.0);
-
         return Positioned(
           top: (index * 60.0) % MediaQuery.of(context).size.height,
           left: (index * 90.0) % MediaQuery.of(context).size.width,
@@ -167,7 +190,7 @@ class _SettingsPageState extends State<SettingsPage>
               staggeredProgress * 100 - 50,
             ),
             child: Opacity(
-              opacity: pitchBlack ? 0 : (1.0 - staggeredProgress) * 0.6,
+              opacity: isPitchBlack ? 0 : (1.0 - staggeredProgress) * 0.6,
               child: Container(
                 width: 3,
                 height: 3,
@@ -245,6 +268,10 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildMusicStatsCard() {
+    // ... unchanged ...
+    // (keep your existing card code)
+    // For brevity, not repeating unchanged parts
+    // If you want the full chunk again, let me know!
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
@@ -282,6 +309,8 @@ class _SettingsPageState extends State<SettingsPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ... rest of your stats card code ...
+            // (keep it as-is)
             Row(
               children: [
                 Container(
@@ -422,7 +451,9 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildThemeSection() {
+  Widget _buildThemeSection(BuildContext context) {
+    final pitchBlackProvider = context
+        .watch<PitchBlackThemeProvider>(); // get provider reference
     return _buildSection(
       title: "Themes & Appearance",
       icon: Icons.palette,
@@ -435,6 +466,7 @@ class _SettingsPageState extends State<SettingsPage>
             setState(() {
               useSystemTheme = val;
             });
+            _saveSettings();
             _showSnackBar("Theme setting updated", const Color(0xFFff7d78));
           },
         ),
@@ -446,19 +478,21 @@ class _SettingsPageState extends State<SettingsPage>
             setState(() {
               useDynamicColors = val;
             });
+            _saveSettings();
           },
         ),
         _buildSwitchTile(
           title: "Pitch Black",
           subtitle: "Ultra dark mode for AMOLED screens",
-          value: pitchBlack,
+          value: pitchBlackProvider.isPitchBlack, // <-- value from provider
           onChanged: (val) {
-            setState(() {
-              pitchBlack = val;
-            });
+            context.read<PitchBlackThemeProvider>().setPitchBlack(
+              val,
+            ); // <-- call provider
+            _saveSettings();
             _showSnackBar(
-              pitchBlack ? "Pitch Black enabled" : "Pitch Black disabled",
-              pitchBlack ? Colors.black : const Color(0xFFff7d78),
+              val ? "Pitch Black enabled" : "Pitch Black disabled",
+              val ? Colors.black : const Color(0xFFff7d78),
             );
           },
         ),
@@ -672,6 +706,7 @@ class _SettingsPageState extends State<SettingsPage>
             setState(() {
               offlineMode = val;
             });
+            _saveSettings();
           },
         ),
         _buildSettingsTile(
@@ -810,6 +845,9 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildDeveloperInfoCard() {
+    // ... unchanged, keep your card as-is
+    // For brevity, not repeating unchanged parts
+    // If you want the full chunk again, let me know!
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
@@ -834,6 +872,8 @@ class _SettingsPageState extends State<SettingsPage>
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
+          // ... rest of your developer card code ...
+          // (keep as-is)
           Container(
             width: 80,
             height: 80,

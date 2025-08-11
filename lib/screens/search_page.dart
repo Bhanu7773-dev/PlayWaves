@@ -6,6 +6,7 @@ import '../widgets/animated_navbar.dart';
 import '../widgets/mini_player.dart';
 import 'music_player.dart';
 import '../services/player_state_provider.dart';
+import '../services/pitch_black_theme_provider.dart'; // <-- ADD PROVIDER
 
 class SearchPage extends StatefulWidget {
   final Function(int) onNavTap;
@@ -296,14 +297,17 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     return 'Unknown Artist';
   }
 
-  Widget _buildAnimatedBackground() {
+  Widget _buildAnimatedBackground({bool isPitchBlack = false}) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment.topLeft,
-          radius: 1.5,
-          colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
-        ),
+      decoration: BoxDecoration(
+        gradient: isPitchBlack
+            ? null
+            : const RadialGradient(
+                center: Alignment.topLeft,
+                radius: 1.5,
+                colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
+              ),
+        color: isPitchBlack ? Colors.black : null,
       ),
       child: Stack(children: List.generate(12, (index) => _buildMeteor(index))),
     );
@@ -810,13 +814,16 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     final songsToShow = _searchController.text.trim().isEmpty
         ? _randomSongs
         : _searchResults;
+    final isPitchBlack = context
+        .watch<PitchBlackThemeProvider>()
+        .isPitchBlack; // <-- THEME
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: isPitchBlack ? Colors.black : Colors.black,
       body: Stack(
         children: [
           // Animated Background
-          _buildAnimatedBackground(),
+          _buildAnimatedBackground(isPitchBlack: isPitchBlack),
 
           SafeArea(
             child: Column(

@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../services/player_state_provider.dart';
+import '../services/pitch_black_theme_provider.dart'; // <-- Import the pitch black provider
 
 class MusicPlayerPage extends StatefulWidget {
   final String songTitle;
@@ -75,10 +76,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     final rawQuality = playerState.downloadQuality ?? "320kbps";
     final quality = _normalizeQuality(rawQuality);
 
-    print("DEBUG: song = $song");
-    print("DEBUG: song['downloadUrl'] = ${song?['downloadUrl']}");
-    print("DEBUG: quality = $quality");
-
     String? downloadUrl;
     if (song != null &&
         song['downloadUrl'] != null &&
@@ -111,7 +108,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     if (Platform.isAndroid) {
       int sdkInt = 30;
       try {
-        // Try to get SDK version (optional, if you use device_info_plus)
         sdkInt = int.parse(
           (await File('/system/build.prop').readAsLines().then(
             (lines) => lines.firstWhere(
@@ -193,8 +189,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         : 0.0;
     final double displayProgress = _isDragging ? _dragValue : progress;
 
+    final isPitchBlack = context
+        .watch<PitchBlackThemeProvider>()
+        .isPitchBlack; // <-- Read theme
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: isPitchBlack
+          ? Colors.black
+          : Colors.black, // <-- Use theme
       body: GestureDetector(
         onVerticalDragUpdate: (details) {
           if (details.delta.dy < -10) {
@@ -202,14 +204,20 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
           }
         },
         child: Container(
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment.topCenter,
-              radius: 1.5,
-              colors: [Color(0x33ff7d78), Color(0x229c27b0), Colors.black],
-              stops: [0.0, 0.4, 1.0],
-            ),
-          ),
+          decoration: isPitchBlack
+              ? const BoxDecoration(color: Colors.black)
+              : const BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.topCenter,
+                    radius: 1.5,
+                    colors: [
+                      Color(0x33ff7d78),
+                      Color(0x229c27b0),
+                      Colors.black,
+                    ],
+                    stops: [0.0, 0.4, 1.0],
+                  ),
+                ),
           child: SafeArea(
             child: Consumer<PlayerStateProvider>(
               builder: (context, playerState, child) {

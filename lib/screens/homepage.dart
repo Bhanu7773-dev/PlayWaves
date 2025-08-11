@@ -17,6 +17,7 @@ import '../widgets/artist_section.dart'; // <-- Import the new artist page widge
 import '../widgets/masonry_song_section.dart';
 import '../widgets/random_songs_section.dart';
 import '../widgets/album_section.dart';
+import '../services/pitch_black_theme_provider.dart'; // <-- Import pitch black provider
 
 // Helper function: pick N random (non-repeating) songs from a list, skipping recently shown
 Future<Set<String>> loadShownIdsFromStorage() async {
@@ -440,6 +441,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final playerState = Provider.of<PlayerStateProvider>(context);
+    final isPitchBlack = context
+        .watch<PitchBlackThemeProvider>()
+        .isPitchBlack; // <-- READ PROVIDER
 
     final List<Widget> pages = [
       _buildBody(),
@@ -469,10 +473,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     ];
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: isPitchBlack
+          ? Colors.black
+          : Colors.black, // <-- USE PROVIDER
       body: Stack(
         children: [
-          _buildAnimatedBackground(),
+          _buildAnimatedBackground(
+            isPitchBlack: isPitchBlack,
+          ), // <-- USE PROVIDER
           SafeArea(
             child: Column(
               children: [
@@ -617,14 +625,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildAnimatedBackground() {
+  Widget _buildAnimatedBackground({required bool isPitchBlack}) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment.topLeft,
-          radius: 1.5,
-          colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
-        ),
+      decoration: BoxDecoration(
+        gradient: isPitchBlack
+            ? null
+            : const RadialGradient(
+                center: Alignment.topLeft,
+                radius: 1.5,
+                colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
+              ),
+        color: isPitchBlack ? Colors.black : null,
       ),
       child: Stack(children: List.generate(15, (index) => _buildMeteor(index))),
     );

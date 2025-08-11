@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../services/player_state_provider.dart';
+import '../services/pitch_black_theme_provider.dart'; // <-- Add this import
 
 class ArtistSongsPage extends StatefulWidget {
   final String artistName;
@@ -178,14 +179,17 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     return null;
   }
 
-  Widget _buildAnimatedBackground() {
+  Widget _buildAnimatedBackground({required bool isPitchBlack}) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment.topLeft,
-          radius: 1.5,
-          colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
-        ),
+      decoration: BoxDecoration(
+        gradient: isPitchBlack
+            ? null
+            : const RadialGradient(
+                center: Alignment.topLeft,
+                radius: 1.5,
+                colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
+              ),
+        color: isPitchBlack ? Colors.black : null,
       ),
     );
   }
@@ -458,11 +462,19 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
 
   @override
   Widget build(BuildContext context) {
+    final isPitchBlack = context
+        .watch<PitchBlackThemeProvider>()
+        .isPitchBlack; // <-- Read provider
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: isPitchBlack
+          ? Colors.black
+          : Colors.black, // <-- Use provider
       body: Stack(
         children: [
-          _buildAnimatedBackground(),
+          _buildAnimatedBackground(
+            isPitchBlack: isPitchBlack,
+          ), // <-- Pass provider
           Column(
             children: [
               _buildHeader(),
@@ -651,7 +663,9 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                         child: RefreshIndicator(
                           onRefresh: _searchArtistSongs,
                           color: const Color(0xFFff7d78),
-                          backgroundColor: Colors.black,
+                          backgroundColor: isPitchBlack
+                              ? Colors.black
+                              : Colors.black,
                           child: ListView.builder(
                             padding: const EdgeInsets.only(top: 10, bottom: 20),
                             itemCount: _songs.length,

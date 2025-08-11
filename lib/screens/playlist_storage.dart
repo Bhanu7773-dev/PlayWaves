@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
-
+import 'package:provider/provider.dart';
+import '../services/pitch_black_theme_provider.dart'; // <-- Add this import
 import '../widgets/animated_navbar.dart'; // <-- Make sure this path is correct!
 
 class LibraryScreen extends StatefulWidget {
@@ -95,6 +96,9 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isPitchBlack = context
+        .watch<PitchBlackThemeProvider>()
+        .isPitchBlack; // <-- Provider
     final libraryItems = [
       LibraryItemData(
         title: "Liked Songs",
@@ -142,10 +146,12 @@ class _LibraryScreenState extends State<LibraryScreen>
     ];
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: isPitchBlack
+          ? Colors.black
+          : Colors.black, // <-- Provider
       body: Stack(
         children: [
-          _buildMeteorBackground(),
+          _buildMeteorBackground(isPitchBlack: isPitchBlack), // <-- Pass theme
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -193,17 +199,24 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  Widget _buildMeteorBackground() {
+  Widget _buildMeteorBackground({required bool isPitchBlack}) {
     return AnimatedBuilder(
       animation: _floatAnimation,
       builder: (context, child) {
         return Container(
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment.topLeft,
-              radius: 1.5,
-              colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
-            ),
+          decoration: BoxDecoration(
+            gradient: isPitchBlack
+                ? null
+                : const RadialGradient(
+                    center: Alignment.topLeft,
+                    radius: 1.5,
+                    colors: [
+                      Color(0xFF1a1a2e),
+                      Color(0xFF16213e),
+                      Colors.black,
+                    ],
+                  ),
+            color: isPitchBlack ? Colors.black : null,
           ),
           child: Stack(
             children: [
