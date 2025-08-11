@@ -1,0 +1,144 @@
+import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
+import '../services/jiosaavn_api_service.dart';
+import '../screens/artist_songs_page.dart';
+
+class ArtistSection extends StatelessWidget {
+  final List<Map<String, dynamic>> artists;
+  final JioSaavnApiService apiService;
+  final AudioPlayer audioPlayer;
+
+  const ArtistSection({
+    Key? key,
+    required this.artists,
+    required this.apiService,
+    required this.audioPlayer,
+  }) : super(key: key);
+
+  String? _getBestImageUrl(dynamic images) {
+    if (images is List && images.isNotEmpty) {
+      for (var img in images.reversed) {
+        if (img is Map && img['link'] != null) {
+          return img['link'];
+        }
+        if (img is Map && img['url'] != null) {
+          return img['url'];
+        }
+      }
+    } else if (images is String) {
+      return images;
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Row(
+            children: [
+              Container(
+                width: 4,
+                height: 24,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                "Popular Artists",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 140,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: artists.length,
+            itemBuilder: (context, index) {
+              final artist = artists[index];
+              return GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ArtistSongsPage(
+                        artistName: artist['name'] ?? 'Unknown Artist',
+                        apiService: apiService,
+                        audioPlayer: audioPlayer,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 120,
+                  margin: const EdgeInsets.only(right: 16),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFff7d78).withOpacity(0.3),
+                              const Color(0xFF9c27b0).withOpacity(0.3),
+                            ],
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: _getBestImageUrl(artist['image']) != null
+                              ? Image.network(
+                                  _getBestImageUrl(artist['image'])!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(
+                                      Icons.person,
+                                      color: Colors.white,
+                                      size: 40,
+                                    );
+                                  },
+                                )
+                              : const Icon(
+                                  Icons.person,
+                                  color: Colors.white,
+                                  size: 40,
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        artist['name'] ?? 'Unknown Artist',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+}

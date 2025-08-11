@@ -7,11 +7,19 @@ class PlayerStateProvider extends ChangeNotifier {
   bool _isPlaying = false;
   bool _isSongLoading = false;
 
+  // Audio/Download quality for streaming and downloads
+  // Defaults to 'High (320 kbps)'
+  String? _audioQuality = 'High (320 kbps)';
+  String? _downloadQuality = 'High (320 kbps)';
+
   Map<String, dynamic>? get currentSong => _currentSong;
   List<Map<String, dynamic>> get currentPlaylist => _currentPlaylist;
   int get currentSongIndex => _currentSongIndex;
   bool get isPlaying => _isPlaying;
   bool get isSongLoading => _isSongLoading;
+
+  String? get audioQuality => _audioQuality;
+  String? get downloadQuality => _downloadQuality;
 
   void setSong(Map<String, dynamic>? song) {
     _currentSong = song;
@@ -35,6 +43,16 @@ class PlayerStateProvider extends ChangeNotifier {
 
   void setSongLoading(bool loading) {
     _isSongLoading = loading;
+    notifyListeners();
+  }
+
+  void setAudioQuality(String quality) {
+    _audioQuality = quality;
+    notifyListeners();
+  }
+
+  void setDownloadQuality(String quality) {
+    _downloadQuality = quality;
     notifyListeners();
   }
 

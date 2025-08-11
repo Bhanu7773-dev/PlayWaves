@@ -53,10 +53,10 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
   @override
   Widget build(BuildContext context) {
     final labels =
-        widget.navLabels ?? ['Home', 'Search', 'Playlist', 'Profile'];
+        widget.navLabels ?? ['Home', 'Search', 'Library', 'Settings'];
     final icons = widget.navIcons.isNotEmpty
         ? widget.navIcons
-        : [Icons.home, Icons.search, Icons.playlist_play, Icons.person_outline];
+        : [Icons.home, Icons.search, Icons.playlist_play, Icons.settings];
 
     return Container(
       padding: EdgeInsets.only(

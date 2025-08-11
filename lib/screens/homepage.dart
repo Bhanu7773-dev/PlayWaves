@@ -6,13 +6,17 @@ import 'package:provider/provider.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../widgets/animated_navbar.dart';
 import '../widgets/mini_player.dart';
-import 'music_player.dart';
-import 'search_page.dart';
+import '../screens/music_player.dart';
+import '../screens/search_page.dart';
 import '../screens/playlist_storage.dart'; // Make sure this import is correct!
 import '../services/player_state_provider.dart';
 import '../screens/settings_page.dart';
 import 'package:swipe_cards/swipe_cards.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import '../widgets/artist_section.dart'; // <-- Import the new artist page widget
+import '../widgets/masonry_song_section.dart';
+import '../widgets/random_songs_section.dart';
+import '../widgets/album_section.dart';
 
 // Helper function: pick N random (non-repeating) songs from a list, skipping recently shown
 Future<Set<String>> loadShownIdsFromStorage() async {
@@ -603,9 +607,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 Icons.home,
                 Icons.search,
                 Icons.playlist_play,
-                Icons.person_outline,
+                Icons.settings,
               ],
-              navLabels: const ['Home', 'Search', 'Library', 'Profile'],
+              navLabels: const ['Home', 'Search', 'Library', 'Settings'],
             ),
           ),
         ],
@@ -841,7 +845,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 const SizedBox(height: 20),
                 if (_albums.isNotEmpty) _buildAlbumsSection(),
                 const SizedBox(height: 20),
-                if (_artists.isNotEmpty) _buildArtistsSection(),
+                if (_artists.isNotEmpty) _buildArtistsSection(), // <-- updated!
                 if (_randomSongs.isNotEmpty) _buildRandomSongsSection(),
                 if (_trendingSongs.isNotEmpty) _buildSongsSection(),
               ],
@@ -999,647 +1003,34 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildAlbumsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 24,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                "Featured Albums",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 200,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _albums.length,
-            itemBuilder: (context, index) {
-              final album = _albums[index];
-              return _buildAlbumCard(album);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAlbumCard(Map<String, dynamic> album) {
-    final imageUrl = _getBestImageUrl(album['image']);
-    final title = album['name'] ?? album['title'] ?? 'Unknown Album';
-    final subtitle = album['subtitle'] ?? album['artist'] ?? 'Unknown Artist';
-
-    return Container(
-      width: 160,
-      margin: const EdgeInsets.only(right: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.1),
-            Colors.white.withOpacity(0.05),
-          ],
-        ),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-      ),
-      child: Stack(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
-                child: imageUrl != null
-                    ? Image.network(
-                        imageUrl,
-                        width: 160,
-                        height: 120,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            width: 160,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  const Color(0xFFff7d78).withOpacity(0.3),
-                                  const Color(0xFF9c27b0).withOpacity(0.3),
-                                ],
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.album,
-                              color: Colors.white,
-                              size: 40,
-                            ),
-                          );
-                        },
-                      )
-                    : Container(
-                        width: 160,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color(0xFFff7d78).withOpacity(0.3),
-                              const Color(0xFF9c27b0).withOpacity(0.3),
-                            ],
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.album,
-                          color: Colors.white,
-                          size: 40,
-                        ),
-                      ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 15,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFff7d78).withOpacity(0.3),
-                    blurRadius: 8,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.play_arrow,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                onPressed: () => _playAlbum(album),
-                padding: const EdgeInsets.all(8),
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return AlbumsSection(
+      albums: _albums,
+      onAlbumPlay: (album) => _playAlbum(album),
+      getBestImageUrl: _getBestImageUrl,
     );
   }
 
   Widget _buildArtistsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 24,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                "Popular Artists",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 140,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _artists.length,
-            itemBuilder: (context, index) {
-              final artist = _artists[index];
-              return _buildArtistCard(artist);
-            },
-          ),
-        ),
-        const SizedBox(height: 20),
-      ],
-    );
-  }
-
-  Widget _buildArtistCard(Map<String, dynamic> artist) {
-    final imageUrl = _getBestImageUrl(artist['image']);
-    final name = artist['name'] ?? 'Unknown Artist';
-
-    return Container(
-      width: 120,
-      margin: const EdgeInsets.only(right: 16),
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFFff7d78).withOpacity(0.3),
-                  const Color(0xFF9c27b0).withOpacity(0.3),
-                ],
-              ),
-            ),
-            child: ClipOval(
-              child: imageUrl != null
-                  ? Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
-                          Icons.person,
-                          color: Colors.white,
-                          size: 40,
-                        );
-                      },
-                    )
-                  : const Icon(Icons.person, color: Colors.white, size: 40),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            name,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return ArtistSection(
+      artists: _artists,
+      apiService: _apiService,
+      audioPlayer: _audioPlayer,
     );
   }
 
   Widget _buildRandomSongsSection() {
-    List<SwipeItem> _swipeItems = [];
-    MatchEngine _matchEngine;
-
-    for (var i = 0; i < _randomSongs.length; i++) {
-      final song = _randomSongs[i];
-      _swipeItems.add(
-        SwipeItem(
-          content: song,
-          likeAction: () {},
-          nopeAction: () {},
-          superlikeAction: () {},
-        ),
-      );
-    }
-    _matchEngine = MatchEngine(swipeItems: _swipeItems);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 24,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                "Random Picks",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (_randomSongs.isNotEmpty)
-          SizedBox(
-            height: 360,
-            child: StatefulBuilder(
-              builder: (context, setState) {
-                return SwipeCards(
-                  matchEngine: _matchEngine,
-                  itemBuilder: (context, index) {
-                    final song = _randomSongs[index];
-                    final imageUrl = _getBestImageUrl(song['image']);
-                    final title =
-                        song['name'] ?? song['title'] ?? 'Unknown Song';
-                    final artist =
-                        song['artists']?['primary']?[0]?['name'] ??
-                        song['subtitle'] ??
-                        'Unknown Artist';
-                    return Card(
-                      elevation: 8,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      color: const Color.fromARGB(
-                        255,
-                        17,
-                        17,
-                        17,
-                      ).withOpacity(1.0),
-                      child: Stack(
-                        children: [
-                          Column(
-                            children: [
-                              ClipRRect(
-                                borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(22),
-                                ),
-                                child: imageUrl != null
-                                    ? Image.network(
-                                        imageUrl,
-                                        width: double.infinity,
-                                        height: 180,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Container(
-                                          width: double.infinity,
-                                          height: 180,
-                                          color: Colors.grey[800],
-                                          child: const Icon(
-                                            Icons.music_note,
-                                            color: Colors.white54,
-                                            size: 48,
-                                          ),
-                                        ),
-                                      )
-                                    : Container(
-                                        width: double.infinity,
-                                        height: 180,
-                                        color: Colors.grey[800],
-                                        child: const Icon(
-                                          Icons.music_note,
-                                          color: Colors.white54,
-                                          size: 48,
-                                        ),
-                                      ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      title,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      artist,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 14,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Spacer(),
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 16.0),
-                                child: CircleAvatar(
-                                  radius: 24,
-                                  backgroundColor: const Color(0xFFff7d78),
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.play_arrow,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () =>
-                                        _playSong(song, index, true),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Positioned(
-                            top: 12,
-                            right: 12,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.deepPurple.withOpacity(0.84),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: const [
-                                  Icon(
-                                    Icons.auto_awesome,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    "Swipe to see magic!",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  onStackFinished: () {
-                    Future.delayed(const Duration(milliseconds: 400), () {
-                      setState(() {
-                        _swipeItems.clear();
-                        for (var i = 0; i < _randomSongs.length; i++) {
-                          final song = _randomSongs[i];
-                          _swipeItems.add(
-                            SwipeItem(
-                              content: song,
-                              likeAction: () {},
-                              nopeAction: () {},
-                              superlikeAction: () {},
-                            ),
-                          );
-                        }
-                        _matchEngine = MatchEngine(swipeItems: _swipeItems);
-                      });
-                    });
-                  },
-                  upSwipeAllowed: false,
-                  fillSpace: true,
-                );
-              },
-            ),
-          ),
-        if (_randomSongs.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 30),
-            child: Center(
-              child: Text(
-                "No random songs available",
-                style: TextStyle(color: Colors.white70),
-              ),
-            ),
-          ),
-      ],
+    return RandomSongsSection(
+      randomSongs: _randomSongs,
+      onSongPlay: (song, index) => _playSong(song, index, true),
+      getBestImageUrl: _getBestImageUrl,
     );
   }
 
   Widget _buildSongsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 24,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                "Trending Songs",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        MasonryGridView.count(
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          itemCount: _trendingSongs.length,
-          itemBuilder: (context, index) {
-            final song = _trendingSongs[index];
-            return _buildMasonrySongCard(song, index);
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMasonrySongCard(Map<String, dynamic> song, int index) {
-    final imageUrl = _getBestImageUrl(song['image']);
-    final title = song['name'] ?? song['title'] ?? 'Unknown Song';
-    String artist = 'Unknown Artist';
-    if (song['artists'] != null) {
-      final artists = song['artists'];
-      if (artists['primary'] != null && artists['primary'].isNotEmpty) {
-        artist = artists['primary'][0]['name'] ?? 'Unknown Artist';
-      }
-    } else if (song['subtitle'] != null) {
-      artist = song['subtitle'];
-    }
-
-    return GestureDetector(
-      onTap: () => _playSong(song, index, false),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: Colors.white.withOpacity(0.05),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(12),
-              ),
-              child: AspectRatio(
-                aspectRatio: 1.0,
-                child: imageUrl != null
-                    ? Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[800],
-                            child: const Icon(
-                              Icons.music_note,
-                              color: Colors.white54,
-                              size: 40,
-                            ),
-                          );
-                        },
-                      )
-                    : Container(
-                        color: Colors.grey[800],
-                        child: const Icon(
-                          Icons.music_note,
-                          color: Colors.white54,
-                          size: 40,
-                        ),
-                      ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    artist,
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return MasonrySongSection(
+      songs: _trendingSongs,
+      onSongTap: (song, index) => _playSong(song, index, false),
+      getBestImageUrl: _getBestImageUrl,
     );
   }
 

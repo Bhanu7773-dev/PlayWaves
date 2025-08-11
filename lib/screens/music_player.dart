@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
+import 'package:permission_handler/permission_handler.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../services/player_state_provider.dart';
 
@@ -59,6 +62,8 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
   // Target number of items to show in the queue (finite, stable)
   static const int _queueTargetCount = 30;
 
+  bool _isDownloading = false;
+
   @override
   void initState() {
     super.initState();
@@ -98,6 +103,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     try {
       String? lyricsId;
       bool hasLyrics = false;
+      String? songUrl;
 
       try {
         final songResponse = await _apiService.getSongById(widget.songId!);
@@ -119,9 +125,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
           } else if (rawHasLyrics is String) {
             hasLyrics = rawHasLyrics.toLowerCase() == 'true';
           }
-
           if (song['lyricsId'] != null) {
             lyricsId = song['lyricsId'].toString();
+          }
+          if (song['url'] != null) {
+            songUrl = song['url'].toString();
           }
         }
       } catch (_) {}
@@ -179,10 +187,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       } else {
         if (mounted) {
           setState(() {
-            _lyrics = [
-              {'time': 0, 'text': 'Lyrics not available for this song'},
-            ];
+            _lyrics = [];
             _lyricsLoading = false;
+            _lyricsError = null;
           });
         }
       }
@@ -196,6 +203,125 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
           _lyricsLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _downloadCurrentSong() async {
+    final playerState = Provider.of<PlayerStateProvider>(
+      context,
+      listen: false,
+    );
+    final song = playerState.currentSong;
+    final rawQuality = playerState.downloadQuality ?? "320kbps";
+    final quality = _normalizeQuality(rawQuality);
+
+    print("DEBUG: song = $song");
+    print("DEBUG: song['downloadUrl'] = ${song?['downloadUrl']}");
+    print("DEBUG: quality = $quality");
+
+    String? downloadUrl;
+    if (song != null &&
+        song['downloadUrl'] != null &&
+        song['downloadUrl'] is List) {
+      final urlObj = (song['downloadUrl'] as List).firstWhere(
+        (item) =>
+            item is Map &&
+            item['quality'] != null &&
+            item['quality'].toString().trim().toLowerCase() ==
+                quality.trim().toLowerCase(),
+        orElse: () => null,
+      );
+      if (urlObj != null && urlObj is Map) {
+        downloadUrl = urlObj['url'];
+      }
+    }
+
+    // Fallback if not found
+    downloadUrl ??= song?['media_preview_url'] ?? song?['media_url'];
+
+    if (downloadUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("No download URL found for $quality")),
+      );
+      return;
+    }
+
+    // Get permission (Scoped for Android 10+/11+)
+    bool hasPermission = false;
+    if (Platform.isAndroid) {
+      int sdkInt = 30;
+      try {
+        // Try to get SDK version (optional, if you use device_info_plus)
+        sdkInt = int.parse(
+          (await File('/system/build.prop').readAsLines().then(
+            (lines) => lines.firstWhere(
+              (line) => line.startsWith('ro.build.version.sdk='),
+              orElse: () => 'ro.build.version.sdk=30',
+            ),
+          )).split('=')[1],
+        );
+      } catch (_) {}
+      if (sdkInt >= 30) {
+        final status = await Permission.manageExternalStorage.request();
+        hasPermission = status.isGranted;
+      } else {
+        final status = await Permission.storage.request();
+        hasPermission = status.isGranted;
+      }
+    } else {
+      final status = await Permission.storage.request();
+      hasPermission = status.isGranted;
+    }
+
+    if (!hasPermission) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Storage permission denied")));
+      return;
+    }
+
+    setState(() {
+      _isDownloading = true;
+    });
+
+    // Save to Downloads directory for Android
+    Directory? dir;
+    if (Platform.isAndroid) {
+      final dirs = await getExternalStorageDirectories(
+        type: StorageDirectory.downloads,
+      );
+      dir = dirs?.first;
+    } else {
+      dir = await getApplicationDocumentsDirectory();
+    }
+    if (dir == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Could not access save directory")),
+      );
+      setState(() {
+        _isDownloading = false;
+      });
+      return;
+    }
+
+    String fileName =
+        "${song?['name']} - ${song?['artists'] != null && song?['artists']?['primary'] != null && (song?['artists']?['primary'] as List?)?.isNotEmpty == true ? (song?['artists']?['primary'] as List)[0]['name'] : 'Unknown'} [$quality].mp3";
+    fileName = fileName.replaceAll(RegExp(r'[\\/:*?"<>|]'), "_");
+    final filePath = "${dir.path}/$fileName";
+
+    try {
+      await Dio().download(downloadUrl, filePath);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Downloaded to $filePath")));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Download failed: $e")));
+    } finally {
+      setState(() {
+        _isDownloading = false;
+      });
     }
   }
 
@@ -486,6 +612,61 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                 ],
                               ),
                             ),
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(25),
+                                color: Colors.white.withOpacity(0.1),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _isDownloading
+                                      ? SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Icon(
+                                          Icons.download,
+                                          color: Colors.white.withOpacity(0.8),
+                                          size: 18,
+                                        ),
+                                  const SizedBox(width: 6),
+                                  GestureDetector(
+                                    onTap: _isDownloading
+                                        ? null
+                                        : _downloadCurrentSong,
+                                    child: Text(
+                                      'Download',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.8),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -690,6 +871,51 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     }
 
     if (_lyrics.isEmpty) {
+      final playerState = Provider.of<PlayerStateProvider>(
+        context,
+        listen: false,
+      );
+      final song = playerState.currentSong;
+      final hasLyrics =
+          song?['hasLyrics'] == true ||
+          (song?['hasLyrics']?.toString().toLowerCase() == 'true');
+      final lyricsId = song?['lyricsId'];
+      final songUrl = song?['url'];
+      if (hasLyrics && lyricsId == null && songUrl != null) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                "Lyrics not available in app.",
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 18),
+              TextButton.icon(
+                icon: Icon(Icons.launch, color: Colors.white),
+                label: Text(
+                  "View Lyrics on JioSaavn",
+                  style: TextStyle(color: Colors.white),
+                ),
+                onPressed: () async {
+                  final url = songUrl;
+                  if (await canLaunchUrl(Uri.parse(url))) {
+                    await launchUrl(Uri.parse(url));
+                  }
+                },
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
       return Center(
         child: Text(
           _lyricsError ?? 'No lyrics available',
@@ -1030,5 +1256,15 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     if (widget.onJumpToSong != null) {
       widget.onJumpToSong!(index);
     }
+  }
+
+  String _normalizeQuality(String rawQuality) {
+    final q = rawQuality.trim().toLowerCase();
+    if (q.contains('320')) return '320kbps';
+    if (q.contains('160')) return '160kbps';
+    if (q.contains('96')) return '96kbps';
+    if (q.contains('48')) return '48kbps';
+    if (q.contains('12')) return '12kbps';
+    return '320kbps';
   }
 }
