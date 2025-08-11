@@ -25,9 +25,8 @@ class _SettingsPageState extends State<SettingsPage>
   bool useSystemTheme = true;
   bool useDynamicColors = false;
   bool offlineMode = false;
+  bool pitchBlack = false; // <-- Pitch Black toggle variable
 
-  // Remove local variables for audio/download quality,
-  // use provider instead.
   final List<String> audioQualities = [
     'Low (96 kbps)',
     'Medium (160 kbps)',
@@ -44,7 +43,6 @@ class _SettingsPageState extends State<SettingsPage>
   late Animation<double> _fadeAnimation;
   late AnimationController _meteorsController;
 
-  // Example music stats
   int totalListeningMinutes = 1234;
   int songsPlayed = 567;
   String topArtist = "Arijit Singh";
@@ -92,7 +90,7 @@ class _SettingsPageState extends State<SettingsPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: pitchBlack ? Colors.black : Colors.black,
       body: Stack(
         children: [
           _buildAnimatedBackground(),
@@ -114,7 +112,7 @@ class _SettingsPageState extends State<SettingsPage>
                             const SizedBox(height: 24),
                             _buildThemeSection(),
                             const SizedBox(height: 20),
-                            _buildAudioSection(), // Provider-based
+                            _buildAudioSection(),
                             const SizedBox(height: 20),
                             _buildSystemSection(),
                             const SizedBox(height: 24),
@@ -136,12 +134,17 @@ class _SettingsPageState extends State<SettingsPage>
 
   Widget _buildAnimatedBackground() {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment.topRight,
-          radius: 1.5,
-          colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
-        ),
+      decoration: BoxDecoration(
+        gradient: pitchBlack
+            ? null
+            : const BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.topRight,
+                  radius: 1.5,
+                  colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
+                ),
+              ).gradient,
+        color: pitchBlack ? Colors.black : null,
       ),
       child: Stack(children: List.generate(20, (index) => _buildMeteor(index))),
     );
@@ -164,7 +167,7 @@ class _SettingsPageState extends State<SettingsPage>
               staggeredProgress * 100 - 50,
             ),
             child: Opacity(
-              opacity: (1.0 - staggeredProgress) * 0.6,
+              opacity: pitchBlack ? 0 : (1.0 - staggeredProgress) * 0.6,
               child: Container(
                 width: 3,
                 height: 3,
@@ -445,12 +448,25 @@ class _SettingsPageState extends State<SettingsPage>
             });
           },
         ),
+        _buildSwitchTile(
+          title: "Pitch Black",
+          subtitle: "Ultra dark mode for AMOLED screens",
+          value: pitchBlack,
+          onChanged: (val) {
+            setState(() {
+              pitchBlack = val;
+            });
+            _showSnackBar(
+              pitchBlack ? "Pitch Black enabled" : "Pitch Black disabled",
+              pitchBlack ? Colors.black : const Color(0xFFff7d78),
+            );
+          },
+        ),
       ],
     );
   }
 
   Widget _buildAudioSection() {
-    // Use Provider for audio/download quality
     return Consumer<PlayerStateProvider>(
       builder: (context, playerState, child) {
         return _buildSection(
