@@ -526,7 +526,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     final primaryColor = customTheme.primaryColor;
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 20),
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: !customColorsEnabled
@@ -954,7 +954,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                           ],
                                         ).createShader(bounds),
                                     child: const Text(
-                                      'Now Playing',
+                                      'Discover Music',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -963,7 +963,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                     ),
                                   )
                                 : Text(
-                                    'Now Playing',
+                                    'Discover Music',
                                     style: TextStyle(
                                       color: customColorsEnabled
                                           ? primaryColor
@@ -1015,6 +1015,152 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
+
+                // Songs List
+                Expanded(
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFff7d78),
+                          ),
+                        )
+                      : _error.isNotEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                color: Colors.grey[400],
+                                size: 64,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Something went wrong',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _error,
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadRandomSongs,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFff7d78),
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Try Again'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : songsToShow.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.music_note,
+                                color: Colors.grey[400],
+                                size: 64,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _searchController.text.trim().isEmpty
+                                    ? 'No trending songs found'
+                                    : 'No results found',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _searchController.text.trim().isEmpty
+                                    ? 'Try searching for your favorite music'
+                                    : 'Try different keywords',
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Section Title
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                20,
+                                10,
+                                20,
+                                10,
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 4,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: customColorsEnabled
+                                          ? primaryColor
+                                          : null,
+                                      gradient: !customColorsEnabled
+                                          ? const LinearGradient(
+                                              colors: [
+                                                Color(0xFFff7d78),
+                                                Color(0xFF9c27b0),
+                                              ],
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                            )
+                                          : null,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    _searchController.text.trim().isEmpty
+                                        ? 'Trending Songs'
+                                        : 'Search Results',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Songs List
+                            Expanded(
+                              child: ListView.builder(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                itemCount: songsToShow.length,
+                                itemBuilder: (context, index) {
+                                  final song = songsToShow[index];
+                                  return _buildEnhancedSongTile(song, index);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
               ],
             ),
           ),

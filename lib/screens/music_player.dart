@@ -275,10 +275,10 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                             customColorsEnabled
                                 ? Text(
                                     'Now Playing',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white,
+                                      color: primaryColor,
                                     ),
                                   )
                                 : ShaderMask(
@@ -404,9 +404,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                 ),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(25),
-                                  color: customColorsEnabled
-                                      ? primaryColor
-                                      : Colors.white.withOpacity(0.1),
+                                  color: Colors.white.withOpacity(0.1),
                                   border: Border.all(
                                     color: Colors.white.withOpacity(0.3),
                                     width: 1,
@@ -447,9 +445,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                 ),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(25),
-                                  color: customColorsEnabled
-                                      ? primaryColor
-                                      : Colors.white.withOpacity(0.1),
+                                  color: Colors.white.withOpacity(0.1),
                                   border: Border.all(
                                     color: Colors.white.withOpacity(0.3),
                                     width: 1,
@@ -607,13 +603,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                       )
                                     : null,
                                 borderRadius: BorderRadius.circular(28),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: primaryColor.withOpacity(0.4),
-                                    blurRadius: 20,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
                               ),
                               child: IconButton(
                                 icon: widget.isLoading
@@ -795,14 +784,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     double size = 28,
     required VoidCallback onPressed,
   }) {
-    final customTheme = context.watch<CustomThemeProvider>();
-    final customColorsEnabled = customTheme.customColorsEnabled;
-    final buttonColor = customColorsEnabled
-        ? customTheme.primaryColor
-        : Colors.white.withOpacity(0.1);
     return Container(
       decoration: BoxDecoration(
-        color: buttonColor,
+        color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
       ),
