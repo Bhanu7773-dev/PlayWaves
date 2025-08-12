@@ -8,8 +8,6 @@ import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../services/jiosaavn_api_service.dart';
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
@@ -50,20 +48,30 @@ class MusicPlayerPage extends StatefulWidget {
   State<MusicPlayerPage> createState() => _MusicPlayerPageState();
 }
 
-class _MusicPlayerPageState extends State<MusicPlayerPage> {
+class _MusicPlayerPageState extends State<MusicPlayerPage>
+    with TickerProviderStateMixin {
   bool _isDragging = false;
   double _dragValue = 0.0;
   final PageController _pageController = PageController();
 
-  final JioSaavnApiService _apiService = JioSaavnApiService();
-
   bool _isQueueOpen = false;
   static const int _queueTargetCount = 30;
   bool _isDownloading = false;
+  late AnimationController _meteorsController;
+
+  @override
+  void initState() {
+    super.initState();
+    _meteorsController = AnimationController(
+      duration: const Duration(seconds: 3),
+      vsync: this,
+    )..repeat();
+  }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _meteorsController.dispose();
     super.dispose();
   }
 
@@ -188,10 +196,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         : const Color(0xFFff7d78);
     final secondaryColor = customColorsEnabled
         ? customTheme.secondaryColor
-        : const Color(0xFF16213e);
-    final gradientColors = (!customColorsEnabled)
-        ? [const Color(0x33ff7d78), const Color(0x229c27b0), Colors.black]
-        : [secondaryColor, secondaryColor, secondaryColor];
+        : Colors.black; // Changed from purple to black
     // Debug print to check secondaryColor value
     print('[MusicPlayerPage] secondaryColor: ' + secondaryColor.toString());
 
@@ -206,445 +211,582 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         .isPitchBlack; // <-- Read theme
 
     return Scaffold(
-      backgroundColor: isPitchBlack ? Colors.black : secondaryColor,
+      backgroundColor: isPitchBlack
+          ? Colors.black
+          : customColorsEnabled
+          ? customTheme.secondaryColor
+          : const Color(
+              0xFF0F0F23,
+            ), // Deep space color to match galaxy background
       body: GestureDetector(
         onVerticalDragUpdate: (details) {
           if (details.delta.dy < -10) {
             _showUpNextQueue(context);
           }
         },
-        child: Container(
-          decoration: isPitchBlack
-              ? const BoxDecoration(color: Colors.black)
-              : (!customColorsEnabled
-                    ? BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment.topCenter,
-                          radius: 1.5,
-                          colors: gradientColors,
-                          stops: [0.0, 0.4, 1.0],
-                        ),
-                      )
-                    : BoxDecoration(color: secondaryColor)),
-          child: SafeArea(
-            child: Consumer<PlayerStateProvider>(
-              builder: (context, playerState, child) {
-                final song = playerState.currentSong;
-                final String currentSongTitle =
-                    song?['name'] ?? song?['title'] ?? widget.songTitle;
+        child: Stack(
+          children: [
+            // Animated background with meteors
+            _buildAnimatedBackground(isPitchBlack: isPitchBlack),
+            SafeArea(
+              child: Consumer<PlayerStateProvider>(
+                builder: (context, playerState, child) {
+                  final song = playerState.currentSong;
+                  final String currentSongTitle =
+                      song?['name'] ?? song?['title'] ?? widget.songTitle;
 
-                String currentArtistName = 'Unknown Artist';
-                if (song?['artists'] != null) {
-                  final artists = song!['artists'];
-                  if (artists is Map &&
-                      artists['primary'] is List &&
-                      artists['primary'].isNotEmpty) {
+                  String currentArtistName = 'Unknown Artist';
+                  if (song?['artists'] != null) {
+                    final artists = song!['artists'];
+                    if (artists is Map &&
+                        artists['primary'] is List &&
+                        artists['primary'].isNotEmpty) {
+                      currentArtistName =
+                          artists['primary'][0]['name'] ?? 'Unknown Artist';
+                    }
+                  } else if (song?['primaryArtists'] != null) {
                     currentArtistName =
-                        artists['primary'][0]['name'] ?? 'Unknown Artist';
+                        song!['primaryArtists'] ?? widget.artistName;
+                  } else if (song?['subtitle'] != null) {
+                    currentArtistName = song!['subtitle'] ?? widget.artistName;
+                  } else {
+                    currentArtistName = widget.artistName;
                   }
-                } else if (song?['primaryArtists'] != null) {
-                  currentArtistName =
-                      song!['primaryArtists'] ?? widget.artistName;
-                } else if (song?['subtitle'] != null) {
-                  currentArtistName = song!['subtitle'] ?? widget.artistName;
-                } else {
-                  currentArtistName = widget.artistName;
-                }
 
-                String currentAlbumArtUrl = '';
-                if (song?['image'] != null) {
-                  currentAlbumArtUrl = _getBestImageUrl(song!['image']);
-                }
-                if (currentAlbumArtUrl.isEmpty) {
-                  currentAlbumArtUrl = widget.albumArtUrl;
-                }
+                  String currentAlbumArtUrl = '';
+                  if (song?['image'] != null) {
+                    currentAlbumArtUrl = _getBestImageUrl(song!['image']);
+                  }
+                  if (currentAlbumArtUrl.isEmpty) {
+                    currentAlbumArtUrl = widget.albumArtUrl;
+                  }
 
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildIconBox(
-                            icon: Icons.keyboard_arrow_down,
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                          customColorsEnabled
-                              ? Text(
-                                  'Now Playing',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : ShaderMask(
-                                  shaderCallback: (bounds) => LinearGradient(
-                                    colors: [primaryColor, secondaryColor],
-                                  ).createShader(bounds),
-                                  child: const Text(
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildIconBox(
+                              icon: Icons.keyboard_arrow_down,
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                            customColorsEnabled
+                                ? Text(
                                     'Now Playing',
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w600,
                                       color: Colors.white,
                                     ),
-                                  ),
-                                ),
-                          _buildIconBox(
-                            icon: Icons.queue_music,
-                            onPressed: () => _showUpNextQueue(context),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                      child: SizedBox(
-                        height: MediaQuery.of(context).size.height * 0.40,
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: 1,
-                            child: Hero(
-                              tag:
-                                  'album_art_${widget.songTitle}_${widget.artistName}',
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(32),
-                                child: currentAlbumArtUrl.isNotEmpty
-                                    ? Image.network(
-                                        currentAlbumArtUrl,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) {
-                                              return Container(
-                                                color: Colors.grey[800],
-                                                child: Icon(
-                                                  Icons.music_note,
-                                                  color: customColorsEnabled
-                                                      ? primaryColor
-                                                      : Colors.white,
-                                                  size: 80,
-                                                ),
-                                              );
-                                            },
-                                      )
-                                    : Container(
-                                        color: Colors.grey[800],
-                                        child: Icon(
-                                          Icons.music_note,
-                                          color: customColorsEnabled
-                                              ? primaryColor
-                                              : Colors.white,
-                                          size: 80,
-                                        ),
+                                  )
+                                : ShaderMask(
+                                    shaderCallback: (bounds) => LinearGradient(
+                                      colors: [primaryColor, secondaryColor],
+                                    ).createShader(bounds),
+                                    child: const Text(
+                                      'Now Playing',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
                                       ),
+                                    ),
+                                  ),
+                            _buildIconBox(
+                              icon: Icons.queue_music,
+                              onPressed: () => _showUpNextQueue(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                        child: SizedBox(
+                          height:
+                              MediaQuery.of(context).size.height *
+                              0.40, // Restored to original size
+                          child: Center(
+                            child: AspectRatio(
+                              aspectRatio: 1,
+                              child: Hero(
+                                tag:
+                                    'album_art_${widget.songTitle}_${widget.artistName}',
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(32),
+                                  child: currentAlbumArtUrl.isNotEmpty
+                                      ? Image.network(
+                                          currentAlbumArtUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                                return Container(
+                                                  color: Colors.grey[800],
+                                                  child: Icon(
+                                                    Icons.music_note,
+                                                    color: customColorsEnabled
+                                                        ? primaryColor
+                                                        : Colors.white,
+                                                    size: 80,
+                                                  ),
+                                                );
+                                              },
+                                        )
+                                      : Container(
+                                          color: Colors.grey[800],
+                                          child: Icon(
+                                            Icons.music_note,
+                                            color: customColorsEnabled
+                                                ? primaryColor
+                                                : Colors.white,
+                                            size: 80,
+                                          ),
+                                        ),
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const SizedBox(height: 18),
-                          Hero(
-                            tag:
-                                'song_title_${widget.songTitle}_${widget.artistName}',
-                            child: Material(
-                              color: Colors.transparent,
-                              child: Text(
-                                currentSongTitle,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Hero(
-                            tag:
-                                'artist_name_${widget.songTitle}_${widget.artistName}',
-                            child: Material(
-                              color: Colors.transparent,
-                              child: Text(
-                                currentArtistName,
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 16,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      child: Center(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(25),
-                                color: customColorsEnabled
-                                    ? primaryColor
-                                    : Colors.white.withOpacity(0.1),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 10,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.playlist_add,
+                            const SizedBox(height: 18),
+                            Hero(
+                              tag:
+                                  'song_title_${widget.songTitle}_${widget.artistName}',
+                              child: Material(
+                                color: Colors.transparent,
+                                child: Text(
+                                  currentSongTitle,
+                                  style: const TextStyle(
                                     color: Colors.white,
-                                    size: 18,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Add to Playlist',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(25),
-                                color: customColorsEnabled
-                                    ? primaryColor
-                                    : Colors.white.withOpacity(0.1),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 10,
-                                    spreadRadius: 1,
+                            const SizedBox(height: 6),
+                            Hero(
+                              tag:
+                                  'artist_name_${widget.songTitle}_${widget.artistName}',
+                              child: Material(
+                                color: Colors.transparent,
+                                child: Text(
+                                  currentArtistName,
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 16,
                                   ),
-                                ],
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _isDownloading
-                                      ? SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : Icon(
-                                          Icons.download,
-                                          color: Colors.white,
-                                          size: 18,
-                                        ),
-                                  const SizedBox(width: 6),
-                                  GestureDetector(
-                                    onTap: _isDownloading
-                                        ? null
-                                        : _downloadCurrentSong,
-                                    child: Text(
-                                      'Download',
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(25),
+                                  color: customColorsEnabled
+                                      ? primaryColor
+                                      : Colors.white.withOpacity(0.1),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 10,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.playlist_add,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Add to Playlist',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(25),
+                                  color: customColorsEnabled
+                                      ? primaryColor
+                                      : Colors.white.withOpacity(0.1),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.3),
+                                    width: 1,
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 6,
-                              thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 8,
-                              ),
-                              overlayShape: const RoundSliderOverlayShape(
-                                overlayRadius: 16,
-                              ),
-                              activeTrackColor: primaryColor,
-                              inactiveTrackColor: Colors.white.withOpacity(0.2),
-                              thumbColor: Colors.white,
-                              overlayColor: primaryColor.withOpacity(0.2),
-                            ),
-                            child: Slider(
-                              value: displayProgress.clamp(0.0, 1.0),
-                              min: 0.0,
-                              max: 1.0,
-                              onChangeStart: (value) {
-                                setState(() {
-                                  _isDragging = true;
-                                  _dragValue = value;
-                                });
-                              },
-                              onChanged: (value) {
-                                setState(() {
-                                  _dragValue = value;
-                                });
-                              },
-                              onChangeEnd: (value) {
-                                setState(() {
-                                  _isDragging = false;
-                                });
-                                widget.onSeek(value.clamp(0.0, 1.0));
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                _formatDuration(
-                                  _isDragging
-                                      ? Duration(
-                                          seconds:
-                                              (_dragValue *
-                                                      widget
-                                                          .totalDuration
-                                                          .inSeconds)
-                                                  .round(),
-                                        )
-                                      : widget.currentPosition,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 10,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
                                 ),
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Text(
-                                _formatDuration(widget.totalDuration),
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _isDownloading
+                                        ? SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.download,
+                                            color: Colors.white,
+                                            size: 18,
+                                          ),
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
+                                      onTap: _isDownloading
+                                          ? null
+                                          : _downloadCurrentSong,
+                                      child: Text(
+                                        'Download',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 40.0,
-                        vertical: 18,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildIconBox(
-                            icon: Icons.skip_previous,
-                            size: 32,
-                            onPressed: widget.onPrevious,
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: customColorsEnabled ? primaryColor : null,
-                              gradient: !customColorsEnabled
-                                  ? LinearGradient(
-                                      colors: [primaryColor, secondaryColor],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    )
-                                  : null,
-                              borderRadius: BorderRadius.circular(28),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: primaryColor.withOpacity(0.4),
-                                  blurRadius: 20,
-                                  spreadRadius: 2,
+                      const Spacer(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 6,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 8,
+                                ),
+                                overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 16,
+                                ),
+                                activeTrackColor: primaryColor,
+                                inactiveTrackColor: Colors.white.withOpacity(
+                                  0.2,
+                                ),
+                                thumbColor: Colors.white,
+                                overlayColor: primaryColor.withOpacity(0.2),
+                              ),
+                              child: Slider(
+                                value: displayProgress.clamp(0.0, 1.0),
+                                min: 0.0,
+                                max: 1.0,
+                                onChangeStart: (value) {
+                                  setState(() {
+                                    _isDragging = true;
+                                    _dragValue = value;
+                                  });
+                                },
+                                onChanged: (value) {
+                                  setState(() {
+                                    _dragValue = value;
+                                  });
+                                },
+                                onChangeEnd: (value) {
+                                  setState(() {
+                                    _isDragging = false;
+                                  });
+                                  widget.onSeek(value.clamp(0.0, 1.0));
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _formatDuration(
+                                    _isDragging
+                                        ? Duration(
+                                            seconds:
+                                                (_dragValue *
+                                                        widget
+                                                            .totalDuration
+                                                            .inSeconds)
+                                                    .round(),
+                                          )
+                                        : widget.currentPosition,
+                                  ),
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  _formatDuration(widget.totalDuration),
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ],
                             ),
-                            child: IconButton(
-                              icon: widget.isLoading
-                                  ? SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : Icon(
-                                      widget.isPlaying
-                                          ? Icons.pause
-                                          : Icons.play_arrow,
-                                      color: Colors.white,
-                                      size: 40,
-                                    ),
-                              onPressed: widget.isLoading
-                                  ? null
-                                  : widget.onPlayPause,
-                              padding: const EdgeInsets.all(16),
-                            ),
-                          ),
-                          _buildIconBox(
-                            icon: Icons.skip_next,
-                            size: 32,
-                            onPressed: widget.onNext,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              },
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40.0,
+                          vertical: 18,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildIconBox(
+                              icon: Icons.skip_previous,
+                              size: 32,
+                              onPressed: widget.onPrevious,
+                            ),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: customColorsEnabled
+                                    ? primaryColor
+                                    : null,
+                                gradient: !customColorsEnabled
+                                    ? LinearGradient(
+                                        colors: [primaryColor, secondaryColor],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      )
+                                    : null,
+                                borderRadius: BorderRadius.circular(28),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: primaryColor.withOpacity(0.4),
+                                    blurRadius: 20,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                icon: widget.isLoading
+                                    ? SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Icon(
+                                        widget.isPlaying
+                                            ? Icons.pause
+                                            : Icons.play_arrow,
+                                        color: Colors.white,
+                                        size: 40,
+                                      ),
+                                onPressed: widget.isLoading
+                                    ? null
+                                    : widget.onPlayPause,
+                                padding: const EdgeInsets.all(16),
+                              ),
+                            ),
+                            _buildIconBox(
+                              icon: Icons.skip_next,
+                              size: 32,
+                              onPressed: widget.onNext,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedBackground({required bool isPitchBlack}) {
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+
+    return Container(
+      decoration: isPitchBlack
+          ? const BoxDecoration(color: Colors.black)
+          : customColorsEnabled
+          ? BoxDecoration(color: customTheme.secondaryColor)
+          : const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF0F0F23), // Deep space blue
+                  Color(0xFF1A1A2E), // Dark navy
+                  Color(0xFF16213E), // Midnight blue
+                  Color(0xFF0F0F23), // Back to deep space
+                ],
+                stops: [0.0, 0.3, 0.7, 1.0],
+              ),
+            ),
+      child: Stack(
+        children: [
+          // Add some static stars
+          ...List.generate(
+            50,
+            (index) => _buildStaticStar(index, isPitchBlack: isPitchBlack),
+          ),
+          // Add moving meteors/shooting stars
+          ...List.generate(
+            15,
+            (index) => _buildMeteor(index, isPitchBlack: isPitchBlack),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStaticStar(int index, {required bool isPitchBlack}) {
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+
+    // Different star colors for galaxy effect
+    final List<Color> starColors = [
+      Colors.white.withOpacity(0.8),
+      Colors.blue.shade100.withOpacity(0.6),
+      Colors.purple.shade100.withOpacity(0.5),
+      const Color(0xFFFFE5B4).withOpacity(0.7), // Warm white
+    ];
+
+    final starColor = customColorsEnabled
+        ? customTheme.primaryColor.withOpacity(0.6)
+        : starColors[index % starColors.length];
+
+    return Positioned(
+      top: (index * 37.0) % MediaQuery.of(context).size.height,
+      left: (index * 73.0) % MediaQuery.of(context).size.width,
+      child: Opacity(
+        opacity: isPitchBlack ? 0 : (0.3 + (index % 3) * 0.2),
+        child: Container(
+          width: 1.5 + (index % 3) * 0.5,
+          height: 1.5 + (index % 3) * 0.5,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(1),
+            color: starColor,
+            boxShadow: [
+              BoxShadow(
+                color: starColor.withOpacity(0.5),
+                blurRadius: 2,
+                spreadRadius: 0.5,
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMeteor(int index, {required bool isPitchBlack}) {
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+
+    // Galaxy shooting star colors
+    final List<Color> meteorColors = [
+      const Color(0xFFFFE5B4), // Warm white
+      const Color(0xFFB8E6FF), // Light blue
+      const Color(0xFFE6B8FF), // Light purple
+      Colors.white,
+    ];
+
+    final meteorColor = customColorsEnabled
+        ? customTheme.primaryColor
+        : meteorColors[index % meteorColors.length];
+
+    return AnimatedBuilder(
+      animation: _meteorsController,
+      builder: (context, child) {
+        final double progress = _meteorsController.value;
+        final double staggeredProgress = ((progress + (index * 0.15)) % 1.0)
+            .clamp(0.0, 1.0);
+        return Positioned(
+          top: (index * 80.0) % MediaQuery.of(context).size.height,
+          left: (index * 120.0) % MediaQuery.of(context).size.width,
+          child: Transform.translate(
+            offset: Offset(
+              staggeredProgress * 150 - 75,
+              staggeredProgress * 150 - 75,
+            ),
+            child: Opacity(
+              opacity: isPitchBlack ? 0 : (1.0 - staggeredProgress) * 0.8,
+              child: Container(
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  color: meteorColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: meteorColor.withOpacity(0.6),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

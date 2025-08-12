@@ -954,7 +954,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                           ],
                                         ).createShader(bounds),
                                     child: const Text(
-                                      'Search & Discover',
+                                      'Now Playing',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -963,7 +963,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                     ),
                                   )
                                 : Text(
-                                    'Search & Discover',
+                                    'Now Playing',
                                     style: TextStyle(
                                       color: customColorsEnabled
                                           ? primaryColor
@@ -1015,64 +1015,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
-
-                // Content Area
-                Expanded(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: _isLoading
-                        ? _buildEmptyState(
-                            icon: Icons.music_note_outlined,
-                            title: 'Loading Music',
-                            subtitle: 'Preparing your music collection...',
-                          )
-                        : _error.isNotEmpty
-                        ? _buildEmptyState(
-                            icon: Icons.error_outline_rounded,
-                            title: 'Oops! Something went wrong',
-                            subtitle:
-                                'We couldn\'t load the music.\nPlease try again.',
-                            onRetry: _loadRandomSongs,
-                          )
-                        : songsToShow.isEmpty
-                        ? _buildEmptyState(
-                            icon: _searchController.text.trim().isEmpty
-                                ? Icons.music_off_rounded
-                                : Icons.search_off_rounded,
-                            title: _searchController.text.trim().isEmpty
-                                ? 'No Music Available'
-                                : 'No Results Found',
-                            subtitle: _searchController.text.trim().isEmpty
-                                ? 'Check your connection and try again'
-                                : 'Try searching with different keywords',
-                          )
-                        : Column(
-                            children: [
-                              // Section Header
-                              _buildSectionHeader(
-                                _searchController.text.trim().isEmpty
-                                    ? 'Trending Now'
-                                    : 'Search Results',
-                                songsToShow.length,
-                              ),
-
-                              // Songs List
-                              Expanded(
-                                child: ListView.builder(
-                                  padding: const EdgeInsets.only(bottom: 160),
-                                  itemCount: songsToShow.length,
-                                  itemBuilder: (context, index) {
-                                    return _buildEnhancedSongTile(
-                                      songsToShow[index],
-                                      index,
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
               ],
             ),
           ),
