@@ -466,9 +466,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                           width: 18,
                                           height: 18,
                                           child: CircularProgressIndicator(
-                                            color: customColorsEnabled
-                                                ? primaryColor
-                                                : Colors.white,
+                                            color: Colors.white,
                                             strokeWidth: 2,
                                           ),
                                         )
@@ -615,9 +613,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                       width: 24,
                                       height: 24,
                                       child: CircularProgressIndicator(
-                                        color: customColorsEnabled
-                                            ? primaryColor
-                                            : Colors.white,
+                                        color: Colors.white,
                                         strokeWidth: 2,
                                       ),
                                     )
