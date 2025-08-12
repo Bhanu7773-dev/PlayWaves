@@ -4,7 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/player_state_provider.dart';
-import '../services/pitch_black_theme_provider.dart'; // <-- Import the provider
+import '../services/pitch_black_theme_provider.dart';
+import '../widgets/color_theme.dialogue.dart';
 
 class SettingsPage extends StatefulWidget {
   final VoidCallback onLogout;
@@ -24,9 +25,26 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage>
     with TickerProviderStateMixin {
-  bool useSystemTheme = true;
+  bool useSystemTheme = false;
   bool useDynamicColors = false;
+  bool customColorsEnabled = false;
+  bool pitchBlackEnabled = false;
   bool offlineMode = false;
+  Color pickedPrimaryColor = const Color(0xFFff7d78);
+  Color pickedSecondaryColor = const Color(0xFF16213e);
+
+  final List<Color> defaultGradient = [Color(0xFFff7d78), Color(0xFF9c27b0)];
+  final Color defaultPrimaryColor = Color(0xFFff7d78);
+  final Color defaultSecondaryColor = Color(0xFF16213e);
+
+  Color get primaryColor =>
+      customColorsEnabled ? pickedPrimaryColor : defaultPrimaryColor;
+  Color get secondaryColor =>
+      customColorsEnabled ? pickedSecondaryColor : defaultSecondaryColor;
+
+  List<Color> get iconGradient => customColorsEnabled
+      ? [pickedPrimaryColor, pickedPrimaryColor]
+      : defaultGradient;
 
   final List<String> audioQualities = [
     'Low (96 kbps)',
@@ -71,10 +89,15 @@ class _SettingsPageState extends State<SettingsPage>
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      useSystemTheme = prefs.getBool('useSystemTheme') ?? true;
+      useSystemTheme = prefs.getBool('useSystemTheme') ?? false;
       useDynamicColors = prefs.getBool('useDynamicColors') ?? false;
+      customColorsEnabled = prefs.getBool('customColorsEnabled') ?? false;
+      pitchBlackEnabled = prefs.getBool('pitchBlackEnabled') ?? false;
       offlineMode = prefs.getBool('offlineMode') ?? false;
-      // REMOVE pitchBlack from local state: we use provider below!
+      pickedPrimaryColor = Color(prefs.getInt('primaryColor') ?? 0xFFff7d78);
+      pickedSecondaryColor = Color(
+        prefs.getInt('secondaryColor') ?? 0xFF16213e,
+      );
     });
   }
 
@@ -82,8 +105,11 @@ class _SettingsPageState extends State<SettingsPage>
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool('useSystemTheme', useSystemTheme);
     prefs.setBool('useDynamicColors', useDynamicColors);
+    prefs.setBool('customColorsEnabled', customColorsEnabled);
+    prefs.setBool('pitchBlackEnabled', pitchBlackEnabled);
     prefs.setBool('offlineMode', offlineMode);
-    // REMOVE pitchBlack from local state: we use provider below!
+    prefs.setInt('primaryColor', pickedPrimaryColor.value);
+    prefs.setInt('secondaryColor', pickedSecondaryColor.value);
   }
 
   Future<void> _launchURL(String url) async {
@@ -105,13 +131,54 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
+  // Mutually exclusive, but all can be off (default theme)
+  void _handleThemeToggle(String key, bool value) {
+    setState(() {
+      if (key == 'system') {
+        useSystemTheme = value;
+        if (value) {
+          useDynamicColors = false;
+          customColorsEnabled = false;
+          pitchBlackEnabled = false;
+          context.read<PitchBlackThemeProvider>().setPitchBlack(false);
+        }
+      } else if (key == 'dynamic') {
+        useDynamicColors = value;
+        if (value) {
+          useSystemTheme = false;
+          customColorsEnabled = false;
+          pitchBlackEnabled = false;
+          context.read<PitchBlackThemeProvider>().setPitchBlack(false);
+        }
+      } else if (key == 'custom') {
+        customColorsEnabled = value;
+        if (value) {
+          useSystemTheme = false;
+          useDynamicColors = false;
+          pitchBlackEnabled = false;
+          context.read<PitchBlackThemeProvider>().setPitchBlack(false);
+        }
+      } else if (key == 'pitchBlack') {
+        pitchBlackEnabled = value;
+        context.read<PitchBlackThemeProvider>().setPitchBlack(value);
+        if (value) {
+          useSystemTheme = false;
+          useDynamicColors = false;
+          customColorsEnabled = false;
+        }
+      }
+      // If all are false, show default gradient theme
+    });
+    _saveSettings();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isPitchBlack = context
-        .watch<PitchBlackThemeProvider>()
-        .isPitchBlack; // <-- Read from provider
+    final isPitchBlack =
+        context.watch<PitchBlackThemeProvider>().isPitchBlack ||
+        pitchBlackEnabled;
     return Scaffold(
-      backgroundColor: isPitchBlack ? Colors.black : Colors.black,
+      backgroundColor: isPitchBlack ? Colors.black : secondaryColor,
       body: Stack(
         children: [
           _buildAnimatedBackground(isPitchBlack: isPitchBlack),
@@ -120,7 +187,7 @@ class _SettingsPageState extends State<SettingsPage>
               opacity: _fadeAnimation,
               child: Column(
                 children: [
-                  _buildHeader(),
+                  _buildHeader(isPitchBlack),
                   Expanded(
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
@@ -129,15 +196,15 @@ class _SettingsPageState extends State<SettingsPage>
                         child: Column(
                           children: [
                             const SizedBox(height: 20),
-                            _buildMusicStatsCard(),
+                            _buildMusicStatsCard(isPitchBlack),
                             const SizedBox(height: 24),
-                            _buildThemeSection(context),
+                            _buildThemeSection(context, isPitchBlack),
                             const SizedBox(height: 20),
-                            _buildAudioSection(),
+                            _buildAudioSection(isPitchBlack),
                             const SizedBox(height: 20),
-                            _buildSystemSection(),
+                            _buildSystemSection(isPitchBlack),
                             const SizedBox(height: 24),
-                            _buildDeveloperInfoCard(),
+                            _buildDeveloperInfoCard(isPitchBlack),
                             const SizedBox(height: 20),
                           ],
                         ),
@@ -155,16 +222,7 @@ class _SettingsPageState extends State<SettingsPage>
 
   Widget _buildAnimatedBackground({required bool isPitchBlack}) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: isPitchBlack
-            ? null
-            : const RadialGradient(
-                center: Alignment.topRight,
-                radius: 1.5,
-                colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
-              ),
-        color: isPitchBlack ? Colors.black : null,
-      ),
+      color: isPitchBlack ? Colors.black : secondaryColor,
       child: Stack(
         children: List.generate(
           20,
@@ -196,16 +254,7 @@ class _SettingsPageState extends State<SettingsPage>
                 height: 3,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFff7d78).withOpacity(0.4),
-                      blurRadius: 6,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                  ),
+                  color: primaryColor,
                 ),
               ),
             ),
@@ -215,7 +264,7 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isPitchBlack) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Row(
@@ -223,11 +272,20 @@ class _SettingsPageState extends State<SettingsPage>
           Container(
             width: 4,
             height: 28,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-              ),
-              borderRadius: BorderRadius.all(Radius.circular(2)),
+            decoration: BoxDecoration(
+              gradient:
+                  (!customColorsEnabled &&
+                      !useSystemTheme &&
+                      !useDynamicColors &&
+                      !pitchBlackEnabled)
+                  ? LinearGradient(
+                      colors: defaultGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: customColorsEnabled ? primaryColor : null,
+              borderRadius: const BorderRadius.all(Radius.circular(2)),
             ),
           ),
           const SizedBox(width: 16),
@@ -242,13 +300,22 @@ class _SettingsPageState extends State<SettingsPage>
           const Spacer(),
           Container(
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-              ),
+              gradient:
+                  (!customColorsEnabled &&
+                      !useSystemTheme &&
+                      !useDynamicColors &&
+                      !pitchBlackEnabled)
+                  ? LinearGradient(
+                      colors: defaultGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: customColorsEnabled ? primaryColor : null,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFff7d78).withOpacity(0.3),
+                  color: primaryColor.withOpacity(0.3),
                   blurRadius: 8,
                   spreadRadius: 2,
                 ),
@@ -267,27 +334,16 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildMusicStatsCard() {
-    // ... unchanged ...
-    // (keep your existing card code)
-    // For brevity, not repeating unchanged parts
-    // If you want the full chunk again, let me know!
+  Widget _buildMusicStatsCard(bool isPitchBlack) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.15),
-            Colors.white.withOpacity(0.05),
-          ],
-        ),
+        color: Colors.white.withOpacity(0.05),
         border: Border.all(color: Colors.white.withOpacity(0.2)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFff7d78).withOpacity(0.1),
+            color: primaryColor.withOpacity(0.1),
             blurRadius: 20,
             spreadRadius: 5,
           ),
@@ -296,29 +352,29 @@ class _SettingsPageState extends State<SettingsPage>
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFFff7d78).withOpacity(0.1),
-              const Color(0xFF9c27b0).withOpacity(0.05),
-            ],
-          ),
+          color: Colors.white.withOpacity(0.05),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ... rest of your stats card code ...
-            // (keep it as-is)
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                    ),
+                    gradient:
+                        (!customColorsEnabled &&
+                            !useSystemTheme &&
+                            !useDynamicColors &&
+                            !pitchBlackEnabled)
+                        ? LinearGradient(
+                            colors: defaultGradient,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: customColorsEnabled ? primaryColor : null,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -363,9 +419,11 @@ class _SettingsPageState extends State<SettingsPage>
                 children: [
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.star,
-                        color: Color(0xFFff7d78),
+                        color: customColorsEnabled
+                            ? primaryColor
+                            : defaultPrimaryColor,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
@@ -386,9 +444,11 @@ class _SettingsPageState extends State<SettingsPage>
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.favorite,
-                        color: Color(0xFF9c27b0),
+                        color: customColorsEnabled
+                            ? secondaryColor
+                            : Color(0xFF9c27b0),
                         size: 16,
                       ),
                       const SizedBox(width: 8),
@@ -430,7 +490,11 @@ class _SettingsPageState extends State<SettingsPage>
         ),
         child: Column(
           children: [
-            Icon(icon, color: const Color(0xFFff7d78), size: 20),
+            Icon(
+              icon,
+              color: customColorsEnabled ? primaryColor : defaultPrimaryColor,
+              size: 20,
+            ),
             const SizedBox(height: 8),
             Text(
               value,
@@ -451,23 +515,19 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildThemeSection(BuildContext context) {
-    final pitchBlackProvider = context
-        .watch<PitchBlackThemeProvider>(); // get provider reference
+  Widget _buildThemeSection(BuildContext context, bool isPitchBlack) {
     return _buildSection(
       title: "Themes & Appearance",
       icon: Icons.palette,
+      isPitchBlack: isPitchBlack,
       children: [
         _buildSwitchTile(
           title: "Use System Theme",
           subtitle: "Automatically adapts to system light/dark mode",
           value: useSystemTheme,
           onChanged: (val) {
-            setState(() {
-              useSystemTheme = val;
-            });
-            _saveSettings();
-            _showSnackBar("Theme setting updated", const Color(0xFFff7d78));
+            _handleThemeToggle('system', val);
+            if (val) _showSnackBar("System theme enabled", defaultPrimaryColor);
           },
         ),
         _buildSwitchTile(
@@ -475,37 +535,90 @@ class _SettingsPageState extends State<SettingsPage>
           subtitle: "Matches system accent color (Android 12+)",
           value: useDynamicColors,
           onChanged: (val) {
-            setState(() {
-              useDynamicColors = val;
-            });
-            _saveSettings();
+            _handleThemeToggle('dynamic', val);
+            if (val)
+              _showSnackBar("Dynamic colors enabled", defaultPrimaryColor);
           },
         ),
         _buildSwitchTile(
           title: "Pitch Black",
           subtitle: "Ultra dark mode for AMOLED screens",
-          value: pitchBlackProvider.isPitchBlack, // <-- value from provider
+          value: isPitchBlack,
           onChanged: (val) {
-            context.read<PitchBlackThemeProvider>().setPitchBlack(
-              val,
-            ); // <-- call provider
-            _saveSettings();
-            _showSnackBar(
-              val ? "Pitch Black enabled" : "Pitch Black disabled",
-              val ? Colors.black : const Color(0xFFff7d78),
-            );
+            _handleThemeToggle('pitchBlack', val);
+            if (val) _showSnackBar("Pitch Black enabled", Colors.black);
           },
         ),
+        _buildCustomColorsTile(context),
       ],
     );
   }
 
-  Widget _buildAudioSection() {
+  Widget _buildCustomColorsTile(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: ListTile(
+        leading: Icon(
+          Icons.palette,
+          color: customColorsEnabled ? pickedPrimaryColor : Colors.white54,
+        ),
+        title: Text(
+          "Custom Colors",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          "Personalize your app colors",
+          style: TextStyle(color: Colors.white70),
+        ),
+        trailing: Switch(
+          value: customColorsEnabled,
+          onChanged: (val) {
+            _handleThemeToggle('custom', val);
+            if (val) {
+              _showSnackBar("Custom colors enabled", pickedPrimaryColor);
+            } else {
+              _showSnackBar("Custom colors disabled", defaultPrimaryColor);
+            }
+          },
+          activeColor: pickedPrimaryColor,
+        ),
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (ctx) => ColorThemeDialog(
+              primaryColor: pickedPrimaryColor,
+              secondaryColor: pickedSecondaryColor,
+              onPrimaryColorChanged: (c) {
+                setState(() {
+                  pickedPrimaryColor = c;
+                });
+                _saveSettings();
+              },
+              onSecondaryColorChanged: (c) {
+                setState(() {
+                  pickedSecondaryColor = c;
+                });
+                _saveSettings();
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAudioSection(bool isPitchBlack) {
     return Consumer<PlayerStateProvider>(
       builder: (context, playerState, child) {
         return _buildSection(
           title: "Audio & Playback",
           icon: Icons.audiotrack,
+          isPitchBlack: isPitchBlack,
           children: [
             _buildQualitySelector(
               icon: Icons.high_quality,
@@ -515,10 +628,7 @@ class _SettingsPageState extends State<SettingsPage>
               options: audioQualities,
               onChanged: (value) {
                 playerState.setAudioQuality(value);
-                _showSnackBar(
-                  "Audio quality updated to $value",
-                  const Color(0xFFff7d78),
-                );
+                _showSnackBar("Audio quality updated to $value", primaryColor);
               },
             ),
             _buildQualitySelector(
@@ -531,7 +641,7 @@ class _SettingsPageState extends State<SettingsPage>
                 playerState.setDownloadQuality(value);
                 _showSnackBar(
                   "Download quality updated to $value",
-                  const Color(0xFFff7d78),
+                  primaryColor,
                 );
               },
             ),
@@ -549,6 +659,9 @@ class _SettingsPageState extends State<SettingsPage>
     required List<String> options,
     required ValueChanged<String> onChanged,
   }) {
+    final isPitchBlack =
+        context.watch<PitchBlackThemeProvider>().isPitchBlack ||
+        pitchBlackEnabled;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -557,7 +670,25 @@ class _SettingsPageState extends State<SettingsPage>
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFFff7d78)),
+        leading: Container(
+          decoration: BoxDecoration(
+            gradient:
+                (!customColorsEnabled &&
+                    !useSystemTheme &&
+                    !useDynamicColors &&
+                    !pitchBlackEnabled)
+                ? LinearGradient(
+                    colors: defaultGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: customColorsEnabled ? primaryColor : null,
+            shape: BoxShape.circle,
+          ),
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, color: Colors.white),
+        ),
         title: Text(title, style: const TextStyle(color: Colors.white)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -567,9 +698,7 @@ class _SettingsPageState extends State<SettingsPage>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                ),
+                color: customColorsEnabled ? primaryColor : defaultPrimaryColor,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -600,11 +729,14 @@ class _SettingsPageState extends State<SettingsPage>
     List<String> options,
     ValueChanged<String> onChanged,
   ) {
+    final isPitchBlack =
+        context.watch<PitchBlackThemeProvider>().isPitchBlack ||
+        pitchBlackEnabled;
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1a1a2e),
+          backgroundColor: secondaryColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: Colors.white.withOpacity(0.2)),
@@ -614,9 +746,18 @@ class _SettingsPageState extends State<SettingsPage>
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                  ),
+                  gradient:
+                      (!customColorsEnabled &&
+                          !useSystemTheme &&
+                          !useDynamicColors &&
+                          !pitchBlackEnabled)
+                      ? LinearGradient(
+                          colors: defaultGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: customColorsEnabled ? primaryColor : null,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -644,12 +785,16 @@ class _SettingsPageState extends State<SettingsPage>
                 margin: const EdgeInsets.symmetric(vertical: 4),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFFff7d78).withOpacity(0.2)
+                      ? (customColorsEnabled
+                            ? primaryColor.withOpacity(0.2)
+                            : defaultPrimaryColor.withOpacity(0.2))
                       : Colors.white.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isSelected
-                        ? const Color(0xFFff7d78)
+                        ? (customColorsEnabled
+                              ? primaryColor
+                              : defaultPrimaryColor)
                         : Colors.white.withOpacity(0.1),
                   ),
                 ),
@@ -658,7 +803,9 @@ class _SettingsPageState extends State<SettingsPage>
                     option,
                     style: TextStyle(
                       color: isSelected
-                          ? const Color(0xFFff7d78)
+                          ? (customColorsEnabled
+                                ? primaryColor
+                                : defaultPrimaryColor)
                           : Colors.white,
                       fontWeight: isSelected
                           ? FontWeight.bold
@@ -666,7 +813,12 @@ class _SettingsPageState extends State<SettingsPage>
                     ),
                   ),
                   leading: isSelected
-                      ? const Icon(Icons.check_circle, color: Color(0xFFff7d78))
+                      ? Icon(
+                          Icons.check_circle,
+                          color: customColorsEnabled
+                              ? primaryColor
+                              : defaultPrimaryColor,
+                        )
                       : const Icon(
                           Icons.radio_button_unchecked,
                           color: Colors.white54,
@@ -693,10 +845,11 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildSystemSection() {
+  Widget _buildSystemSection(bool isPitchBlack) {
     return _buildSection(
       title: "System & Storage",
       icon: Icons.settings,
+      isPitchBlack: isPitchBlack,
       children: [
         _buildSwitchTile(
           title: "Offline Mode",
@@ -714,7 +867,7 @@ class _SettingsPageState extends State<SettingsPage>
           title: "Language",
           subtitle: "English",
           onTap: () {
-            _showSnackBar("Language settings coming soon", Colors.blue);
+            _showSnackBar("Language settings coming soon", primaryColor);
           },
         ),
         _buildSettingsTile(
@@ -722,7 +875,7 @@ class _SettingsPageState extends State<SettingsPage>
           title: "Notifications",
           subtitle: "Manage notification settings",
           onTap: () {
-            _showSnackBar("Notification settings coming soon", Colors.blue);
+            _showSnackBar("Notification settings coming soon", primaryColor);
           },
         ),
         _buildSettingsTile(
@@ -741,19 +894,13 @@ class _SettingsPageState extends State<SettingsPage>
     required String title,
     required IconData icon,
     required List<Widget> children,
+    bool isPitchBlack = false,
   }) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.1),
-            Colors.white.withOpacity(0.05),
-          ],
-        ),
+        color: Colors.white.withOpacity(0.05),
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
       child: Column(
@@ -766,9 +913,18 @@ class _SettingsPageState extends State<SettingsPage>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                    ),
+                    gradient:
+                        (!customColorsEnabled &&
+                            !useSystemTheme &&
+                            !useDynamicColors &&
+                            !pitchBlackEnabled)
+                        ? LinearGradient(
+                            colors: defaultGradient,
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: customColorsEnabled ? primaryColor : null,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: Colors.white, size: 20),
@@ -809,8 +965,10 @@ class _SettingsPageState extends State<SettingsPage>
         subtitle: Text(subtitle, style: const TextStyle(color: Colors.white70)),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFFff7d78),
-        activeTrackColor: const Color(0xFFff7d78).withOpacity(0.3),
+        activeColor: customColorsEnabled ? primaryColor : defaultPrimaryColor,
+        activeTrackColor:
+            (customColorsEnabled ? primaryColor : defaultPrimaryColor)
+                .withOpacity(0.3),
         inactiveThumbColor: Colors.white24,
         inactiveTrackColor: Colors.white12,
       ),
@@ -823,6 +981,9 @@ class _SettingsPageState extends State<SettingsPage>
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final isPitchBlack =
+        context.watch<PitchBlackThemeProvider>().isPitchBlack ||
+        pitchBlackEnabled;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -831,7 +992,25 @@ class _SettingsPageState extends State<SettingsPage>
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFFff7d78)),
+        leading: Container(
+          decoration: BoxDecoration(
+            gradient:
+                (!customColorsEnabled &&
+                    !useSystemTheme &&
+                    !useDynamicColors &&
+                    !pitchBlackEnabled)
+                ? LinearGradient(
+                    colors: defaultGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: customColorsEnabled ? primaryColor : null,
+            shape: BoxShape.circle,
+          ),
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, color: Colors.white),
+        ),
         title: Text(title, style: const TextStyle(color: Colors.white)),
         subtitle: Text(subtitle, style: const TextStyle(color: Colors.white70)),
         trailing: const Icon(
@@ -844,26 +1023,16 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildDeveloperInfoCard() {
-    // ... unchanged, keep your card as-is
-    // For brevity, not repeating unchanged parts
-    // If you want the full chunk again, let me know!
+  Widget _buildDeveloperInfoCard(bool isPitchBlack) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF6366F1).withOpacity(0.2),
-            const Color(0xFF9c27b0).withOpacity(0.1),
-          ],
-        ),
-        border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+        color: Colors.white.withOpacity(0.05),
+        border: Border.all(color: primaryColor.withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6366F1).withOpacity(0.2),
+            color: primaryColor.withOpacity(0.2),
             blurRadius: 20,
             spreadRadius: 5,
           ),
@@ -872,19 +1041,26 @@ class _SettingsPageState extends State<SettingsPage>
       padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          // ... rest of your developer card code ...
-          // (keep as-is)
           Container(
             width: 80,
             height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF9c27b0)],
-              ),
+              gradient:
+                  (!customColorsEnabled &&
+                      !useSystemTheme &&
+                      !useDynamicColors &&
+                      !pitchBlackEnabled)
+                  ? LinearGradient(
+                      colors: defaultGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: customColorsEnabled ? primaryColor : null,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF6366F1).withOpacity(0.4),
+                  color: primaryColor.withOpacity(0.4),
                   blurRadius: 15,
                   spreadRadius: 3,
                 ),
@@ -908,9 +1084,18 @@ class _SettingsPageState extends State<SettingsPage>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF9c27b0)],
-              ),
+              gradient:
+                  (!customColorsEnabled &&
+                      !useSystemTheme &&
+                      !useDynamicColors &&
+                      !pitchBlackEnabled)
+                  ? LinearGradient(
+                      colors: defaultGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: customColorsEnabled ? primaryColor : null,
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Text(
@@ -1055,7 +1240,7 @@ class _SettingsPageState extends State<SettingsPage>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1a1a2e),
+          backgroundColor: secondaryColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: Colors.white.withOpacity(0.2)),
@@ -1078,9 +1263,18 @@ class _SettingsPageState extends State<SettingsPage>
             ),
             Container(
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                ),
+                gradient:
+                    (!customColorsEnabled &&
+                        !useSystemTheme &&
+                        !useDynamicColors &&
+                        !pitchBlackEnabled)
+                    ? LinearGradient(
+                        colors: defaultGradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                color: customColorsEnabled ? primaryColor : null,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: TextButton(
@@ -1108,7 +1302,7 @@ class _SettingsPageState extends State<SettingsPage>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF1a1a2e),
+          backgroundColor: secondaryColor,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: Colors.white.withOpacity(0.2)),
@@ -1118,9 +1312,18 @@ class _SettingsPageState extends State<SettingsPage>
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                  ),
+                  gradient:
+                      (!customColorsEnabled &&
+                          !useSystemTheme &&
+                          !useDynamicColors &&
+                          !pitchBlackEnabled)
+                      ? LinearGradient(
+                          colors: defaultGradient,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: customColorsEnabled ? primaryColor : null,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.storage, color: Colors.white, size: 20),
@@ -1174,9 +1377,18 @@ class _SettingsPageState extends State<SettingsPage>
             ),
             Container(
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                ),
+                gradient:
+                    (!customColorsEnabled &&
+                        !useSystemTheme &&
+                        !useDynamicColors &&
+                        !pitchBlackEnabled)
+                    ? LinearGradient(
+                        colors: defaultGradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                color: customColorsEnabled ? primaryColor : null,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: TextButton(

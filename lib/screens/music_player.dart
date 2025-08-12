@@ -8,7 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../services/player_state_provider.dart';
-import '../services/pitch_black_theme_provider.dart'; // <-- Import the pitch black provider
+import '../services/pitch_black_theme_provider.dart';
+import '../services/custom_theme_provider.dart'; // <-- Import your custom theme provider
 
 class MusicPlayerPage extends StatefulWidget {
   final String songTitle;
@@ -53,12 +54,8 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
 
   final JioSaavnApiService _apiService = JioSaavnApiService();
 
-  // Guard to prevent multiple queue sheets
   bool _isQueueOpen = false;
-
-  // Target number of items to show in the queue (finite, stable)
   static const int _queueTargetCount = 30;
-
   bool _isDownloading = false;
 
   @override
@@ -93,7 +90,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       }
     }
 
-    // Fallback if not found
     downloadUrl ??= song?['media_preview_url'] ?? song?['media_url'];
 
     if (downloadUrl == null) {
@@ -103,7 +99,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       return;
     }
 
-    // Get permission (Scoped for Android 10+/11+)
     bool hasPermission = false;
     if (Platform.isAndroid) {
       int sdkInt = 30;
@@ -140,7 +135,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       _isDownloading = true;
     });
 
-    // Save to Downloads directory for Android
     Directory? dir;
     if (Platform.isAndroid) {
       final dirs = await getExternalStorageDirectories(
@@ -183,6 +177,19 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ---- Custom theme logic here ----
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+    final primaryColor = customColorsEnabled
+        ? customTheme.primaryColor
+        : Color(0xFFff7d78);
+    final secondaryColor = customColorsEnabled
+        ? customTheme.secondaryColor
+        : Color(0xFF16213e);
+    final gradientColors = customColorsEnabled
+        ? [primaryColor, secondaryColor, Colors.black]
+        : [Color(0x33ff7d78), Color(0x229c27b0), Colors.black];
+
     final double progress = widget.totalDuration.inSeconds > 0
         ? (widget.currentPosition.inSeconds / widget.totalDuration.inSeconds)
               .clamp(0.0, 1.0)
@@ -194,9 +201,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         .isPitchBlack; // <-- Read theme
 
     return Scaffold(
-      backgroundColor: isPitchBlack
-          ? Colors.black
-          : Colors.black, // <-- Use theme
+      backgroundColor: isPitchBlack ? Colors.black : secondaryColor,
       body: GestureDetector(
         onVerticalDragUpdate: (details) {
           if (details.delta.dy < -10) {
@@ -206,15 +211,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         child: Container(
           decoration: isPitchBlack
               ? const BoxDecoration(color: Colors.black)
-              : const BoxDecoration(
+              : BoxDecoration(
                   gradient: RadialGradient(
                     center: Alignment.topCenter,
                     radius: 1.5,
-                    colors: [
-                      Color(0x33ff7d78),
-                      Color(0x229c27b0),
-                      Colors.black,
-                    ],
+                    colors: gradientColors,
                     stops: [0.0, 0.4, 1.0],
                   ),
                 ),
@@ -263,8 +264,8 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                             onPressed: () => Navigator.pop(context),
                           ),
                           ShaderMask(
-                            shaderCallback: (bounds) => const LinearGradient(
-                              colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                            shaderCallback: (bounds) => LinearGradient(
+                              colors: [primaryColor, secondaryColor],
                             ).createShader(bounds),
                             child: const Text(
                               'Now Playing',
@@ -486,12 +487,10 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                               overlayShape: const RoundSliderOverlayShape(
                                 overlayRadius: 16,
                               ),
-                              activeTrackColor: const Color(0xFFff7d78),
+                              activeTrackColor: primaryColor,
                               inactiveTrackColor: Colors.white.withOpacity(0.2),
                               thumbColor: Colors.white,
-                              overlayColor: const Color(
-                                0xFFff7d78,
-                              ).withOpacity(0.2),
+                              overlayColor: primaryColor.withOpacity(0.2),
                             ),
                             child: Slider(
                               value: displayProgress.clamp(0.0, 1.0),
@@ -567,17 +566,15 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                           ),
                           Container(
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                              gradient: LinearGradient(
+                                colors: [primaryColor, secondaryColor],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
                               borderRadius: BorderRadius.circular(28),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(
-                                    0xFFff7d78,
-                                  ).withOpacity(0.4),
+                                  color: primaryColor.withOpacity(0.4),
                                   blurRadius: 20,
                                   spreadRadius: 2,
                                 ),
