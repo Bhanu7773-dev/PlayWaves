@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'screens/homepage.dart';
 import 'services/player_state_provider.dart';
 import 'services/pitch_black_theme_provider.dart';
-import 'services/custom_theme_provider.dart'; // <-- Import your custom theme provider
+import 'services/custom_theme_provider.dart';
 
 void main() {
   runApp(
@@ -11,9 +11,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => PlayerStateProvider()),
         ChangeNotifierProvider(create: (_) => PitchBlackThemeProvider()),
-        ChangeNotifierProvider(
-          create: (_) => CustomThemeProvider(),
-        ), // <-- Add this line
+        ChangeNotifierProvider(create: (_) => CustomThemeProvider()),
       ],
       child: const MyApp(),
     ),
@@ -28,7 +26,6 @@ class MyApp extends StatelessWidget {
     final isPitchBlack = context.watch<PitchBlackThemeProvider>().isPitchBlack;
     final customTheme = context.watch<CustomThemeProvider>();
 
-    // Don't break pitch black, always override with black background if enabled
     Color scaffoldColor = isPitchBlack
         ? Colors.black
         : (customTheme.customColorsEnabled
@@ -39,10 +36,7 @@ class MyApp extends StatelessWidget {
       color: Colors.transparent,
       debugShowCheckedModeBanner: false,
       title: 'PlayWaves',
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: scaffoldColor,
-        // Other theme customizations can use customTheme.primaryColor if needed
-      ),
+      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: scaffoldColor),
       home: const HomePage(),
     );
   }

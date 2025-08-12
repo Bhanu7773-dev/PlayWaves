@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../widgets/color_theme.dialogue.dart';
+import '../services/custom_theme_provider.dart';
 
 class SettingsPage extends StatefulWidget {
   final VoidCallback onLogout;
@@ -579,6 +580,11 @@ class _SettingsPageState extends State<SettingsPage>
           value: customColorsEnabled,
           onChanged: (val) {
             _handleThemeToggle('custom', val);
+            // Update provider so all screens get notified
+            Provider.of<CustomThemeProvider>(
+              context,
+              listen: false,
+            ).setCustomColorsEnabled(val);
             if (val) {
               _showSnackBar("Custom colors enabled", pickedPrimaryColor);
             } else {
@@ -597,12 +603,26 @@ class _SettingsPageState extends State<SettingsPage>
                 setState(() {
                   pickedPrimaryColor = c;
                 });
+                // Debug print to check selected primary color
+                print('[SettingsPage] Picked primaryColor: ' + c.toString());
+                // Provide color data to CustomThemeProvider
+                Provider.of<CustomThemeProvider>(
+                  context,
+                  listen: false,
+                ).setPrimaryColor(c);
                 _saveSettings();
               },
               onSecondaryColorChanged: (c) {
                 setState(() {
                   pickedSecondaryColor = c;
                 });
+                // Debug print to check selected secondary color
+                print('[SettingsPage] Picked secondaryColor: ' + c.toString());
+                // Provide color data to CustomThemeProvider
+                Provider.of<CustomThemeProvider>(
+                  context,
+                  listen: false,
+                ).setSecondaryColor(c);
                 _saveSettings();
               },
             ),

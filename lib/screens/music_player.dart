@@ -1,3 +1,6 @@
+// Debug print to check primaryColor value from provider
+// Debug print to check secondaryColor value from provider
+// Debug print to check secondaryColor value
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -9,7 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
-import '../services/custom_theme_provider.dart'; // <-- Import your custom theme provider
+import '../services/custom_theme_provider.dart';
 
 class MusicPlayerPage extends StatefulWidget {
   final String songTitle;
@@ -182,13 +185,15 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     final customColorsEnabled = customTheme.customColorsEnabled;
     final primaryColor = customColorsEnabled
         ? customTheme.primaryColor
-        : Color(0xFFff7d78);
+        : const Color(0xFFff7d78);
     final secondaryColor = customColorsEnabled
         ? customTheme.secondaryColor
-        : Color(0xFF16213e);
-    final gradientColors = customColorsEnabled
-        ? [primaryColor, secondaryColor, Colors.black]
-        : [Color(0x33ff7d78), Color(0x229c27b0), Colors.black];
+        : const Color(0xFF16213e);
+    final gradientColors = (!customColorsEnabled)
+        ? [const Color(0x33ff7d78), const Color(0x229c27b0), Colors.black]
+        : [secondaryColor, secondaryColor, secondaryColor];
+    // Debug print to check secondaryColor value
+    print('[MusicPlayerPage] secondaryColor: ' + secondaryColor.toString());
 
     final double progress = widget.totalDuration.inSeconds > 0
         ? (widget.currentPosition.inSeconds / widget.totalDuration.inSeconds)
@@ -211,14 +216,16 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         child: Container(
           decoration: isPitchBlack
               ? const BoxDecoration(color: Colors.black)
-              : BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.topCenter,
-                    radius: 1.5,
-                    colors: gradientColors,
-                    stops: [0.0, 0.4, 1.0],
-                  ),
-                ),
+              : (!customColorsEnabled
+                    ? BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment.topCenter,
+                          radius: 1.5,
+                          colors: gradientColors,
+                          stops: [0.0, 0.4, 1.0],
+                        ),
+                      )
+                    : BoxDecoration(color: secondaryColor)),
           child: SafeArea(
             child: Consumer<PlayerStateProvider>(
               builder: (context, playerState, child) {
@@ -263,19 +270,28 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                             icon: Icons.keyboard_arrow_down,
                             onPressed: () => Navigator.pop(context),
                           ),
-                          ShaderMask(
-                            shaderCallback: (bounds) => LinearGradient(
-                              colors: [primaryColor, secondaryColor],
-                            ).createShader(bounds),
-                            child: const Text(
-                              'Now Playing',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
+                          customColorsEnabled
+                              ? Text(
+                                  'Now Playing',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : ShaderMask(
+                                  shaderCallback: (bounds) => LinearGradient(
+                                    colors: [primaryColor, secondaryColor],
+                                  ).createShader(bounds),
+                                  child: const Text(
+                                    'Now Playing',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
                           _buildIconBox(
                             icon: Icons.queue_music,
                             onPressed: () => _showUpNextQueue(context),
@@ -304,9 +320,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                             (context, error, stackTrace) {
                                               return Container(
                                                 color: Colors.grey[800],
-                                                child: const Icon(
+                                                child: Icon(
                                                   Icons.music_note,
-                                                  color: Colors.white,
+                                                  color: customColorsEnabled
+                                                      ? primaryColor
+                                                      : Colors.white,
                                                   size: 80,
                                                 ),
                                               );
@@ -314,9 +332,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                       )
                                     : Container(
                                         color: Colors.grey[800],
-                                        child: const Icon(
+                                        child: Icon(
                                           Icons.music_note,
-                                          color: Colors.white,
+                                          color: customColorsEnabled
+                                              ? primaryColor
+                                              : Colors.white,
                                           size: 80,
                                         ),
                                       ),
@@ -380,7 +400,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                               ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(25),
-                                color: Colors.white.withOpacity(0.1),
+                                color: customColorsEnabled
+                                    ? primaryColor
+                                    : Colors.white.withOpacity(0.1),
                                 border: Border.all(
                                   color: Colors.white.withOpacity(0.3),
                                   width: 1,
@@ -398,14 +420,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                 children: [
                                   Icon(
                                     Icons.playlist_add,
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white,
                                     size: 18,
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
                                     'Add to Playlist',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.8),
+                                      color: Colors.white,
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -421,7 +443,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                               ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(25),
-                                color: Colors.white.withOpacity(0.1),
+                                color: customColorsEnabled
+                                    ? primaryColor
+                                    : Colors.white.withOpacity(0.1),
                                 border: Border.all(
                                   color: Colors.white.withOpacity(0.3),
                                   width: 1,
@@ -442,13 +466,15 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                           width: 18,
                                           height: 18,
                                           child: CircularProgressIndicator(
-                                            color: Colors.white,
+                                            color: customColorsEnabled
+                                                ? primaryColor
+                                                : Colors.white,
                                             strokeWidth: 2,
                                           ),
                                         )
                                       : Icon(
                                           Icons.download,
-                                          color: Colors.white.withOpacity(0.8),
+                                          color: Colors.white,
                                           size: 18,
                                         ),
                                   const SizedBox(width: 6),
@@ -459,7 +485,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                                     child: Text(
                                       'Download',
                                       style: TextStyle(
-                                        color: Colors.white.withOpacity(0.8),
+                                        color: Colors.white,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -566,11 +592,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                           ),
                           Container(
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [primaryColor, secondaryColor],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                              color: customColorsEnabled ? primaryColor : null,
+                              gradient: !customColorsEnabled
+                                  ? LinearGradient(
+                                      colors: [primaryColor, secondaryColor],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : null,
                               borderRadius: BorderRadius.circular(28),
                               boxShadow: [
                                 BoxShadow(
@@ -582,11 +611,13 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                             ),
                             child: IconButton(
                               icon: widget.isLoading
-                                  ? const SizedBox(
+                                  ? SizedBox(
                                       width: 24,
                                       height: 24,
                                       child: CircularProgressIndicator(
-                                        color: Colors.white,
+                                        color: customColorsEnabled
+                                            ? primaryColor
+                                            : Colors.white,
                                         strokeWidth: 2,
                                       ),
                                     )
@@ -626,9 +657,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     double size = 28,
     required VoidCallback onPressed,
   }) {
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+    final buttonColor = customColorsEnabled
+        ? customTheme.primaryColor
+        : Colors.white.withOpacity(0.1);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: buttonColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
       ),
