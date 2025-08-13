@@ -126,14 +126,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     _audioPlayer.playerStateStream.listen((state) {
       if (!mounted) return; // Check if widget is still mounted
-      
+
       final playerState = Provider.of<PlayerStateProvider>(
         context,
         listen: false,
       );
-      
+
       print('Player state changed: ${state.processingState}');
-      
+
       if (state.processingState == ProcessingState.ready) {
         playerState.setSongLoading(false);
       } else if (state.processingState == ProcessingState.completed) {
@@ -151,14 +151,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     // Additional listener for position to detect near-end of song
     _audioPlayer.positionStream.listen((position) {
       if (!mounted) return;
-      
+
       final duration = _audioPlayer.duration;
       if (duration != null) {
         final remaining = duration - position;
         // If less than 500ms remaining and was playing, trigger next song
-        if (remaining.inMilliseconds < 500 && remaining.inMilliseconds > 0 && 
-            _audioPlayer.playing && !_isAutoPlayTriggered) {
-          print('Song near completion: ${remaining.inMilliseconds}ms remaining - triggering next song');
+        if (remaining.inMilliseconds < 500 &&
+            remaining.inMilliseconds > 0 &&
+            _audioPlayer.playing &&
+            !_isAutoPlayTriggered) {
+          print(
+            'Song near completion: ${remaining.inMilliseconds}ms remaining - triggering next song',
+          );
           _isAutoPlayTriggered = true;
           // Trigger next song when very close to end
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1605,10 +1609,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
     final playlist = playerState.currentPlaylist;
     final songIndex = playerState.currentSongIndex;
-    
+
     print('Current playlist length: ${playlist.length}');
     print('Current song index: $songIndex');
-    
+
     if (playlist.isNotEmpty && songIndex < playlist.length - 1) {
       // Play next song in playlist
       final nextSong = playlist[songIndex + 1];

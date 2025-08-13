@@ -5,6 +5,7 @@ import '../services/jiosaavn_api_service.dart';
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart'; // <-- Add this import
 import '../services/custom_theme_provider.dart';
+import 'music_player.dart';
 
 class ArtistSongsPage extends StatefulWidget {
   final String artistName;
@@ -23,7 +24,7 @@ class ArtistSongsPage extends StatefulWidget {
 }
 
 class _ArtistSongsPageState extends State<ArtistSongsPage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _songs = [];
@@ -43,6 +44,21 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+
+    // Add this widget as an observer for app lifecycle changes
+    WidgetsBinding.instance.addObserver(this);
+
+    // Listen to audio player state changes to keep UI in sync
+    widget.audioPlayer.playingStream.listen((playing) {
+      if (!_isDisposed && mounted) {
+        final playerState = Provider.of<PlayerStateProvider>(
+          context,
+          listen: false,
+        );
+        playerState.setPlaying(playing);
+      }
+    });
+
     _searchArtistSongs();
   }
 
@@ -50,7 +66,34 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
   void dispose() {
     _isDisposed = true;
     _animationController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // App regained focus, sync the state
+      _syncPlayerState();
+    }
+  }
+
+  void _syncPlayerState() {
+    if (!_isDisposed && mounted) {
+      final playerState = Provider.of<PlayerStateProvider>(
+        context,
+        listen: false,
+      );
+      // Force sync with actual audio player state
+      final actuallyPlaying = widget.audioPlayer.playing;
+      playerState.setPlaying(actuallyPlaying);
+
+      // Trigger a rebuild to update UI
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 
   Future<void> _searchArtistSongs() async {
@@ -98,13 +141,14 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     );
     try {
       playerState.setSongLoading(true);
-      await widget.audioPlayer.stop();
-      await widget.audioPlayer.seek(Duration.zero);
 
+      // Set playlist first before playing song
       playerState.setPlaylist(_songs);
-      playerState.setSong(song);
       int index = _songs.indexWhere((s) => s['id'] == song['id']);
       playerState.setSongIndex(index == -1 ? 0 : index);
+
+      await widget.audioPlayer.stop();
+      await widget.audioPlayer.seek(Duration.zero);
 
       final songId = song['id'];
       if (songId != null) {
@@ -178,6 +222,109 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
       return images;
     }
     return null;
+  }
+
+  void _openMusicPlayer(Map<String, dynamic> song) {
+    final playerState = Provider.of<PlayerStateProvider>(
+      context,
+      listen: false,
+    );
+
+    // Only play the song if it's not already the current song
+    final isCurrentSong =
+        playerState.currentSong != null &&
+        playerState.currentSong!['id'] == song['id'];
+
+    if (!isCurrentSong) {
+      // Play the song only if it's different from current
+      _playSong(song);
+    }
+
+    // Then open the music player
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => StreamBuilder<bool>(
+          stream: widget.audioPlayer.playingStream,
+          builder: (context, playingSnapshot) {
+            return StreamBuilder<Duration>(
+              stream: widget.audioPlayer.positionStream,
+              builder: (context, positionSnapshot) {
+                return StreamBuilder<Duration?>(
+                  stream: widget.audioPlayer.durationStream,
+                  builder: (context, durationSnapshot) {
+                    final songTitle =
+                        song['name'] ?? song['title'] ?? 'Unknown Song';
+                    String artistName = 'Unknown Artist';
+                    if (song['artists'] != null) {
+                      final artists = song['artists'];
+                      if (artists['primary'] != null &&
+                          artists['primary'].isNotEmpty) {
+                        artistName =
+                            artists['primary'][0]['name'] ?? 'Unknown Artist';
+                      }
+                    } else if (song['subtitle'] != null) {
+                      artistName = song['subtitle'];
+                    }
+                    final albumArtUrl = _getBestImageUrl(song['image']) ?? '';
+
+                    return MusicPlayerPage(
+                      songTitle: songTitle,
+                      artistName: artistName,
+                      albumArtUrl: albumArtUrl,
+                      songId: song['id'],
+                      isPlaying: playingSnapshot.data ?? false,
+                      isLoading: playerState.isSongLoading,
+                      currentPosition: positionSnapshot.data ?? Duration.zero,
+                      totalDuration: durationSnapshot.data ?? Duration.zero,
+                      onPlayPause: () {
+                        if (widget.audioPlayer.playing) {
+                          widget.audioPlayer.pause();
+                        } else {
+                          widget.audioPlayer.play();
+                        }
+                      },
+                      onNext: () {
+                        // Simple next song logic - play next song in list
+                        final currentIndex = _songs.indexWhere(
+                          (s) => s['id'] == song['id'],
+                        );
+                        if (currentIndex != -1 &&
+                            currentIndex < _songs.length - 1) {
+                          _playSong(_songs[currentIndex + 1]);
+                        }
+                      },
+                      onPrevious: () {
+                        // Simple previous song logic - play previous song in list
+                        final currentIndex = _songs.indexWhere(
+                          (s) => s['id'] == song['id'],
+                        );
+                        if (currentIndex > 0) {
+                          _playSong(_songs[currentIndex - 1]);
+                        }
+                      },
+                      onJumpToSong: (index) {
+                        if (index >= 0 && index < _songs.length) {
+                          _playSong(_songs[index]);
+                        }
+                      },
+                      onSeek: (value) {
+                        final position =
+                            (durationSnapshot.data ?? Duration.zero) * value;
+                        widget.audioPlayer.seek(position);
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
+      ),
+    ).then((_) {
+      // Sync state when returning from music player
+      _syncPlayerState();
+    });
   }
 
   Widget _buildAnimatedBackground({
@@ -366,7 +513,7 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () => _playSong(song),
+          onTap: () => _openMusicPlayer(song),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -513,18 +660,26 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                         onPressed: isLoading
                             ? null // Disable button when loading
                             : () async {
-                                if (isCurrentSong && playerState.isPlaying) {
-                                  // Pause current song
-                                  playerState.setPlaying(false);
-                                  await widget.audioPlayer.pause();
-                                } else if (isCurrentSong &&
-                                    !playerState.isPlaying) {
-                                  // Resume current song
-                                  playerState.setPlaying(true);
-                                  await widget.audioPlayer.play();
-                                } else {
-                                  // Play a different song
-                                  _playSong(song);
+                                try {
+                                  if (isCurrentSong && playerState.isPlaying) {
+                                    // Pause current song
+                                    await widget.audioPlayer.pause();
+                                    playerState.setPlaying(false);
+                                  } else if (isCurrentSong &&
+                                      !playerState.isPlaying) {
+                                    // Resume current song
+                                    await widget.audioPlayer.play();
+                                    playerState.setPlaying(true);
+                                  } else {
+                                    // Play a different song
+                                    _playSong(song);
+                                  }
+                                } catch (e) {
+                                  print('Error in artist songs play/pause: $e');
+                                  // Sync state with actual player state
+                                  final actuallyPlaying =
+                                      widget.audioPlayer.playing;
+                                  playerState.setPlaying(actuallyPlaying);
                                 }
                               },
                       );
