@@ -79,6 +79,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   String? _error;
 
   bool _isMusicPlayerPageOpen = false;
+  bool _isAutoPlayTriggered = false;
 
   @override
   void initState() {
@@ -124,12 +125,48 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     });
 
     _audioPlayer.playerStateStream.listen((state) {
+      if (!mounted) return; // Check if widget is still mounted
+      
       final playerState = Provider.of<PlayerStateProvider>(
         context,
         listen: false,
       );
+      
+      print('Player state changed: ${state.processingState}');
+      
       if (state.processingState == ProcessingState.ready) {
         playerState.setSongLoading(false);
+      } else if (state.processingState == ProcessingState.completed) {
+        // Song finished, play next song automatically
+        print('Song completed, scheduling next song...');
+        // Use post frame callback to ensure we're on the main thread
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _playNextSong();
+          }
+        });
+      }
+    });
+
+    // Additional listener for position to detect near-end of song
+    _audioPlayer.positionStream.listen((position) {
+      if (!mounted) return;
+      
+      final duration = _audioPlayer.duration;
+      if (duration != null) {
+        final remaining = duration - position;
+        // If less than 500ms remaining and was playing, trigger next song
+        if (remaining.inMilliseconds < 500 && remaining.inMilliseconds > 0 && 
+            _audioPlayer.playing && !_isAutoPlayTriggered) {
+          print('Song near completion: ${remaining.inMilliseconds}ms remaining - triggering next song');
+          _isAutoPlayTriggered = true;
+          // Trigger next song when very close to end
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _playNextSong();
+            }
+          });
+        }
       }
     });
   }
@@ -1148,32 +1185,24 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                         onPressed: isLoading
                             ? null
                             : () async {
-                                if (isCurrentSong && playerState.isPlaying) {
-                                  // Pause current song
-                                  playerState.setPlaying(false);
-                                  await Future.delayed(
-                                    Duration(milliseconds: 50),
-                                  );
-                                  try {
+                                try {
+                                  if (isCurrentSong && isPlaying) {
+                                    // Pause current song
                                     await _audioPlayer.pause();
-                                  } catch (e) {
-                                    playerState.setPlaying(true);
-                                  }
-                                } else if (isCurrentSong &&
-                                    !playerState.isPlaying) {
-                                  // Resume current song
-                                  playerState.setPlaying(true);
-                                  await Future.delayed(
-                                    Duration(milliseconds: 50),
-                                  );
-                                  try {
-                                    await _audioPlayer.play();
-                                  } catch (e) {
                                     playerState.setPlaying(false);
+                                  } else if (isCurrentSong && !isPlaying) {
+                                    // Resume current song
+                                    await _audioPlayer.play();
+                                    playerState.setPlaying(true);
+                                  } else {
+                                    // Play a different song
+                                    _playSong(song, null, false);
                                   }
-                                } else {
-                                  // Play a different song
-                                  _playSong(song, null, false);
+                                } catch (e) {
+                                  print('Error in banner play/pause: $e');
+                                  // Sync state with actual player state
+                                  final actuallyPlaying = _audioPlayer.playing;
+                                  playerState.setPlaying(actuallyPlaying);
                                 }
                               },
                       );
@@ -1404,6 +1433,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       listen: false,
     );
     try {
+      _isAutoPlayTriggered = false; // Reset auto-play flag for new song
       playerState.setSongLoading(true);
       await _audioPlayer.stop();
       await _audioPlayer.seek(Duration.zero);
@@ -1567,17 +1597,34 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
   }
 
-  void _playNextSong() {
+  Future<void> _playNextSong() async {
+    print('_playNextSong called');
     final playerState = Provider.of<PlayerStateProvider>(
       context,
       listen: false,
     );
     final playlist = playerState.currentPlaylist;
     final songIndex = playerState.currentSongIndex;
+    
+    print('Current playlist length: ${playlist.length}');
+    print('Current song index: $songIndex');
+    
     if (playlist.isNotEmpty && songIndex < playlist.length - 1) {
+      // Play next song in playlist
       final nextSong = playlist[songIndex + 1];
       bool useRandom = ListEquality().equals(playlist, _randomSongs);
-      _playSong(nextSong, songIndex + 1, useRandom);
+      print('Playing next song: ${nextSong['name'] ?? 'Unknown'}');
+      await _playSong(nextSong, songIndex + 1, useRandom);
+    } else {
+      // End of playlist - stop playback and clear state
+      print('End of playlist reached');
+      playerState.setPlaying(false);
+      playerState.setSongLoading(false);
+      try {
+        await _audioPlayer.stop();
+      } catch (e) {
+        print('Error stopping audio player: $e');
+      }
     }
   }
 

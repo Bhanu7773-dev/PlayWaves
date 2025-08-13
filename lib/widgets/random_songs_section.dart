@@ -310,35 +310,25 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                                       listen: false,
                                     );
 
-                                if (isCurrentSong && isPlaying) {
-                                  // Pause current song - update state immediately
-                                  playerState.setPlaying(false);
-                                  // Small delay to ensure UI updates
-                                  await Future.delayed(
-                                    Duration(milliseconds: 50),
-                                  );
-                                  try {
+                                try {
+                                  if (isCurrentSong && isPlaying) {
+                                    // Pause current song
                                     await widget.audioPlayer.pause();
-                                  } catch (e) {
-                                    // Revert state if pause fails
-                                    playerState.setPlaying(true);
-                                  }
-                                } else if (isCurrentSong && !isPlaying) {
-                                  // Resume current song - update state immediately
-                                  playerState.setPlaying(true);
-                                  // Small delay to ensure UI updates
-                                  await Future.delayed(
-                                    Duration(milliseconds: 50),
-                                  );
-                                  try {
-                                    await widget.audioPlayer.play();
-                                  } catch (e) {
-                                    // Revert state if play fails
                                     playerState.setPlaying(false);
+                                  } else if (isCurrentSong && !isPlaying) {
+                                    // Resume current song
+                                    await widget.audioPlayer.play();
+                                    playerState.setPlaying(true);
+                                  } else {
+                                    // Play a different song
+                                    widget.onSongPlay(song, index);
                                   }
-                                } else {
-                                  // Play a different song
-                                  widget.onSongPlay(song, index);
+                                } catch (e) {
+                                  print('Error in random songs play/pause: $e');
+                                  // Sync state with actual player state
+                                  final actuallyPlaying =
+                                      widget.audioPlayer.playing;
+                                  playerState.setPlaying(actuallyPlaying);
                                 }
                               },
                       ),

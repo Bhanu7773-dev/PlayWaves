@@ -29,10 +29,6 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         
-        // Add these to prevent native crashes
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
-        }
         multiDexEnabled = true
     }
 
