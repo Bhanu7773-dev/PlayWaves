@@ -1,6 +1,184 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
+class RippleFlowEffect extends StatefulWidget {
+  final bool isPlaying;
+  final Color color;
+
+  const RippleFlowEffect({
+    Key? key,
+    required this.isPlaying,
+    required this.color,
+  }) : super(key: key);
+
+  @override
+  State<RippleFlowEffect> createState() => _RippleFlowEffectState();
+}
+
+class _RippleFlowEffectState extends State<RippleFlowEffect>
+    with TickerProviderStateMixin {
+  late AnimationController _controller1;
+  late AnimationController _controller2;
+  late AnimationController _controller3;
+  late Animation<double> _animation1;
+  late Animation<double> _animation2;
+  late Animation<double> _animation3;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller1 = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+    _controller2 = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+    _controller3 = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+
+    _animation1 = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller1, curve: Curves.easeOut));
+    _animation2 = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller2, curve: Curves.easeOut));
+    _animation3 = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller3, curve: Curves.easeOut));
+
+    if (widget.isPlaying) {
+      _startAnimations();
+    }
+  }
+
+  void _startAnimations() {
+    _controller1.repeat();
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) _controller2.repeat();
+    });
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (mounted) _controller3.repeat();
+    });
+  }
+
+  void _stopAnimations() {
+    _controller1.stop();
+    _controller2.stop();
+    _controller3.stop();
+  }
+
+  @override
+  void didUpdateWidget(RippleFlowEffect oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPlaying != oldWidget.isPlaying) {
+      if (widget.isPlaying) {
+        _startAnimations();
+      } else {
+        _stopAnimations();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller1.dispose();
+    _controller2.dispose();
+    _controller3.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_animation1, _animation2, _animation3]),
+      builder: (context, child) {
+        return CustomPaint(
+          painter: RipplePainter(
+            animation1: _animation1.value,
+            animation2: _animation2.value,
+            animation3: _animation3.value,
+            color: widget.color,
+          ),
+          size: Size.infinite,
+        );
+      },
+    );
+  }
+}
+
+class RipplePainter extends CustomPainter {
+  final double animation1;
+  final double animation2;
+  final double animation3;
+  final Color color;
+
+  RipplePainter({
+    required this.animation1,
+    required this.animation2,
+    required this.animation3,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(
+      size.width * 0.08,
+      size.height * 0.5,
+    ); // Position even further left, just below album art
+    final maxRadius = size.width * 0.9;
+
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    // Draw multiple ripples with different opacity and size
+    _drawRipple(
+      canvas,
+      center,
+      maxRadius * animation1,
+      color.withOpacity((1 - animation1) * 0.3),
+      paint,
+    );
+    _drawRipple(
+      canvas,
+      center,
+      maxRadius * animation2,
+      color.withOpacity((1 - animation2) * 0.2),
+      paint,
+    );
+    _drawRipple(
+      canvas,
+      center,
+      maxRadius * animation3,
+      color.withOpacity((1 - animation3) * 0.1),
+      paint,
+    );
+  }
+
+  void _drawRipple(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    Color color,
+    Paint paint,
+  ) {
+    if (radius > 0) {
+      paint.color = color;
+      canvas.drawCircle(center, radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
 class MiniPlayer extends StatelessWidget {
   final Map<String, dynamic>? currentSong;
   final AudioPlayer audioPlayer;
@@ -92,131 +270,152 @@ class MiniPlayer extends StatelessWidget {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
             children: [
-              // Album Art with Hero Animation (same tag as MusicPlayerPage)
-              Hero(
-                tag: heroAlbumArtTag,
-                child: Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color.fromARGB(
-                          255,
-                          19,
-                          19,
-                          19,
-                        ).withOpacity(1.0),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: albumArtUrl.isNotEmpty
-                        ? Image.network(
-                            albumArtUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.grey[800],
-                                child: const Icon(
-                                  Icons.music_note,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              );
-                            },
-                          )
-                        : Container(
-                            color: Colors.grey[800],
-                            child: const Icon(
-                              Icons.music_note,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                  ),
+              // Ripple effect background
+              Positioned.fill(
+                child: StreamBuilder<bool>(
+                  stream: audioPlayer.playingStream,
+                  builder: (context, snapshot) {
+                    final isPlaying = snapshot.data ?? false;
+                    return RippleFlowEffect(
+                      isPlaying: isPlaying,
+                      color: const Color(0xFFff7d78),
+                    );
+                  },
                 ),
               ),
-              const SizedBox(width: 12),
-              // Song Info with Hero Animation (same tags as MusicPlayerPage)
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
                   children: [
+                    // Album Art with Hero Animation (same tag as MusicPlayerPage)
                     Hero(
-                      tag: heroTitleTag,
-                      child: Material(
-                        color: Colors.transparent,
-                        child: Text(
-                          songTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      tag: heroAlbumArtTag,
+                      child: Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color.fromARGB(
+                                255,
+                                19,
+                                19,
+                                19,
+                              ).withOpacity(1.0),
+                              blurRadius: 8,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: albumArtUrl.isNotEmpty
+                              ? Image.network(
+                                  albumArtUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[800],
+                                      child: const Icon(
+                                        Icons.music_note,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Container(
+                                  color: Colors.grey[800],
+                                  child: const Icon(
+                                    Icons.music_note,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Hero(
-                      tag: heroArtistTag,
-                      child: Material(
-                        color: Colors.transparent,
-                        child: Text(
-                          artistName,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w400,
+                    const SizedBox(width: 12),
+                    // Song Info with Hero Animation (same tags as MusicPlayerPage)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Hero(
+                            tag: heroTitleTag,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Text(
+                                songTitle,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                          const SizedBox(height: 2),
+                          Hero(
+                            tag: heroArtistTag,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Text(
+                                artistName,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    // Control buttons
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        StreamBuilder<bool>(
+                          stream: audioPlayer.playingStream,
+                          builder: (context, snapshot) {
+                            final isPlaying = snapshot.data ?? false;
+                            return IconButton(
+                              onPressed: onPlayPause,
+                              icon: Icon(
+                                isPlaying ? Icons.pause : Icons.play_arrow,
+                                color: const Color(0xFFff7d78),
+                                size: 28,
+                              ),
+                              padding: const EdgeInsets.all(4),
+                            );
+                          },
+                        ),
+                        IconButton(
+                          onPressed: onClose,
+                          icon: const Icon(
+                            Icons.close,
+                            color: Colors.white70,
+                            size: 20,
+                          ),
+                          padding: const EdgeInsets.all(4),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
-              // Control buttons
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  StreamBuilder<bool>(
-                    stream: audioPlayer.playingStream,
-                    builder: (context, snapshot) {
-                      final isPlaying = snapshot.data ?? false;
-                      return IconButton(
-                        onPressed: onPlayPause,
-                        icon: Icon(
-                          isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: const Color(0xFFff7d78),
-                          size: 28,
-                        ),
-                        padding: const EdgeInsets.all(4),
-                      );
-                    },
-                  ),
-                  IconButton(
-                    onPressed: onClose,
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
-                    padding: const EdgeInsets.all(4),
-                  ),
-                ],
               ),
             ],
           ),
