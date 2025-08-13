@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import '../services/pitch_black_theme_provider.dart'; // <-- Add this import
+import '../services/custom_theme_provider.dart';
 import '../widgets/animated_navbar.dart'; // <-- Make sure this path is correct!
 
 class LibraryScreen extends StatefulWidget {
@@ -26,41 +27,39 @@ class _LibraryScreenState extends State<LibraryScreen>
   late Animation<double> _floatAnimation;
   late Animation<double> _rippleAnimation;
 
-  int _selectedCategory = 0;
-  final List<String> _categories = ['All', 'Recent', 'Favorites', 'Created'];
-
   @override
   void initState() {
     super.initState();
-    _initializeAnimations();
-    _startAnimations();
+    try {
+      _initializeAnimations();
+      _startAnimations();
+    } catch (e) {
+      // Handle animation initialization errors gracefully
+      debugPrint('Animation initialization error: $e');
+    }
   }
 
   void _initializeAnimations() {
     _masterController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     _floatController = AnimationController(
-      duration: const Duration(seconds: 6),
+      duration: const Duration(
+        seconds: 8,
+      ), // Slower animation to reduce CPU usage
       vsync: this,
     );
     _rippleController = AnimationController(
-      duration: const Duration(seconds: 4),
+      duration: const Duration(seconds: 5),
       vsync: this,
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _masterController,
-        curve: const Interval(0.0, 0.8, curve: Curves.easeOutQuart),
-      ),
+      CurvedAnimation(parent: _masterController, curve: Curves.easeOut),
     );
     _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _masterController,
-            curve: const Interval(0.2, 1.0, curve: Curves.easeOutCubic),
-          ),
+        Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+          CurvedAnimation(parent: _masterController, curve: Curves.easeOut),
         );
     _floatAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
@@ -78,6 +77,9 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   @override
   void dispose() {
+    _masterController.stop();
+    _floatController.stop();
+    _rippleController.stop();
     _masterController.dispose();
     _floatController.dispose();
     _rippleController.dispose();
@@ -99,12 +101,18 @@ class _LibraryScreenState extends State<LibraryScreen>
     final isPitchBlack = context
         .watch<PitchBlackThemeProvider>()
         .isPitchBlack; // <-- Provider
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+    final primaryColor = customTheme.primaryColor;
+    final secondaryColor = customTheme.secondaryColor;
     final libraryItems = [
       LibraryItemData(
-        title: "Liked Songs",
+        title: "Favorites",
         subtitle: "247 songs",
         iconData: Icons.favorite,
-        gradient: const [Color(0xFFff7d78), Color(0xFFf54ea2)],
+        gradient: customColorsEnabled
+            ? [primaryColor, primaryColor.withOpacity(0.7)]
+            : const [Color(0xFFff7d78), Color(0xFFf54ea2)],
         isActive: true,
         onTap: () {},
       ),
@@ -112,35 +120,45 @@ class _LibraryScreenState extends State<LibraryScreen>
         title: "My Playlists",
         subtitle: "18 playlists",
         iconData: Icons.queue_music,
-        gradient: const [Color(0xFF667eea), Color(0xFF764ba2)],
+        gradient: customColorsEnabled
+            ? [primaryColor, primaryColor]
+            : const [Color(0xFF667eea), Color(0xFF764ba2)],
         onTap: () {},
       ),
       LibraryItemData(
         title: "Recently Played",
         subtitle: "89 tracks",
         iconData: Icons.history,
-        gradient: const [Color(0xFF9c27b0), Color(0xFFe91e63)],
+        gradient: customColorsEnabled
+            ? [primaryColor, primaryColor]
+            : const [Color(0xFF9c27b0), Color(0xFFe91e63)],
         onTap: () {},
       ),
       LibraryItemData(
         title: "Downloaded",
         subtitle: "32 songs",
         iconData: Icons.download_done,
-        gradient: const [Color(0xFF4facfe), Color(0xFF00f2fe)],
+        gradient: customColorsEnabled
+            ? [primaryColor, primaryColor]
+            : const [Color(0xFF4facfe), Color(0xFF00f2fe)],
         onTap: () {},
       ),
       LibraryItemData(
         title: "Albums",
         subtitle: "12 albums",
         iconData: Icons.album,
-        gradient: const [Color(0xFF43e97b), Color(0xFF38f9d7)],
+        gradient: customColorsEnabled
+            ? [primaryColor.withOpacity(0.9), primaryColor.withOpacity(0.6)]
+            : const [Color(0xFF43e97b), Color(0xFF38f9d7)],
         onTap: () {},
       ),
       LibraryItemData(
         title: "Artists",
         subtitle: "34 artists",
         iconData: Icons.person,
-        gradient: const [Color(0xFFfa709a), Color(0xFFfee140)],
+        gradient: customColorsEnabled
+            ? [primaryColor, primaryColor]
+            : const [Color(0xFFfa709a), Color(0xFFfee140)],
         onTap: () {},
       ),
     ];
@@ -148,10 +166,14 @@ class _LibraryScreenState extends State<LibraryScreen>
     return Scaffold(
       backgroundColor: isPitchBlack
           ? Colors.black
+          : customColorsEnabled
+          ? secondaryColor
           : Colors.black, // <-- Provider
       body: Stack(
         children: [
-          _buildMeteorBackground(isPitchBlack: isPitchBlack), // <-- Pass theme
+          _buildStardustBackground(
+            isPitchBlack: isPitchBlack,
+          ), // <-- Pass theme
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -162,7 +184,6 @@ class _LibraryScreenState extends State<LibraryScreen>
                   slivers: [
                     SliverToBoxAdapter(child: _buildHeader()),
                     SliverToBoxAdapter(child: _buildSearchBar()),
-                    SliverToBoxAdapter(child: _buildCategoryFilter(context)),
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
                       sliver: SliverList(
@@ -199,7 +220,12 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  Widget _buildMeteorBackground({required bool isPitchBlack}) {
+  Widget _buildStardustBackground({required bool isPitchBlack}) {
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+    final primaryColor = customTheme.primaryColor;
+    final secondaryColor = customTheme.secondaryColor;
+
     return AnimatedBuilder(
       animation: _floatAnimation,
       builder: (context, child) {
@@ -207,6 +233,16 @@ class _LibraryScreenState extends State<LibraryScreen>
           decoration: BoxDecoration(
             gradient: isPitchBlack
                 ? null
+                : customColorsEnabled
+                ? RadialGradient(
+                    center: Alignment.topLeft,
+                    radius: 1.5,
+                    colors: [
+                      secondaryColor,
+                      secondaryColor.withOpacity(0.8),
+                      Colors.black,
+                    ],
+                  )
                 : const RadialGradient(
                     center: Alignment.topLeft,
                     radius: 1.5,
@@ -220,46 +256,22 @@ class _LibraryScreenState extends State<LibraryScreen>
           ),
           child: Stack(
             children: [
-              _buildFloatingOrb(
-                100 + math.sin(_floatAnimation.value * 2 * math.pi) * 30,
-                150,
-                const Color(0xFFff7d78).withOpacity(0.1),
-                40,
-              ),
-              _buildFloatingOrb(
-                300,
-                200 + math.cos(_floatAnimation.value * 2 * math.pi) * 20,
-                const Color(0xFF9c27b0).withOpacity(0.08),
-                60,
-              ),
-              _buildFloatingOrb(
-                80,
-                400 + math.sin(_floatAnimation.value * 2 * math.pi + 1) * 25,
-                const Color(0xFF667eea).withOpacity(0.12),
-                35,
-              ),
-              AnimatedBuilder(
-                animation: _rippleAnimation,
-                builder: (context, child) {
-                  return Positioned(
-                    top: MediaQuery.of(context).size.height * 0.3,
-                    left: MediaQuery.of(context).size.width * 0.1,
-                    child: Container(
-                      width: 200 * _rippleAnimation.value,
-                      height: 200 * _rippleAnimation.value,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withOpacity(
-                            0.1 * (1 - _rippleAnimation.value),
-                          ),
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+              // Generate small floating meteors like settings page
+              ...List.generate(12, (index) {
+                final Color meteorColor = customColorsEnabled
+                    ? primaryColor
+                    : const Color(0xFFff7d78);
+
+                return _buildFloatingMeteor(index, meteorColor, isPitchBlack);
+              }),
+
+              // Add background stars
+              ...List.generate(20, (index) {
+                final double offsetX = (index * 45.7) % 350;
+                final double offsetY = (index * 78.2) % 600;
+
+                return _buildBackgroundStar(offsetX, offsetY, index);
+              }),
             ],
           ),
         );
@@ -267,21 +279,72 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  Widget _buildFloatingOrb(double left, double top, Color color, double size) {
+  Widget _buildFloatingMeteor(int index, Color meteorColor, bool isPitchBlack) {
+    return AnimatedBuilder(
+      animation: _floatAnimation,
+      builder: (context, child) {
+        final double progress = _floatAnimation.value;
+        final double staggeredProgress = ((progress + (index * 0.08)) % 1.0)
+            .clamp(0.0, 1.0);
+
+        // Use screen size to position meteors properly
+        final screenWidth = MediaQuery.of(context).size.width;
+        final screenHeight = MediaQuery.of(context).size.height;
+
+        return Positioned(
+          top: (index * 70.0) % screenHeight,
+          left: (index * 110.0) % screenWidth,
+          child: Transform.translate(
+            offset: Offset(
+              staggeredProgress * 120 - 60,
+              staggeredProgress * 120 - 60,
+            ),
+            child: Opacity(
+              opacity: isPitchBlack ? 0 : (1.0 - staggeredProgress) * 0.7,
+              child: Container(
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  color: meteorColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: meteorColor.withOpacity(0.5),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBackgroundStar(double offsetX, double offsetY, int index) {
+    // Create gentle twinkling effect
+    final twinkle =
+        0.3 + math.sin(_floatAnimation.value * 2 * math.pi + index * 0.8) * 0.4;
+    final clampedTwinkle = twinkle.clamp(0.1, 0.7);
+
     return Positioned(
-      left: left,
-      top: top,
+      left: offsetX,
+      top: offsetY,
       child: Container(
-        width: size,
-        height: size,
+        width: 2,
+        height: 2,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: RadialGradient(colors: [color, Colors.transparent]),
+          color: Colors.white.withOpacity(clampedTwinkle),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.3),
-              blurRadius: size * 0.8,
-              spreadRadius: size * 0.2,
+              color: Colors.white.withOpacity(
+                (clampedTwinkle * 0.3).clamp(0.0, 1.0),
+              ),
+              blurRadius: 4,
+              spreadRadius: 0.5,
             ),
           ],
         ),
@@ -290,6 +353,10 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   Widget _buildHeader() {
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+    final primaryColor = customTheme.primaryColor;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Column(
@@ -304,29 +371,44 @@ class _LibraryScreenState extends State<LibraryScreen>
             ),
           ),
           const SizedBox(height: 4),
-          ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ).createShader(bounds),
-            child: const Text(
-              'Music Collection',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: -0.5,
-                height: 1.1,
-              ),
-            ),
-          ),
+          customColorsEnabled
+              ? Text(
+                  'Music Collection',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: primaryColor,
+                    letterSpacing: -0.5,
+                    height: 1.1,
+                  ),
+                )
+              : ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ).createShader(bounds),
+                  child: const Text(
+                    'Music Collection',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                      height: 1.1,
+                    ),
+                  ),
+                ),
         ],
       ),
     );
   }
 
   Widget _buildSearchBar() {
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+    final primaryColor = customTheme.primaryColor;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
       child: Container(
@@ -350,16 +432,18 @@ class _LibraryScreenState extends State<LibraryScreen>
             child: Row(
               children: [
                 const SizedBox(width: 20),
-                ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                  ).createShader(bounds),
-                  child: const Icon(
-                    Icons.search_rounded,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
+                customColorsEnabled
+                    ? Icon(Icons.search_rounded, color: primaryColor, size: 24)
+                    : ShaderMask(
+                        shaderCallback: (bounds) => const LinearGradient(
+                          colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                        ).createShader(bounds),
+                        child: const Icon(
+                          Icons.search_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: TextField(
@@ -374,95 +458,10 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                   ),
                 ),
-                Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.15),
-                        Colors.white.withOpacity(0.08),
-                      ],
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.tune_rounded,
-                    color: Colors.white.withOpacity(0.7),
-                    size: 20,
-                  ),
-                ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  /// ----------- Pill Layout without scroll, wrapping in row ------------
-  Widget _buildCategoryFilter(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // Calculate pill widths so they fit within constraints.maxWidth
-          final pillSpacing = 12.0;
-          final totalSpacing = pillSpacing * (_categories.length - 1);
-          final pillWidth =
-              (constraints.maxWidth - totalSpacing) / _categories.length;
-
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(_categories.length, (index) {
-              final isSelected = _selectedCategory == index;
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedCategory = index;
-                  });
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  width: pillWidth,
-                  margin: EdgeInsets.only(
-                    right: index < _categories.length - 1 ? pillSpacing : 0,
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(22),
-                    gradient: isSelected
-                        ? const LinearGradient(
-                            colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                          )
-                        : null,
-                    color: isSelected ? null : Colors.white.withOpacity(0.08),
-                    border: Border.all(
-                      color: isSelected
-                          ? Colors.transparent
-                          : Colors.white.withOpacity(0.15),
-                      width: 1,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      _categories[index],
-                      style: TextStyle(
-                        color: isSelected
-                            ? Colors.white
-                            : Colors.white.withOpacity(0.7),
-                        fontSize: 14,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          );
-        },
       ),
     );
   }

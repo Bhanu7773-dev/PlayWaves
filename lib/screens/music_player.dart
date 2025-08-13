@@ -282,9 +282,13 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                     ),
                                   )
                                 : ShaderMask(
-                                    shaderCallback: (bounds) => LinearGradient(
-                                      colors: [primaryColor, secondaryColor],
-                                    ).createShader(bounds),
+                                    shaderCallback: (bounds) =>
+                                        const LinearGradient(
+                                          colors: [
+                                            Color(0xFFff7d78),
+                                            Color(0xFF9c27b0),
+                                          ],
+                                        ).createShader(bounds),
                                     child: const Text(
                                       'Now Playing',
                                       style: TextStyle(
@@ -596,8 +600,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                     ? primaryColor
                                     : null,
                                 gradient: !customColorsEnabled
-                                    ? LinearGradient(
-                                        colors: [primaryColor, secondaryColor],
+                                    ? const LinearGradient(
+                                        colors: [
+                                          Color(0xFFff7d78),
+                                          Color(0xFF9c27b0),
+                                        ],
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,
                                       )

@@ -6,6 +6,12 @@ import 'services/pitch_black_theme_provider.dart';
 import 'services/custom_theme_provider.dart';
 
 void main() {
+  // Add error handling for native crashes
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter Error: ${details.exception}');
+  };
+
   runApp(
     MultiProvider(
       providers: [
