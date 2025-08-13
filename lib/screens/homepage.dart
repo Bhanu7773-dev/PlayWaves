@@ -18,6 +18,7 @@ import '../widgets/masonry_song_section.dart';
 import '../widgets/random_songs_section.dart';
 import '../widgets/album_section.dart';
 import '../services/pitch_black_theme_provider.dart'; // <-- Import pitch black provider
+import '../services/custom_theme_provider.dart';
 
 // Helper function: pick N random (non-repeating) songs from a list, skipping recently shown
 Future<Set<String>> loadShownIdsFromStorage() async {
@@ -62,6 +63,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late AnimationController _pageTransitionController;
   late Animation<Offset> _pageOffsetAnimation;
 
+  late AnimationController _meteorsController;
+
   Timer? _bannerTimer;
   int _selectedNavIndex = 0;
   int _prevNavIndex = 0;
@@ -99,6 +102,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             curve: Curves.easeOutCubic,
           ),
         );
+
+    _meteorsController = AnimationController(
+      duration: const Duration(seconds: 8),
+      vsync: this,
+    )..repeat();
 
     _loadData();
     _startBannerAutoScroll();
@@ -444,9 +452,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final isPitchBlack = context
         .watch<PitchBlackThemeProvider>()
         .isPitchBlack; // <-- READ PROVIDER
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+    final primaryColor = customTheme.primaryColor;
+    final secondaryColor = customTheme.secondaryColor;
 
     final List<Widget> pages = [
-      _buildBody(),
+      _buildBody(
+        customColorsEnabled: customColorsEnabled,
+        primaryColor: primaryColor,
+        secondaryColor: secondaryColor,
+      ),
       SearchPage(
         onNavTap: _onNavTap,
         selectedNavIndex: _selectedNavIndex,
@@ -475,16 +491,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: isPitchBlack
           ? Colors.black
-          : Colors.black, // <-- USE PROVIDER
+          : customColorsEnabled
+          ? secondaryColor
+          : Colors.black, // <-- USE PROVIDER AND CUSTOM THEME
       body: Stack(
         children: [
           _buildAnimatedBackground(
             isPitchBlack: isPitchBlack,
+            customColorsEnabled: customColorsEnabled,
+            primaryColor: primaryColor,
+            secondaryColor: secondaryColor,
           ), // <-- USE PROVIDER
           SafeArea(
             child: Column(
               children: [
-                if (_selectedNavIndex == 0) _buildHeader(),
+                if (_selectedNavIndex == 0)
+                  _buildHeader(
+                    customColorsEnabled: customColorsEnabled,
+                    primaryColor: primaryColor,
+                    secondaryColor: secondaryColor,
+                  ),
                 Expanded(
                   child: AnimatedBuilder(
                     animation: _pageTransitionController,
@@ -625,11 +651,26 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildAnimatedBackground({required bool isPitchBlack}) {
+  Widget _buildAnimatedBackground({
+    required bool isPitchBlack,
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     return Container(
       decoration: BoxDecoration(
         gradient: isPitchBlack
             ? null
+            : customColorsEnabled
+            ? RadialGradient(
+                center: Alignment.topLeft,
+                radius: 1.5,
+                colors: [
+                  secondaryColor,
+                  secondaryColor.withOpacity(0.8),
+                  Colors.black,
+                ],
+              )
             : const RadialGradient(
                 center: Alignment.topLeft,
                 radius: 1.5,
@@ -637,32 +678,50 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               ),
         color: isPitchBlack ? Colors.black : null,
       ),
-      child: Stack(children: List.generate(15, (index) => _buildMeteor(index))),
+      child: Stack(
+        children: List.generate(
+          15,
+          (index) => _buildMeteor(
+            index,
+            isPitchBlack: isPitchBlack,
+            customColorsEnabled: customColorsEnabled,
+            primaryColor: primaryColor,
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildMeteor(int index) {
+  Widget _buildMeteor(
+    int index, {
+    required bool isPitchBlack,
+    required bool customColorsEnabled,
+    required Color primaryColor,
+  }) {
     return AnimatedBuilder(
-      animation: _animationController,
+      animation: _meteorsController,
       builder: (context, child) {
+        final double progress = _meteorsController.value;
+        final double staggeredProgress = ((progress + (index * 0.1)) % 1.0)
+            .clamp(0.0, 1.0);
         return Positioned(
-          top: (index * 50.0) % MediaQuery.of(context).size.height,
-          left: (index * 80.0) % MediaQuery.of(context).size.width,
-          child: Transform.rotate(
-            angle: 3.14159 * 1.2,
-            child: Container(
-              width: 2,
-              height: 2,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(1),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.white.withOpacity(0.1),
-                    blurRadius: 1,
-                  ),
-                ],
-                gradient: const LinearGradient(
-                  colors: [Colors.white70, Colors.transparent],
+          top: (index * 60.0) % MediaQuery.of(context).size.height,
+          left: (index * 90.0) % MediaQuery.of(context).size.width,
+          child: Transform.translate(
+            offset: Offset(
+              staggeredProgress * 100 - 50,
+              staggeredProgress * 100 - 50,
+            ),
+            child: Opacity(
+              opacity: isPitchBlack ? 0 : (1.0 - staggeredProgress) * 0.6,
+              child: Container(
+                width: 3,
+                height: 3,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(1.5),
+                  color: customColorsEnabled
+                      ? primaryColor
+                      : const Color(0xFFff7d78),
                 ),
               ),
             ),
@@ -672,7 +731,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader({
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -686,10 +749,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 style: TextStyle(color: Colors.grey[400], fontSize: 16),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'PlayWaves',
                 style: TextStyle(
-                  color: Colors.white,
+                  color: customColorsEnabled ? primaryColor : Colors.white,
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                 ),
@@ -701,7 +764,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildActionCards() {
+  Widget _buildActionCards({
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     return GridView.count(
       shrinkWrap: true,
       crossAxisCount: 2,
@@ -716,6 +783,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           Colors.red,
           Icons.local_fire_department,
           () {},
+          customColorsEnabled: customColorsEnabled,
+          primaryColor: primaryColor,
+          secondaryColor: secondaryColor,
         ),
         _buildActionCard(
           'Popular',
@@ -724,6 +794,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           Colors.green,
           Icons.play_circle_filled,
           () {},
+          customColorsEnabled: customColorsEnabled,
+          primaryColor: primaryColor,
+          secondaryColor: secondaryColor,
         ),
         _buildActionCard(
           'Collection',
@@ -732,6 +805,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           Colors.purple,
           Icons.playlist_play,
           () {},
+          customColorsEnabled: customColorsEnabled,
+          primaryColor: primaryColor,
+          secondaryColor: secondaryColor,
         ),
         _buildActionCard(
           'Stars',
@@ -740,6 +816,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           Colors.blue,
           Icons.person,
           () {},
+          customColorsEnabled: customColorsEnabled,
+          primaryColor: primaryColor,
+          secondaryColor: secondaryColor,
         ),
       ],
     );
@@ -751,8 +830,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     String description,
     Color color,
     IconData icon,
-    VoidCallback onTap,
-  ) {
+    VoidCallback onTap, {
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -770,12 +852,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(6),
-                color: color.withOpacity(0.15),
+                color: customColorsEnabled
+                    ? primaryColor.withOpacity(0.15)
+                    : color.withOpacity(0.15),
               ),
               child: Text(
                 tag.toUpperCase(),
                 style: TextStyle(
-                  color: color,
+                  color: customColorsEnabled ? primaryColor : color,
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
                 ),
@@ -805,11 +889,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody({
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     if (_isLoading) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFff7d78)),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            customColorsEnabled ? primaryColor : Color(0xFFff7d78),
+          ),
         ),
       );
     }
@@ -833,7 +923,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
     return RefreshIndicator(
       onRefresh: _loadData,
-      color: const Color(0xFFff7d78),
+      color: customColorsEnabled ? primaryColor : const Color(0xFFff7d78),
       backgroundColor: Colors.black,
       displacement: 40.0,
       strokeWidth: 3.0,
@@ -849,10 +939,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               children: [
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildActionCards(),
+                  child: _buildActionCards(
+                    customColorsEnabled: customColorsEnabled,
+                    primaryColor: primaryColor,
+                    secondaryColor: secondaryColor,
+                  ),
                 ),
                 const SizedBox(height: 20),
-                if (_bannerSongs.isNotEmpty) _buildBannerSection(),
+                if (_bannerSongs.isNotEmpty)
+                  _buildBannerSection(
+                    customColorsEnabled: customColorsEnabled,
+                    primaryColor: primaryColor,
+                    secondaryColor: secondaryColor,
+                  ),
                 const SizedBox(height: 20),
                 if (_albums.isNotEmpty) _buildAlbumsSection(),
                 const SizedBox(height: 20),
@@ -867,7 +966,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildBannerSection() {
+  Widget _buildBannerSection({
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     return SizedBox(
       height: 180,
       child: PageView.builder(
@@ -875,13 +978,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         itemCount: _bannerSongs.length,
         itemBuilder: (context, index) {
           final song = _bannerSongs[index];
-          return _buildBannerCard(song);
+          return _buildBannerCard(
+            song,
+            customColorsEnabled: customColorsEnabled,
+            primaryColor: primaryColor,
+            secondaryColor: secondaryColor,
+          );
         },
       ),
     );
   }
 
-  Widget _buildBannerCard(Map<String, dynamic> song) {
+  Widget _buildBannerCard(
+    Map<String, dynamic> song, {
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     final imageUrl = _getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
     final songId = song['id'];
@@ -914,10 +1027,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFFff7d78).withOpacity(0.3),
-                          const Color(0xFF9c27b0).withOpacity(0.3),
-                        ],
+                        colors: customColorsEnabled
+                            ? [
+                                primaryColor.withOpacity(0.3),
+                                primaryColor.withOpacity(0.1),
+                              ]
+                            : [
+                                const Color(0xFFff7d78).withOpacity(0.3),
+                                const Color(0xFF9c27b0).withOpacity(0.3),
+                              ],
                       ),
                     ),
                   );
@@ -995,14 +1113,71 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
                 Container(
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                    gradient: LinearGradient(
+                      colors: customColorsEnabled
+                          ? [primaryColor, primaryColor.withOpacity(0.8)]
+                          : [Color(0xFFff7d78), Color(0xFF9c27b0)],
                     ),
                     shape: BoxShape.circle,
                   ),
-                  child: IconButton(
-                    icon: const Icon(Icons.play_arrow, color: Colors.white),
-                    onPressed: () => _playSong(song, null, false),
+                  child: Consumer<PlayerStateProvider>(
+                    builder: (context, playerState, child) {
+                      final isCurrentSong =
+                          playerState.currentSong != null &&
+                          playerState.currentSong!['id'] == song['id'];
+                      final isPlaying = playerState.isPlaying && isCurrentSong;
+                      final isLoading =
+                          playerState.isSongLoading && isCurrentSong;
+
+                      return IconButton(
+                        icon: isLoading
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                isPlaying ? Icons.pause : Icons.play_arrow,
+                                color: Colors.white,
+                              ),
+                        onPressed: isLoading
+                            ? null
+                            : () async {
+                                if (isCurrentSong && playerState.isPlaying) {
+                                  // Pause current song
+                                  playerState.setPlaying(false);
+                                  await Future.delayed(
+                                    Duration(milliseconds: 50),
+                                  );
+                                  try {
+                                    await _audioPlayer.pause();
+                                  } catch (e) {
+                                    playerState.setPlaying(true);
+                                  }
+                                } else if (isCurrentSong &&
+                                    !playerState.isPlaying) {
+                                  // Resume current song
+                                  playerState.setPlaying(true);
+                                  await Future.delayed(
+                                    Duration(milliseconds: 50),
+                                  );
+                                  try {
+                                    await _audioPlayer.play();
+                                  } catch (e) {
+                                    playerState.setPlaying(false);
+                                  }
+                                } else {
+                                  // Play a different song
+                                  _playSong(song, null, false);
+                                }
+                              },
+                      );
+                    },
                   ),
                 ),
               ],
@@ -1018,6 +1193,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       albums: _albums,
       onAlbumPlay: (album) => _playAlbum(album),
       getBestImageUrl: _getBestImageUrl,
+      audioPlayer: _audioPlayer,
     );
   }
 
@@ -1034,6 +1210,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       randomSongs: _randomSongs,
       onSongPlay: (song, index) => _playSong(song, index, true),
       getBestImageUrl: _getBestImageUrl,
+      audioPlayer: _audioPlayer,
     );
   }
 
@@ -1045,7 +1222,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildSongTile(Map<String, dynamic> song, int index, bool useRandom) {
+  Widget _buildSongTile(
+    Map<String, dynamic> song,
+    int index,
+    bool useRandom, {
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     final imageUrl = _getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
     String subtitle = 'Unknown Artist';
@@ -1074,10 +1258,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
                 gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFFff7d78).withOpacity(0.3),
-                    const Color(0xFF9c27b0).withOpacity(0.3),
-                  ],
+                  colors: customColorsEnabled
+                      ? [
+                          primaryColor.withOpacity(0.3),
+                          primaryColor.withOpacity(0.1),
+                        ]
+                      : [
+                          const Color(0xFFff7d78).withOpacity(0.3),
+                          const Color(0xFF9c27b0).withOpacity(0.3),
+                        ],
                 ),
               ),
               child: imageUrl != null
@@ -1134,14 +1323,55 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
         trailing: Container(
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+            gradient: LinearGradient(
+              colors: customColorsEnabled
+                  ? [primaryColor, primaryColor.withOpacity(0.8)]
+                  : [Color(0xFFff7d78), Color(0xFF9c27b0)],
             ),
             shape: BoxShape.circle,
           ),
-          child: IconButton(
-            icon: const Icon(Icons.play_arrow, color: Colors.white),
-            onPressed: () => _playSong(song, index, useRandom),
+          child: Consumer<PlayerStateProvider>(
+            builder: (context, playerState, child) {
+              final isCurrentSong =
+                  playerState.currentSong != null &&
+                  playerState.currentSong!['id'] == song['id'];
+              final isPlaying = playerState.isPlaying && isCurrentSong;
+              final isLoading = playerState.isSongLoading && isCurrentSong;
+
+              return IconButton(
+                icon: isLoading
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.white,
+                      ),
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        if (isCurrentSong && playerState.isPlaying) {
+                          // Pause current song
+                          playerState.setPlaying(false);
+                          await _audioPlayer.pause();
+                        } else if (isCurrentSong && !playerState.isPlaying) {
+                          // Resume current song
+                          playerState.setPlaying(true);
+                          await _audioPlayer.play();
+                        } else {
+                          // Play a different song
+                          _playSong(song, index, useRandom);
+                        }
+                      },
+              );
+            },
           ),
         ),
       ),
@@ -1383,6 +1613,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _animationController.dispose();
     _audioPlayer.dispose();
     _pageTransitionController.dispose();
+    _meteorsController.dispose();
     super.dispose();
   }
 

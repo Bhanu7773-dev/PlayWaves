@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../screens/settings_page.dart';
+import '../services/custom_theme_provider.dart';
 
 class AnimatedNavBar extends StatefulWidget {
   final int selectedIndex;
@@ -52,6 +54,10 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
 
   @override
   Widget build(BuildContext context) {
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+    final primaryColor = customTheme.primaryColor;
+
     final labels =
         widget.navLabels ?? ['Home', 'Search', 'Library', 'Settings'];
     final icons = widget.navIcons.isNotEmpty
@@ -101,8 +107,10 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
                         ..scale(isSelected ? 1.2 : 1.0),
                       child: ShaderMask(
                         shaderCallback: (bounds) => isSelected
-                            ? const LinearGradient(
-                                colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                            ? LinearGradient(
+                                colors: customColorsEnabled
+                                    ? [primaryColor, primaryColor]
+                                    : [Color(0xFFff7d78), Color(0xFF9c27b0)],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ).createShader(bounds)

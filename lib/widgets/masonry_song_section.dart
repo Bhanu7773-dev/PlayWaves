@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:provider/provider.dart';
+import '../services/custom_theme_provider.dart';
 
 class MasonrySongSection extends StatelessWidget {
   final List<Map<String, dynamic>> songs;
@@ -15,56 +17,79 @@ class MasonrySongSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: [
-              Container(
-                width: 4,
-                height: 24,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+    return Consumer<CustomThemeProvider>(
+      builder: (context, customTheme, child) {
+        final customColorsEnabled = customTheme.customColorsEnabled;
+        final primaryColor = customTheme.primaryColor;
+        final secondaryColor = customTheme.secondaryColor;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: customColorsEnabled
+                            ? [
+                                primaryColor,
+                                primaryColor.withValues(alpha: 0.7),
+                              ]
+                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    "Trending Songs",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              const Text(
-                "Trending Songs",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-        MasonryGridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          itemCount: songs.length,
-          itemBuilder: (context, index) {
-            final song = songs[index];
-            return _buildMasonrySongCard(song, index, context);
-          },
-        ),
-      ],
+            ),
+            MasonryGridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              itemCount: songs.length,
+              itemBuilder: (context, index) {
+                final song = songs[index];
+                return _buildMasonrySongCard(
+                  song,
+                  index,
+                  context,
+                  customColorsEnabled: customColorsEnabled,
+                  primaryColor: primaryColor,
+                  secondaryColor: secondaryColor,
+                );
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildMasonrySongCard(
     Map<String, dynamic> song,
     int index,
-    BuildContext context,
-  ) {
+    BuildContext context, {
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     final imageUrl = getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
     String artist = 'Unknown Artist';
@@ -82,8 +107,23 @@ class MasonrySongSection extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: Colors.white.withOpacity(0.05),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          color: customColorsEnabled
+              ? primaryColor.withValues(alpha: 0.05)
+              : Colors.white.withOpacity(0.05),
+          border: Border.all(
+            color: customColorsEnabled
+                ? primaryColor.withValues(alpha: 0.2)
+                : Colors.white.withOpacity(0.1),
+          ),
+          boxShadow: customColorsEnabled
+              ? [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,29 +134,50 @@ class MasonrySongSection extends StatelessWidget {
               ),
               child: AspectRatio(
                 aspectRatio: 1.0,
-                child: imageUrl != null
-                    ? Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[800],
-                            child: const Icon(
-                              Icons.music_note,
-                              color: Colors.white54,
-                              size: 40,
+                child: Stack(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: double.infinity,
+                      child: imageUrl != null
+                          ? Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[800],
+                                  child: const Icon(
+                                    Icons.music_note,
+                                    color: Colors.white54,
+                                    size: 40,
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(
+                              color: Colors.grey[800],
+                              child: const Icon(
+                                Icons.music_note,
+                                color: Colors.white54,
+                                size: 40,
+                              ),
                             ),
-                          );
-                        },
-                      )
-                    : Container(
-                        color: Colors.grey[800],
-                        child: const Icon(
-                          Icons.music_note,
-                          color: Colors.white54,
-                          size: 40,
+                    ),
+                    if (customColorsEnabled)
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.transparent,
+                              primaryColor.withValues(alpha: 0.1),
+                            ],
+                          ),
                         ),
                       ),
+                  ],
+                ),
               ),
             ),
             Padding(
@@ -126,8 +187,10 @@ class MasonrySongSection extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: customColorsEnabled
+                          ? primaryColor.withValues(alpha: 0.9)
+                          : Colors.white,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
@@ -137,7 +200,7 @@ class MasonrySongSection extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     artist,
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
