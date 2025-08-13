@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart'; // <-- Add this import
+import '../services/custom_theme_provider.dart';
 
 class ArtistSongsPage extends StatefulWidget {
   final String artistName;
@@ -179,11 +180,26 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     return null;
   }
 
-  Widget _buildAnimatedBackground({required bool isPitchBlack}) {
+  Widget _buildAnimatedBackground({
+    required bool isPitchBlack,
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     return Container(
       decoration: BoxDecoration(
         gradient: isPitchBlack
             ? null
+            : customColorsEnabled
+            ? RadialGradient(
+                center: Alignment.topLeft,
+                radius: 1.5,
+                colors: [
+                  secondaryColor,
+                  secondaryColor.withOpacity(0.8),
+                  Colors.black,
+                ],
+              )
             : const RadialGradient(
                 center: Alignment.topLeft,
                 radius: 1.5,
@@ -194,13 +210,19 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader({
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [const Color(0xFF1a1a2e), Colors.black.withOpacity(0.8)],
+          colors: customColorsEnabled
+              ? [secondaryColor, Colors.black.withOpacity(0.8)]
+              : [const Color(0xFF1a1a2e), Colors.black.withOpacity(0.8)],
         ),
       ),
       child: SafeArea(
@@ -234,8 +256,10 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                      gradient: LinearGradient(
+                        colors: customColorsEnabled
+                            ? [primaryColor, primaryColor.withOpacity(0.8)]
+                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
                       ),
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -256,9 +280,11 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                   Container(
                     width: 4,
                     height: 32,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                        colors: customColorsEnabled
+                            ? [primaryColor, primaryColor.withOpacity(0.7)]
+                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
                       ),
                       borderRadius: BorderRadius.all(Radius.circular(2)),
                     ),
@@ -296,7 +322,13 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     );
   }
 
-  Widget _buildSongCard(Map<String, dynamic> song, int index) {
+  Widget _buildSongCard(
+    Map<String, dynamic> song,
+    int index, {
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     final imageUrl = _getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
     String artist = 'Unknown Artist';
@@ -345,10 +377,15 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                   height: 36,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFFff7d78).withOpacity(0.3),
-                        const Color(0xFF9c27b0).withOpacity(0.3),
-                      ],
+                      colors: customColorsEnabled
+                          ? [
+                              primaryColor.withOpacity(0.3),
+                              primaryColor.withOpacity(0.1),
+                            ]
+                          : [
+                              const Color(0xFFff7d78).withOpacity(0.3),
+                              const Color(0xFF9c27b0).withOpacity(0.3),
+                            ],
                     ),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -431,25 +468,67 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                 // Play Button
                 Container(
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                    gradient: LinearGradient(
+                      colors: customColorsEnabled
+                          ? [primaryColor, primaryColor.withOpacity(0.8)]
+                          : [Color(0xFFff7d78), Color(0xFF9c27b0)],
                     ),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFff7d78).withOpacity(0.4),
+                        color: customColorsEnabled
+                            ? primaryColor.withOpacity(0.4)
+                            : const Color(0xFFff7d78).withOpacity(0.4),
                         blurRadius: 8,
                         spreadRadius: 2,
                       ),
                     ],
                   ),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.play_arrow,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                    onPressed: () => _playSong(song),
+                  child: Consumer<PlayerStateProvider>(
+                    builder: (context, playerState, child) {
+                      final isCurrentSong =
+                          playerState.currentSong != null &&
+                          playerState.currentSong!['id'] == song['id'];
+                      final isPlaying = playerState.isPlaying && isCurrentSong;
+                      final isLoading =
+                          playerState.isSongLoading && isCurrentSong;
+
+                      return IconButton(
+                        icon: isLoading
+                            ? SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                isPlaying ? Icons.pause : Icons.play_arrow,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                        onPressed: isLoading
+                            ? null // Disable button when loading
+                            : () async {
+                                if (isCurrentSong && playerState.isPlaying) {
+                                  // Pause current song
+                                  playerState.setPlaying(false);
+                                  await widget.audioPlayer.pause();
+                                } else if (isCurrentSong &&
+                                    !playerState.isPlaying) {
+                                  // Resume current song
+                                  playerState.setPlaying(true);
+                                  await widget.audioPlayer.play();
+                                } else {
+                                  // Play a different song
+                                  _playSong(song);
+                                }
+                              },
+                      );
+                    },
                   ),
                 ),
               ],
@@ -465,6 +544,10 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     final isPitchBlack = context
         .watch<PitchBlackThemeProvider>()
         .isPitchBlack; // <-- Read provider
+    final customTheme = context.watch<CustomThemeProvider>();
+    final customColorsEnabled = customTheme.customColorsEnabled;
+    final primaryColor = customTheme.primaryColor;
+    final secondaryColor = customTheme.secondaryColor;
 
     return Scaffold(
       backgroundColor: isPitchBlack
@@ -474,10 +557,17 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
         children: [
           _buildAnimatedBackground(
             isPitchBlack: isPitchBlack,
+            customColorsEnabled: customColorsEnabled,
+            primaryColor: primaryColor,
+            secondaryColor: secondaryColor,
           ), // <-- Pass provider
           Column(
             children: [
-              _buildHeader(),
+              _buildHeader(
+                customColorsEnabled: customColorsEnabled,
+                primaryColor: primaryColor,
+                secondaryColor: secondaryColor,
+              ),
               Expanded(
                 child: _isLoading
                     ? Center(
@@ -488,11 +578,13 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                               width: 60,
                               height: 60,
                               decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFFff7d78),
-                                    Color(0xFF9c27b0),
-                                  ],
+                                gradient: LinearGradient(
+                                  colors: customColorsEnabled
+                                      ? [
+                                          primaryColor,
+                                          primaryColor.withOpacity(0.8),
+                                        ]
+                                      : [Color(0xFFff7d78), Color(0xFF9c27b0)],
                                 ),
                                 borderRadius: BorderRadius.circular(30),
                               ),
@@ -566,11 +658,16 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                               const SizedBox(height: 20),
                               Container(
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFFff7d78),
-                                      Color(0xFF9c27b0),
-                                    ],
+                                  gradient: LinearGradient(
+                                    colors: customColorsEnabled
+                                        ? [
+                                            primaryColor,
+                                            primaryColor.withOpacity(0.8),
+                                          ]
+                                        : [
+                                            Color(0xFFff7d78),
+                                            Color(0xFF9c27b0),
+                                          ],
                                   ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -670,7 +767,13 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                             padding: const EdgeInsets.only(top: 10, bottom: 20),
                             itemCount: _songs.length,
                             itemBuilder: (context, index) {
-                              return _buildSongCard(_songs[index], index);
+                              return _buildSongCard(
+                                _songs[index],
+                                index,
+                                customColorsEnabled: customColorsEnabled,
+                                primaryColor: primaryColor,
+                                secondaryColor: secondaryColor,
+                              );
                             },
                           ),
                         ),
