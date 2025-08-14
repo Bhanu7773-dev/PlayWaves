@@ -310,9 +310,9 @@ class MiniPlayer extends StatelessWidget {
     final String heroArtistTag =
         'artist_name_${currentSong?['id'] ?? songTitle}_${artistName}';
 
-  final customTheme = Provider.of<CustomThemeProvider>(context);
-  final useCustom = customTheme.customColorsEnabled;
-  final primaryColor = customTheme.primaryColor;
+    final customTheme = Provider.of<CustomThemeProvider>(context);
+    final useCustom = customTheme.customColorsEnabled;
+    final primaryColor = customTheme.primaryColor;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -367,7 +367,14 @@ class MiniPlayer extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: useCustom ? primaryColor.withOpacity(0.22) : const Color.fromARGB(255, 19, 19, 19).withOpacity(1.0),
+                              color: useCustom
+                                  ? primaryColor.withOpacity(0.22)
+                                  : const Color.fromARGB(
+                                      255,
+                                      19,
+                                      19,
+                                      19,
+                                    ).withOpacity(1.0),
                               blurRadius: 8,
                               spreadRadius: 1,
                             ),
@@ -381,7 +388,9 @@ class MiniPlayer extends StatelessWidget {
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Container(
-                                      color: useCustom ? primaryColor.withOpacity(0.18) : Colors.grey[800],
+                                      color: useCustom
+                                          ? primaryColor.withOpacity(0.18)
+                                          : Colors.grey[800],
                                       child: const Icon(
                                         Icons.music_note,
                                         color: Colors.white,
@@ -391,7 +400,9 @@ class MiniPlayer extends StatelessWidget {
                                   },
                                 )
                               : Container(
-                                  color: useCustom ? primaryColor.withOpacity(0.18) : Colors.grey[800],
+                                  color: useCustom
+                                      ? primaryColor.withOpacity(0.18)
+                                      : Colors.grey[800],
                                   child: const Icon(
                                     Icons.music_note,
                                     color: Colors.white,
@@ -415,7 +426,9 @@ class MiniPlayer extends StatelessWidget {
                               child: Text(
                                 songTitle,
                                 style: TextStyle(
-                                  color: useCustom ? primaryColor : Colors.white,
+                                  color: useCustom
+                                      ? primaryColor
+                                      : Colors.white,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -456,7 +469,9 @@ class MiniPlayer extends StatelessWidget {
                               onPressed: onPlayPause,
                               icon: Icon(
                                 isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: useCustom ? primaryColor : const Color(0xFFff7d78),
+                                color: useCustom
+                                    ? primaryColor
+                                    : const Color(0xFFff7d78),
                                 size: 28,
                               ),
                               padding: const EdgeInsets.all(4),

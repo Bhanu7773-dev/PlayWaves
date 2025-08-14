@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../widgets/animated_navbar.dart';
 import '../widgets/mini_player.dart';
+import '../widgets/music_loader.dart';
 import '../screens/music_player.dart';
 import '../screens/search_page.dart';
 import '../screens/playlist_storage.dart'; // Make sure this import is correct!
@@ -937,10 +938,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }) {
     if (_isLoading) {
       return Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(
-            customColorsEnabled ? primaryColor : Color(0xFFff7d78),
-          ),
+        child: SiriWaveLoader(
+          colors: customColorsEnabled
+              ? [
+                  primaryColor,
+                  primaryColor.withOpacity(0.7),
+                  primaryColor.withOpacity(0.5),
+                  primaryColor.withOpacity(0.3),
+                ]
+              : [Colors.purple, Colors.blue, Colors.pink, Colors.cyan],
+          width: 80,
+          height: 80,
         ),
       );
     }
