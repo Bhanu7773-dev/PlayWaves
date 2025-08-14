@@ -898,14 +898,6 @@ class _SettingsPageState extends State<SettingsPage>
             _showSnackBar("Notification settings coming soon", primaryColor);
           },
         ),
-        _buildSettingsTile(
-          icon: Icons.storage,
-          title: "Storage",
-          subtitle: "Manage downloaded songs and cache",
-          onTap: () {
-            _showStorageDialog();
-          },
-        ),
       ],
     );
   }
@@ -1259,194 +1251,34 @@ class _SettingsPageState extends State<SettingsPage>
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: secondaryColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Colors.white.withOpacity(0.2)),
-          ),
-          title: const Text(
-            'Logout',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            'Are you sure you want to logout?',
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.white54),
-              ),
+        return _buildSection(
+          title: "System",
+          icon: Icons.settings,
+          children: [
+            _buildSwitchTile(
+              title: "Offline Mode",
+              subtitle: "Only show/play downloaded and local songs",
+              value: offlineMode,
+              onChanged: (val) {
+                setState(() {
+                  offlineMode = val;
+                });
+              },
             ),
-            Container(
-              decoration: BoxDecoration(
-                gradient:
-                    (!customColorsEnabled &&
-                        !useSystemTheme &&
-                        !useDynamicColors &&
-                        !pitchBlackEnabled)
-                    ? LinearGradient(
-                        colors: defaultGradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: customColorsEnabled ? primaryColor : null,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  widget.onLogout();
-                },
-                child: const Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+            _buildSettingsTile(
+              icon: Icons.notifications,
+              title: "Notifications",
+              subtitle: "Manage notification settings",
+              onTap: () {
+                _showSnackBar(
+                  "Notification settings coming soon",
+                  primaryColor,
+                );
+              },
             ),
           ],
         );
       },
-    );
-  }
-
-  void _showStorageDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: secondaryColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Colors.white.withOpacity(0.2)),
-          ),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient:
-                      (!customColorsEnabled &&
-                          !useSystemTheme &&
-                          !useDynamicColors &&
-                          !pitchBlackEnabled)
-                      ? LinearGradient(
-                          colors: defaultGradient,
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: customColorsEnabled ? primaryColor : null,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.storage, color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Storage Info',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildStorageItem('Downloaded Songs', '2.3 GB'),
-              _buildStorageItem('Cache', '456 MB'),
-              _buildStorageItem('Playlists', '12 MB'),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info, color: Color(0xFFff7d78), size: 16),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Total storage used: 2.77 GB',
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Close',
-                style: TextStyle(color: Colors.white54),
-              ),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                gradient:
-                    (!customColorsEnabled &&
-                        !useSystemTheme &&
-                        !useDynamicColors &&
-                        !pitchBlackEnabled)
-                    ? LinearGradient(
-                        colors: defaultGradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: customColorsEnabled ? primaryColor : null,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _showSnackBar("Cache cleared successfully", Colors.green);
-                },
-                child: const Text(
-                  'Clear Cache',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildStorageItem(String label, String size) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white70)),
-          Text(
-            size,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

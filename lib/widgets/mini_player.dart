@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:provider/provider.dart';
+import '../services/custom_theme_provider.dart';
 
 class RippleFlowEffect extends StatefulWidget {
   final bool isPlaying;
@@ -20,9 +22,13 @@ class _RippleFlowEffectState extends State<RippleFlowEffect>
   late AnimationController _controller1;
   late AnimationController _controller2;
   late AnimationController _controller3;
+  late AnimationController _controller4;
+  late AnimationController _controller5;
   late Animation<double> _animation1;
   late Animation<double> _animation2;
   late Animation<double> _animation3;
+  late Animation<double> _animation4;
+  late Animation<double> _animation5;
 
   @override
   void initState() {
@@ -32,11 +38,19 @@ class _RippleFlowEffectState extends State<RippleFlowEffect>
       vsync: this,
     );
     _controller2 = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 2200),
       vsync: this,
     );
     _controller3 = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 2400),
+      vsync: this,
+    );
+    _controller4 = AnimationController(
+      duration: const Duration(milliseconds: 2600),
+      vsync: this,
+    );
+    _controller5 = AnimationController(
+      duration: const Duration(milliseconds: 2800),
       vsync: this,
     );
 
@@ -52,6 +66,14 @@ class _RippleFlowEffectState extends State<RippleFlowEffect>
       begin: 0,
       end: 1,
     ).animate(CurvedAnimation(parent: _controller3, curve: Curves.easeOut));
+    _animation4 = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller4, curve: Curves.easeOut));
+    _animation5 = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller5, curve: Curves.easeOut));
 
     if (widget.isPlaying) {
       _startAnimations();
@@ -66,12 +88,20 @@ class _RippleFlowEffectState extends State<RippleFlowEffect>
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (mounted) _controller3.repeat();
     });
+    Future.delayed(const Duration(milliseconds: 1800), () {
+      if (mounted) _controller4.repeat();
+    });
+    Future.delayed(const Duration(milliseconds: 2400), () {
+      if (mounted) _controller5.repeat();
+    });
   }
 
   void _stopAnimations() {
     _controller1.stop();
     _controller2.stop();
     _controller3.stop();
+    _controller4.stop();
+    _controller5.stop();
   }
 
   @override
@@ -91,20 +121,34 @@ class _RippleFlowEffectState extends State<RippleFlowEffect>
     _controller1.dispose();
     _controller2.dispose();
     _controller3.dispose();
+    _controller4.dispose();
+    _controller5.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final customTheme = Provider.of<CustomThemeProvider>(context);
+    final rippleColor = customTheme.customColorsEnabled
+        ? customTheme.primaryColor
+        : widget.color;
     return AnimatedBuilder(
-      animation: Listenable.merge([_animation1, _animation2, _animation3]),
+      animation: Listenable.merge([
+        _animation1,
+        _animation2,
+        _animation3,
+        _animation4,
+        _animation5,
+      ]),
       builder: (context, child) {
         return CustomPaint(
           painter: RipplePainter(
             animation1: _animation1.value,
             animation2: _animation2.value,
             animation3: _animation3.value,
-            color: widget.color,
+            animation4: _animation4.value,
+            animation5: _animation5.value,
+            color: rippleColor,
           ),
           size: Size.infinite,
         );
@@ -117,12 +161,16 @@ class RipplePainter extends CustomPainter {
   final double animation1;
   final double animation2;
   final double animation3;
+  final double animation4;
+  final double animation5;
   final Color color;
 
   RipplePainter({
     required this.animation1,
     required this.animation2,
     required this.animation3,
+    required this.animation4,
+    required this.animation5,
     required this.color,
   });
 
@@ -136,7 +184,7 @@ class RipplePainter extends CustomPainter {
 
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
+      ..strokeWidth = 3.0;
 
     // Draw multiple ripples with different opacity and size
     _drawRipple(
@@ -150,14 +198,28 @@ class RipplePainter extends CustomPainter {
       canvas,
       center,
       maxRadius * animation2,
-      color.withOpacity((1 - animation2) * 0.2),
+      color.withOpacity((1 - animation2) * 0.22),
       paint,
     );
     _drawRipple(
       canvas,
       center,
       maxRadius * animation3,
-      color.withOpacity((1 - animation3) * 0.1),
+      color.withOpacity((1 - animation3) * 0.16),
+      paint,
+    );
+    _drawRipple(
+      canvas,
+      center,
+      maxRadius * animation4,
+      color.withOpacity((1 - animation4) * 0.10),
+      paint,
+    );
+    _drawRipple(
+      canvas,
+      center,
+      maxRadius * animation5,
+      color.withOpacity((1 - animation5) * 0.06),
       paint,
     );
   }
@@ -248,6 +310,9 @@ class MiniPlayer extends StatelessWidget {
     final String heroArtistTag =
         'artist_name_${currentSong?['id'] ?? songTitle}_${artistName}';
 
+  final customTheme = Provider.of<CustomThemeProvider>(context);
+  final useCustom = customTheme.customColorsEnabled;
+  final primaryColor = customTheme.primaryColor;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -282,7 +347,7 @@ class MiniPlayer extends StatelessWidget {
                     final isPlaying = snapshot.data ?? false;
                     return RippleFlowEffect(
                       isPlaying: isPlaying,
-                      color: const Color(0xFFff7d78),
+                      color: useCustom ? primaryColor : const Color(0xFFff7d78),
                     );
                   },
                 ),
@@ -302,12 +367,7 @@ class MiniPlayer extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color.fromARGB(
-                                255,
-                                19,
-                                19,
-                                19,
-                              ).withOpacity(1.0),
+                              color: useCustom ? primaryColor.withOpacity(0.22) : const Color.fromARGB(255, 19, 19, 19).withOpacity(1.0),
                               blurRadius: 8,
                               spreadRadius: 1,
                             ),
@@ -321,7 +381,7 @@ class MiniPlayer extends StatelessWidget {
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Container(
-                                      color: Colors.grey[800],
+                                      color: useCustom ? primaryColor.withOpacity(0.18) : Colors.grey[800],
                                       child: const Icon(
                                         Icons.music_note,
                                         color: Colors.white,
@@ -331,7 +391,7 @@ class MiniPlayer extends StatelessWidget {
                                   },
                                 )
                               : Container(
-                                  color: Colors.grey[800],
+                                  color: useCustom ? primaryColor.withOpacity(0.18) : Colors.grey[800],
                                   child: const Icon(
                                     Icons.music_note,
                                     color: Colors.white,
@@ -354,8 +414,8 @@ class MiniPlayer extends StatelessWidget {
                               color: Colors.transparent,
                               child: Text(
                                 songTitle,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: useCustom ? primaryColor : Colors.white,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -396,7 +456,7 @@ class MiniPlayer extends StatelessWidget {
                               onPressed: onPlayPause,
                               icon: Icon(
                                 isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: const Color(0xFFff7d78),
+                                color: useCustom ? primaryColor : const Color(0xFFff7d78),
                                 size: 28,
                               ),
                               padding: const EdgeInsets.all(4),

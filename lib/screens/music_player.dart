@@ -58,6 +58,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
   static const int _queueTargetCount = 30;
   bool _isDownloading = false;
   late AnimationController _meteorsController;
+  bool _isLiked = false;
+  late AnimationController _likeController;
+  late Animation<double> _likeScale;
 
   @override
   void initState() {
@@ -66,12 +69,21 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
       duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat();
+    _likeController = AnimationController(
+      duration: const Duration(milliseconds: 350),
+      vsync: this,
+    );
+    _likeScale = Tween<double>(
+      begin: 1.0,
+      end: 1.25,
+    ).chain(CurveTween(curve: Curves.elasticOut)).animate(_likeController);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
     _meteorsController.dispose();
+    _likeController.dispose();
     super.dispose();
   }
 
@@ -355,7 +367,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
@@ -377,20 +389,115 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                               ),
                             ),
                             const SizedBox(height: 6),
-                            Hero(
-                              tag:
-                                  'artist_name_${widget.songTitle}_${widget.artistName}',
-                              child: Material(
-                                color: Colors.transparent,
-                                child: Text(
-                                  currentArtistName,
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 16,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Hero(
+                                  tag:
+                                      'artist_name_${widget.songTitle}_${widget.artistName}',
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: Text(
+                                      currentArtistName,
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 16,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
                                   ),
-                                  textAlign: TextAlign.center,
                                 ),
-                              ),
+                                const SizedBox(width: 16),
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _isLiked = !_isLiked;
+                                    });
+                                    if (!_likeController.isAnimating) {
+                                      if (_isLiked) {
+                                        _likeController.forward(from: 0);
+                                      } else {
+                                        _likeController.reverse();
+                                      }
+                                    }
+                                  },
+                                  child: AnimatedBuilder(
+                                    animation: _likeController,
+                                    builder: (context, child) {
+                                      return Transform.scale(
+                                        scale: _isLiked
+                                            ? _likeScale.value
+                                            : 1.0,
+                                        child: _isLiked
+                                            ? (customColorsEnabled
+                                                  ? Icon(
+                                                      Icons.favorite,
+                                                      color: primaryColor,
+                                                      size: 28,
+                                                    )
+                                                  : ShaderMask(
+                                                      shaderCallback:
+                                                          (Rect bounds) {
+                                                            return const LinearGradient(
+                                                              colors: [
+                                                                Color(
+                                                                  0xFFff7d78,
+                                                                ),
+                                                                Color(
+                                                                  0xFF9c27b0,
+                                                                ),
+                                                              ],
+                                                              begin: Alignment
+                                                                  .topLeft,
+                                                              end: Alignment
+                                                                  .bottomRight,
+                                                            ).createShader(
+                                                              bounds,
+                                                            );
+                                                          },
+                                                      child: const Icon(
+                                                        Icons.favorite,
+                                                        color: Colors.white,
+                                                        size: 28,
+                                                      ),
+                                                    ))
+                                            : const Icon(
+                                                Icons.favorite_border,
+                                                color: Colors.white,
+                                                size: 28,
+                                              ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.more_vert,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) {
+                                        return AlertDialog(
+                                          title: const Text('More Options'),
+                                          content: const Text(
+                                            'Add items here later.',
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.of(context).pop(),
+                                              child: const Text('Close'),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                           ],
                         ),
