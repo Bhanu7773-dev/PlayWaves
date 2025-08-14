@@ -82,6 +82,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   bool _isMusicPlayerPageOpen = false;
   bool _isAutoPlayTriggered = false;
 
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _trendingSectionKey = GlobalKey();
+  final GlobalKey _randomSectionKey = GlobalKey();
+  final GlobalKey _albumsSectionKey = GlobalKey();
+  final GlobalKey _artistsSectionKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -488,6 +494,50 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _pageTransitionController.forward(from: 0.0);
   }
 
+  void _scrollToTrending() {
+    final context = _trendingSectionKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _scrollToRandom() {
+    final context = _randomSectionKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _scrollToAlbums() {
+    final context = _albumsSectionKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _scrollToArtists() {
+    final context = _artistsSectionKey.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final playerState = Provider.of<PlayerStateProvider>(context);
@@ -810,6 +860,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required VoidCallback onTrendingTap,
+    required VoidCallback onRandomTap,
+    required VoidCallback onAlbumsTap,
+    required VoidCallback onArtistsTap,
   }) {
     return GridView.count(
       shrinkWrap: true,
@@ -824,29 +878,29 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           'Discover what\'s trending right now.',
           Colors.red,
           Icons.local_fire_department,
-          () {},
+          onTrendingTap,
           customColorsEnabled: customColorsEnabled,
           primaryColor: primaryColor,
           secondaryColor: secondaryColor,
         ),
         _buildActionCard(
-          'Popular',
-          'Most Played',
-          'Check out the most played songs.',
-          Colors.green,
-          Icons.play_circle_filled,
-          () {},
+          'Random',
+          'Random Picks',
+          'Discover a fresh selection of random songs.',
+          Colors.teal,
+          Icons.shuffle,
+          onRandomTap,
           customColorsEnabled: customColorsEnabled,
           primaryColor: primaryColor,
           secondaryColor: secondaryColor,
         ),
         _buildActionCard(
           'Collection',
-          'Playlists',
-          'Browse curated playlists for every mood.',
+          'Albums',
+          'Browse top albums for every mood.',
           Colors.purple,
-          Icons.playlist_play,
-          () {},
+          Icons.album,
+          onAlbumsTap,
           customColorsEnabled: customColorsEnabled,
           primaryColor: primaryColor,
           secondaryColor: secondaryColor,
@@ -857,7 +911,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           'Explore your favorite artists.',
           Colors.blue,
           Icons.person,
-          () {},
+          onArtistsTap,
           customColorsEnabled: customColorsEnabled,
           primaryColor: primaryColor,
           secondaryColor: secondaryColor,
@@ -980,6 +1034,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       child: FadeTransition(
         opacity: _fadeAnimation,
         child: SingleChildScrollView(
+          controller: _scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
           child: Padding(
             padding: const EdgeInsets.only(bottom: 100),
@@ -992,6 +1047,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
                     secondaryColor: secondaryColor,
+                    onTrendingTap: _scrollToTrending,
+                    onRandomTap: _scrollToRandom,
+                    onAlbumsTap: _scrollToAlbums,
+                    onArtistsTap: _scrollToArtists,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -1002,11 +1061,27 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     secondaryColor: secondaryColor,
                   ),
                 const SizedBox(height: 20),
-                if (_albums.isNotEmpty) _buildAlbumsSection(),
+                if (_albums.isNotEmpty)
+                  Container(
+                    key: _albumsSectionKey,
+                    child: _buildAlbumsSection(),
+                  ),
                 const SizedBox(height: 20),
-                if (_artists.isNotEmpty) _buildArtistsSection(), // <-- updated!
-                if (_randomSongs.isNotEmpty) _buildRandomSongsSection(),
-                if (_trendingSongs.isNotEmpty) _buildSongsSection(),
+                if (_artists.isNotEmpty)
+                  Container(
+                    key: _artistsSectionKey,
+                    child: _buildArtistsSection(),
+                  ),
+                if (_randomSongs.isNotEmpty)
+                  Container(
+                    key: _randomSectionKey,
+                    child: _buildRandomSongsSection(),
+                  ),
+                if (_trendingSongs.isNotEmpty)
+                  Container(
+                    key: _trendingSectionKey,
+                    child: _buildSongsSection(),
+                  ),
               ],
             ),
           ),
