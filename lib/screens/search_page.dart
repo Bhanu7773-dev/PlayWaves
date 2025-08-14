@@ -12,19 +12,10 @@ import '../services/custom_theme_provider.dart';
 class SearchPage extends StatefulWidget {
   final Function(int) onNavTap;
   final int selectedNavIndex;
-  final AudioPlayer audioPlayer;
-  final VoidCallback onPlayPause;
-  final VoidCallback onNext;
-  final VoidCallback onPrevious;
-
   const SearchPage({
     super.key,
     required this.onNavTap,
     required this.selectedNavIndex,
-    required this.audioPlayer,
-    required this.onPlayPause,
-    required this.onNext,
-    required this.onPrevious,
   });
 
   @override
@@ -80,11 +71,11 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     _animationController.forward();
     _searchController2.forward();
 
-    widget.audioPlayer.playingStream.listen((playing) {
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+    audioPlayer.playingStream.listen((playing) {
       if (mounted) setState(() {});
     });
-
-    widget.audioPlayer.playerStateStream.listen((state) {
+    audioPlayer.playerStateStream.listen((state) {
       if (mounted) setState(() {});
     });
   }
@@ -212,8 +203,9 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     try {
       playerState.setSongLoading(true);
 
-      await widget.audioPlayer.stop();
-      await widget.audioPlayer.seek(Duration.zero);
+      final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+      await audioPlayer.stop();
+      await audioPlayer.seek(Duration.zero);
 
       // Choose which list to use as playlist
       final songsToShow = _searchController.text.trim().isEmpty
@@ -261,8 +253,8 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
         if (downloadUrl != null && downloadUrl.isNotEmpty) {
           if (downloadUrl.contains('preview.saavncdn.com') ||
               downloadUrl.contains('aac.saavncdn.com')) {
-            await widget.audioPlayer.setUrl(downloadUrl);
-            await widget.audioPlayer.play();
+            await audioPlayer.setUrl(downloadUrl);
+            await audioPlayer.play();
             playerState.setPlaying(true);
             playerState.setSongLoading(false);
           } else {
@@ -1173,27 +1165,45 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
               right: 16,
               child: MiniPlayer(
                 currentSong: playerState.currentSong,
-                audioPlayer: widget.audioPlayer,
+                audioPlayer: Provider.of<AudioPlayer>(context, listen: false),
                 isSongLoading: playerState.isSongLoading,
-                onPlayPause: widget.onPlayPause,
+                onPlayPause: () {
+                  final audioPlayer = Provider.of<AudioPlayer>(
+                    context,
+                    listen: false,
+                  );
+                  if (audioPlayer.playing) {
+                    audioPlayer.pause();
+                  } else {
+                    audioPlayer.play();
+                  }
+                },
                 onClose: () {
-                  widget.audioPlayer.stop();
+                  final audioPlayer = Provider.of<AudioPlayer>(
+                    context,
+                    listen: false,
+                  );
+                  audioPlayer.stop();
                   playerState.clearSong();
                 },
                 onTap: () {
+                  final audioPlayer = Provider.of<AudioPlayer>(
+                    context,
+                    listen: false,
+                  );
                   Navigator.push(
                     context,
                     PageRouteBuilder(
                       pageBuilder: (context, animation, secondaryAnimation) {
                         final song = playerState.currentSong;
                         return StreamBuilder<Duration>(
-                          stream: widget.audioPlayer.positionStream,
+                          stream: audioPlayer.positionStream,
                           builder: (context, positionSnapshot) {
                             return StreamBuilder<Duration?>(
-                              stream: widget.audioPlayer.durationStream,
+                              stream: audioPlayer.durationStream,
                               builder: (context, durationSnapshot) {
                                 return StreamBuilder<bool>(
-                                  stream: widget.audioPlayer.playingStream,
+                                  stream: audioPlayer.playingStream,
                                   builder: (context, playingSnapshot) {
                                     String currentSongTitle =
                                         song?['name'] ??
@@ -1236,7 +1246,13 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                       totalDuration:
                                           durationSnapshot.data ??
                                           Duration.zero,
-                                      onPlayPause: widget.onPlayPause,
+                                      onPlayPause: () {
+                                        if (audioPlayer.playing) {
+                                          audioPlayer.pause();
+                                        } else {
+                                          audioPlayer.play();
+                                        }
+                                      },
                                       onNext: _playNextSong,
                                       onPrevious: _playPreviousSong,
                                       onJumpToSong: (index) =>
@@ -1246,7 +1262,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                             (durationSnapshot.data ??
                                                 Duration.zero) *
                                             value;
-                                        widget.audioPlayer.seek(position);
+                                        audioPlayer.seek(position);
                                       },
                                     );
                                   },

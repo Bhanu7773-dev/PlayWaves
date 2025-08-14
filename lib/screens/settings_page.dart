@@ -326,7 +326,7 @@ class _SettingsPageState extends State<SettingsPage>
               tooltip: 'Logout',
               icon: const Icon(Icons.logout, color: Colors.white),
               onPressed: () {
-                _showLogoutDialog();
+                widget.onLogout();
               },
             ),
           ),
@@ -580,7 +580,6 @@ class _SettingsPageState extends State<SettingsPage>
           value: customColorsEnabled,
           onChanged: (val) {
             _handleThemeToggle('custom', val);
-            // Update provider so all screens get notified
             Provider.of<CustomThemeProvider>(
               context,
               listen: false,
@@ -603,9 +602,7 @@ class _SettingsPageState extends State<SettingsPage>
                 setState(() {
                   pickedPrimaryColor = c;
                 });
-                // Debug print to check selected primary color
                 print('[SettingsPage] Picked primaryColor: ' + c.toString());
-                // Provide color data to CustomThemeProvider
                 Provider.of<CustomThemeProvider>(
                   context,
                   listen: false,
@@ -616,9 +613,7 @@ class _SettingsPageState extends State<SettingsPage>
                 setState(() {
                   pickedSecondaryColor = c;
                 });
-                // Debug print to check selected secondary color
                 print('[SettingsPage] Picked secondaryColor: ' + c.toString());
-                // Provide color data to CustomThemeProvider
                 Provider.of<CustomThemeProvider>(
                   context,
                   listen: false,
@@ -1244,41 +1239,6 @@ class _SettingsPageState extends State<SettingsPage>
         tooltip: tooltip,
         onPressed: onPressed,
       ),
-    );
-  }
-
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return _buildSection(
-          title: "System",
-          icon: Icons.settings,
-          children: [
-            _buildSwitchTile(
-              title: "Offline Mode",
-              subtitle: "Only show/play downloaded and local songs",
-              value: offlineMode,
-              onChanged: (val) {
-                setState(() {
-                  offlineMode = val;
-                });
-              },
-            ),
-            _buildSettingsTile(
-              icon: Icons.notifications,
-              title: "Notifications",
-              subtitle: "Manage notification settings",
-              onTap: () {
-                _showSnackBar(
-                  "Notification settings coming soon",
-                  primaryColor,
-                );
-              },
-            ),
-          ],
-        );
-      },
     );
   }
 

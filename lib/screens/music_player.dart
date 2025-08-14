@@ -8,9 +8,11 @@ import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
+import '../models/liked_song.dart';
 
 class MusicPlayerPage extends StatefulWidget {
   final String songTitle;
@@ -62,6 +64,8 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
   late AnimationController _likeController;
   late Animation<double> _likeScale;
 
+  late Box<LikedSong> likedSongsBox;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +81,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
       begin: 1.0,
       end: 1.25,
     ).chain(CurveTween(curve: Curves.elasticOut)).animate(_likeController);
+    likedSongsBox = Hive.box<LikedSong>('likedSongs');
   }
 
   @override
@@ -198,6 +203,94 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     }
   }
 
+  bool isLiked(String songId) {
+    return likedSongsBox.containsKey(songId);
+  }
+
+  void toggleLike(Map<String, dynamic> song) {
+    final songId = song['id'] ?? song['title'];
+    if (isLiked(songId)) {
+      likedSongsBox.delete(songId);
+    } else {
+      // Improved image extraction logic
+      String imageUrl = '';
+      final img = song['image'];
+      if (img is List && img.isNotEmpty) {
+        // Prefer 500x500 image if available
+        for (var item in img) {
+          if (item is Map &&
+              item['link'] != null &&
+              item['link'].toString().contains('500x500')) {
+            imageUrl = item['link'];
+            break;
+          }
+        }
+        // If not found, fallback to highest available resolution
+        if (imageUrl.isEmpty) {
+          for (var item in img.reversed) {
+            if (item is Map &&
+                item['link'] != null &&
+                item['link'].toString().isNotEmpty) {
+              imageUrl = item['link'];
+              break;
+            }
+            if (item is Map &&
+                item['url'] != null &&
+                item['url'].toString().isNotEmpty) {
+              imageUrl = item['url'];
+              break;
+            }
+          }
+        }
+        // Fallback to last item's link if none found
+        if (imageUrl.isEmpty && img.last is Map && img.last['link'] != null) {
+          imageUrl = img.last['link'];
+        }
+      } else if (img is String && img.isNotEmpty) {
+        imageUrl = img;
+      }
+      // Extract artist name from best available field
+      String artistName = '';
+      if (song['artists'] != null &&
+          song['artists'] is Map &&
+          song['artists']['primary'] is List &&
+          (song['artists']['primary'] as List).isNotEmpty) {
+        artistName = song['artists']['primary'][0]['name'] ?? '';
+      } else if (song['primaryArtists'] != null &&
+          song['primaryArtists'].toString().isNotEmpty) {
+        artistName = song['primaryArtists'];
+      } else if (song['subtitle'] != null &&
+          song['subtitle'].toString().isNotEmpty) {
+        artistName = song['subtitle'];
+      }
+      // Extract downloadUrl
+      String downloadUrl = '';
+      if (song['downloadUrl'] != null &&
+          song['downloadUrl'] is List &&
+          (song['downloadUrl'] as List).isNotEmpty) {
+        final urlObj = (song['downloadUrl'] as List).last;
+        if (urlObj is Map && urlObj['url'] != null) {
+          downloadUrl = urlObj['url'];
+        }
+      } else if (song['media_url'] != null) {
+        downloadUrl = song['media_url'];
+      } else if (song['media_preview_url'] != null) {
+        downloadUrl = song['media_preview_url'];
+      }
+      likedSongsBox.put(
+        songId,
+        LikedSong(
+          id: songId,
+          title: song['name'] ?? song['title'] ?? '',
+          artist: artistName,
+          imageUrl: imageUrl,
+          downloadUrl: downloadUrl,
+        ),
+      );
+    }
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     // ---- Custom theme logic here ----
@@ -222,6 +315,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
         .watch<PitchBlackThemeProvider>()
         .isPitchBlack; // <-- Read theme
 
+    // Always sync _isLiked with the current song
     return Scaffold(
       backgroundColor: isPitchBlack
           ? Colors.black
@@ -271,6 +365,21 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                   }
                   if (currentAlbumArtUrl.isEmpty) {
                     currentAlbumArtUrl = widget.albumArtUrl;
+                  }
+
+                  // Sync _isLiked with the current song
+                  final songId = song?['id'] ?? song?['title'];
+                  final actuallyLiked = songId != null
+                      ? isLiked(songId)
+                      : false;
+                  if (_isLiked != actuallyLiked) {
+                    // Only update if changed to avoid unnecessary rebuilds
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted)
+                        setState(() {
+                          _isLiked = actuallyLiked;
+                        });
+                    });
                   }
 
                   return Column(
@@ -410,8 +519,18 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                 const SizedBox(width: 16),
                                 GestureDetector(
                                   onTap: () {
+                                    final playerState =
+                                        Provider.of<PlayerStateProvider>(
+                                          context,
+                                          listen: false,
+                                        );
+                                    final song = playerState.currentSong;
+                                    if (song == null) return;
+                                    toggleLike(song);
+                                    final songId = song['id'] ?? song['title'];
+                                    final nowLiked = isLiked(songId);
                                     setState(() {
-                                      _isLiked = !_isLiked;
+                                      _isLiked = nowLiked;
                                     });
                                     if (!_likeController.isAnimating) {
                                       if (_isLiked) {

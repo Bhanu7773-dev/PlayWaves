@@ -9,14 +9,12 @@ class RandomSongsSection extends StatefulWidget {
   final List<Map<String, dynamic>> randomSongs;
   final void Function(Map<String, dynamic> song, int index) onSongPlay;
   final String? Function(dynamic images) getBestImageUrl;
-  final AudioPlayer audioPlayer;
 
   const RandomSongsSection({
     Key? key,
     required this.randomSongs,
     required this.onSongPlay,
     required this.getBestImageUrl,
-    required this.audioPlayer,
   }) : super(key: key);
 
   @override
@@ -90,10 +88,7 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: customColorsEnabled
-                            ? [
-                                primaryColor,
-                                primaryColor.withValues(alpha: 0.7),
-                              ]
+                            ? [primaryColor, primaryColor.withOpacity(0.7)]
                             : [Color(0xFFff7d78), Color(0xFF9c27b0)],
                       ),
                     ),
@@ -118,6 +113,7 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                     matchEngine: _matchEngine,
                     itemBuilder: (context, index) {
                       return _buildSongCard(
+                        context,
                         widget.randomSongs[index],
                         index,
                         customColorsEnabled: customColorsEnabled,
@@ -157,6 +153,7 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
   }
 
   Widget _buildSongCard(
+    BuildContext context,
     Map<String, dynamic> song,
     int index, {
     required bool customColorsEnabled,
@@ -174,7 +171,7 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       color: customColorsEnabled
-          ? secondaryColor.withValues(alpha: 0.8)
+          ? secondaryColor.withOpacity(0.8)
           : const Color.fromARGB(255, 17, 17, 17),
       child: Stack(
         children: [
@@ -197,8 +194,8 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                             gradient: LinearGradient(
                               colors: customColorsEnabled
                                   ? [
-                                      primaryColor.withValues(alpha: 0.3),
-                                      primaryColor.withValues(alpha: 0.1),
+                                      primaryColor.withOpacity(0.3),
+                                      primaryColor.withOpacity(0.1),
                                     ]
                                   : [Colors.grey[800]!, Colors.grey[700]!],
                             ),
@@ -206,7 +203,7 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                           child: Icon(
                             Icons.music_note,
                             color: customColorsEnabled
-                                ? primaryColor.withValues(alpha: 0.7)
+                                ? primaryColor.withOpacity(0.7)
                                 : Colors.white54,
                             size: 48,
                           ),
@@ -219,8 +216,8 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                           gradient: LinearGradient(
                             colors: customColorsEnabled
                                 ? [
-                                    primaryColor.withValues(alpha: 0.3),
-                                    primaryColor.withValues(alpha: 0.1),
+                                    primaryColor.withOpacity(0.3),
+                                    primaryColor.withOpacity(0.1),
                                   ]
                                 : [Colors.grey[800]!, Colors.grey[700]!],
                           ),
@@ -228,7 +225,7 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                         child: Icon(
                           Icons.music_note,
                           color: customColorsEnabled
-                              ? primaryColor.withValues(alpha: 0.7)
+                              ? primaryColor.withOpacity(0.7)
                               : Colors.white54,
                           size: 48,
                         ),
@@ -245,7 +242,7 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                       title,
                       style: TextStyle(
                         color: customColorsEnabled
-                            ? primaryColor.withValues(alpha: 0.9)
+                            ? primaryColor.withOpacity(0.9)
                             : Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
@@ -258,7 +255,7 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                       artist,
                       style: TextStyle(
                         color: customColorsEnabled
-                            ? primaryColor.withValues(alpha: 0.6)
+                            ? primaryColor.withOpacity(0.6)
                             : Colors.white70,
                         fontSize: 14,
                       ),
@@ -273,6 +270,10 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                 padding: const EdgeInsets.only(bottom: 16.0),
                 child: Consumer<PlayerStateProvider>(
                   builder: (context, playerState, child) {
+                    final audioPlayer = Provider.of<AudioPlayer>(
+                      context,
+                      listen: false,
+                    );
                     final isCurrentSong =
                         playerState.currentSong != null &&
                         playerState.currentSong!['id'] == song['id'];
@@ -312,22 +313,17 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
 
                                 try {
                                   if (isCurrentSong && isPlaying) {
-                                    // Pause current song
-                                    await widget.audioPlayer.pause();
+                                    await audioPlayer.pause();
                                     playerState.setPlaying(false);
                                   } else if (isCurrentSong && !isPlaying) {
-                                    // Resume current song
-                                    await widget.audioPlayer.play();
+                                    await audioPlayer.play();
                                     playerState.setPlaying(true);
                                   } else {
-                                    // Play a different song
                                     widget.onSongPlay(song, index);
                                   }
                                 } catch (e) {
                                   print('Error in random songs play/pause: $e');
-                                  // Sync state with actual player state
-                                  final actuallyPlaying =
-                                      widget.audioPlayer.playing;
+                                  final actuallyPlaying = audioPlayer.playing;
                                   playerState.setPlaying(actuallyPlaying);
                                 }
                               },
@@ -345,8 +341,8 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: customColorsEnabled
-                    ? primaryColor.withValues(alpha: 0.8)
-                    : Colors.deepPurple.withValues(alpha: 0.84),
+                    ? primaryColor.withOpacity(0.8)
+                    : Colors.deepPurple.withOpacity(0.84),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(

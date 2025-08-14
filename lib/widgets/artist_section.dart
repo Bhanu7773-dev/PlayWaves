@@ -89,7 +89,6 @@ class ArtistSection extends StatelessWidget {
                           builder: (context) => ArtistSongsPage(
                             artistName: artist['name'] ?? 'Unknown Artist',
                             apiService: apiService,
-                            audioPlayer: audioPlayer,
                           ),
                         ),
                       );

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
-import '../services/pitch_black_theme_provider.dart'; // <-- Add this import
+import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
-import '../widgets/animated_navbar.dart'; // <-- Make sure this path is correct!
+import '../widgets/animated_navbar.dart';
+import 'liked_songs_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
   final Function(int)? onNavTap;
@@ -34,7 +35,6 @@ class _LibraryScreenState extends State<LibraryScreen>
       _initializeAnimations();
       _startAnimations();
     } catch (e) {
-      // Handle animation initialization errors gracefully
       debugPrint('Animation initialization error: $e');
     }
   }
@@ -45,9 +45,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       vsync: this,
     );
     _floatController = AnimationController(
-      duration: const Duration(
-        seconds: 8,
-      ), // Slower animation to reduce CPU usage
+      duration: const Duration(seconds: 8),
       vsync: this,
     );
     _rippleController = AnimationController(
@@ -98,9 +96,7 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isPitchBlack = context
-        .watch<PitchBlackThemeProvider>()
-        .isPitchBlack; // <-- Provider
+    final isPitchBlack = context.watch<PitchBlackThemeProvider>().isPitchBlack;
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
     final primaryColor = customTheme.primaryColor;
@@ -114,7 +110,12 @@ class _LibraryScreenState extends State<LibraryScreen>
             ? [primaryColor, primaryColor.withOpacity(0.7)]
             : const [Color(0xFFff7d78), Color(0xFFf54ea2)],
         isActive: true,
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const LikedSongsScreen()),
+          );
+        },
       ),
       LibraryItemData(
         title: "My Playlists",
@@ -168,12 +169,10 @@ class _LibraryScreenState extends State<LibraryScreen>
           ? Colors.black
           : customColorsEnabled
           ? secondaryColor
-          : Colors.black, // <-- Provider
+          : Colors.black,
       body: Stack(
         children: [
-          _buildStardustBackground(
-            isPitchBlack: isPitchBlack,
-          ), // <-- Pass theme
+          _buildStardustBackground(isPitchBlack: isPitchBlack),
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -256,7 +255,6 @@ class _LibraryScreenState extends State<LibraryScreen>
           ),
           child: Stack(
             children: [
-              // Generate small floating meteors like settings page
               ...List.generate(12, (index) {
                 final Color meteorColor = customColorsEnabled
                     ? primaryColor
@@ -264,8 +262,6 @@ class _LibraryScreenState extends State<LibraryScreen>
 
                 return _buildFloatingMeteor(index, meteorColor, isPitchBlack);
               }),
-
-              // Add background stars
               ...List.generate(20, (index) {
                 final double offsetX = (index * 45.7) % 350;
                 final double offsetY = (index * 78.2) % 600;
@@ -287,7 +283,6 @@ class _LibraryScreenState extends State<LibraryScreen>
         final double staggeredProgress = ((progress + (index * 0.08)) % 1.0)
             .clamp(0.0, 1.0);
 
-        // Use screen size to position meteors properly
         final screenWidth = MediaQuery.of(context).size.width;
         final screenHeight = MediaQuery.of(context).size.height;
 
@@ -324,7 +319,6 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   Widget _buildBackgroundStar(double offsetX, double offsetY, int index) {
-    // Create gentle twinkling effect
     final twinkle =
         0.3 + math.sin(_floatAnimation.value * 2 * math.pi + index * 0.8) * 0.4;
     final clampedTwinkle = twinkle.clamp(0.1, 0.7);

@@ -8,14 +8,12 @@ class AlbumsSection extends StatelessWidget {
   final List<Map<String, dynamic>> albums;
   final void Function(Map<String, dynamic> album) onAlbumPlay;
   final String? Function(dynamic images) getBestImageUrl;
-  final AudioPlayer audioPlayer;
 
   const AlbumsSection({
     Key? key,
     required this.albums,
     required this.onAlbumPlay,
     required this.getBestImageUrl,
-    required this.audioPlayer,
   }) : super(key: key);
 
   @override
@@ -42,10 +40,7 @@ class AlbumsSection extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: customColorsEnabled
-                            ? [
-                                primaryColor,
-                                primaryColor.withValues(alpha: 0.7),
-                              ]
+                            ? [primaryColor, primaryColor.withOpacity(0.7)]
                             : [Color(0xFFff7d78), Color(0xFF9c27b0)],
                       ),
                     ),
@@ -71,6 +66,7 @@ class AlbumsSection extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final album = albums[index];
                   return _buildAlbumCard(
+                    context,
                     album,
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
@@ -86,6 +82,7 @@ class AlbumsSection extends StatelessWidget {
   }
 
   Widget _buildAlbumCard(
+    BuildContext context,
     Map<String, dynamic> album, {
     required bool customColorsEnabled,
     required Color primaryColor,
@@ -105,18 +102,15 @@ class AlbumsSection extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: customColorsEnabled
               ? [
-                  secondaryColor.withValues(alpha: 0.2),
-                  secondaryColor.withValues(alpha: 0.1),
+                  secondaryColor.withOpacity(0.2),
+                  secondaryColor.withOpacity(0.1),
                 ]
-              : [
-                  Colors.white.withValues(alpha: 0.1),
-                  Colors.white.withValues(alpha: 0.05),
-                ],
+              : [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.05)],
         ),
         border: Border.all(
           color: customColorsEnabled
-              ? primaryColor.withValues(alpha: 0.3)
-              : Colors.white.withValues(alpha: 0.1),
+              ? primaryColor.withOpacity(0.3)
+              : Colors.white.withOpacity(0.1),
         ),
       ),
       child: Stack(
@@ -142,16 +136,16 @@ class AlbumsSection extends StatelessWidget {
                               gradient: LinearGradient(
                                 colors: customColorsEnabled
                                     ? [
-                                        primaryColor.withValues(alpha: 0.3),
-                                        primaryColor.withValues(alpha: 0.1),
+                                        primaryColor.withOpacity(0.3),
+                                        primaryColor.withOpacity(0.1),
                                       ]
                                     : [
                                         const Color(
                                           0xFFff7d78,
-                                        ).withValues(alpha: 0.3),
+                                        ).withOpacity(0.3),
                                         const Color(
                                           0xFF9c27b0,
-                                        ).withValues(alpha: 0.3),
+                                        ).withOpacity(0.3),
                                       ],
                               ),
                             ),
@@ -170,16 +164,12 @@ class AlbumsSection extends StatelessWidget {
                           gradient: LinearGradient(
                             colors: customColorsEnabled
                                 ? [
-                                    primaryColor.withValues(alpha: 0.3),
-                                    primaryColor.withValues(alpha: 0.1),
+                                    primaryColor.withOpacity(0.3),
+                                    primaryColor.withOpacity(0.1),
                                   ]
                                 : [
-                                    const Color(
-                                      0xFFff7d78,
-                                    ).withValues(alpha: 0.3),
-                                    const Color(
-                                      0xFF9c27b0,
-                                    ).withValues(alpha: 0.3),
+                                    const Color(0xFFff7d78).withOpacity(0.3),
+                                    const Color(0xFF9c27b0).withOpacity(0.3),
                                   ],
                           ),
                         ),
@@ -227,15 +217,15 @@ class AlbumsSection extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: customColorsEnabled
-                      ? [primaryColor, primaryColor.withValues(alpha: 0.8)]
+                      ? [primaryColor, primaryColor.withOpacity(0.8)]
                       : [Color(0xFFff7d78), Color(0xFF9c27b0)],
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
                     color: customColorsEnabled
-                        ? primaryColor.withValues(alpha: 0.3)
-                        : const Color(0xFFff7d78).withValues(alpha: 0.3),
+                        ? primaryColor.withOpacity(0.3)
+                        : const Color(0xFFff7d78).withOpacity(0.3),
                     blurRadius: 8,
                     spreadRadius: 2,
                   ),
@@ -243,20 +233,19 @@ class AlbumsSection extends StatelessWidget {
               ),
               child: Consumer<PlayerStateProvider>(
                 builder: (context, playerState, child) {
-                  // Check if any song from this album is currently playing
-                  // Since albums don't have direct song lists, we'll check if the current song's album matches
+                  final audioPlayer = Provider.of<AudioPlayer>(
+                    context,
+                    listen: false,
+                  );
                   final currentSong = playerState.currentSong;
                   bool isCurrentAlbum = false;
 
                   if (currentSong != null) {
-                    // Try to match by album ID if available
                     final currentAlbumId =
                         currentSong['album']?['id'] ?? currentSong['albumId'];
                     final thisAlbumId = album['id'];
                     isCurrentAlbum =
                         currentAlbumId != null && currentAlbumId == thisAlbumId;
-
-                    // If no album ID match, try matching by album name
                     if (!isCurrentAlbum) {
                       final currentAlbumName =
                           currentSong['album']?['name'] ??
@@ -299,7 +288,6 @@ class AlbumsSection extends StatelessWidget {
                                 );
 
                             if (isCurrentAlbum && isPlaying) {
-                              // Pause current album/song
                               playerState.setPlaying(false);
                               await Future.delayed(Duration(milliseconds: 50));
                               try {
@@ -308,7 +296,6 @@ class AlbumsSection extends StatelessWidget {
                                 playerState.setPlaying(true);
                               }
                             } else if (isCurrentAlbum && !isPlaying) {
-                              // Resume current album/song
                               playerState.setPlaying(true);
                               await Future.delayed(Duration(milliseconds: 50));
                               try {
@@ -317,7 +304,6 @@ class AlbumsSection extends StatelessWidget {
                                 playerState.setPlaying(false);
                               }
                             } else {
-                              // Play a different album
                               onAlbumPlay(album);
                             }
                           },

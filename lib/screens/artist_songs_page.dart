@@ -10,13 +10,11 @@ import 'music_player.dart';
 class ArtistSongsPage extends StatefulWidget {
   final String artistName;
   final JioSaavnApiService apiService;
-  final AudioPlayer audioPlayer;
 
   const ArtistSongsPage({
     Key? key,
     required this.artistName,
     required this.apiService,
-    required this.audioPlayer,
   }) : super(key: key);
 
   @override
@@ -49,14 +47,17 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     WidgetsBinding.instance.addObserver(this);
 
     // Listen to audio player state changes to keep UI in sync
-    widget.audioPlayer.playingStream.listen((playing) {
-      if (!_isDisposed && mounted) {
-        final playerState = Provider.of<PlayerStateProvider>(
-          context,
-          listen: false,
-        );
-        playerState.setPlaying(playing);
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+      audioPlayer.playingStream.listen((playing) {
+        if (!_isDisposed && mounted) {
+          final playerState = Provider.of<PlayerStateProvider>(
+            context,
+            listen: false,
+          );
+          playerState.setPlaying(playing);
+        }
+      });
     });
 
     _searchArtistSongs();
@@ -81,12 +82,13 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
 
   void _syncPlayerState() {
     if (!_isDisposed && mounted) {
+      final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
       final playerState = Provider.of<PlayerStateProvider>(
         context,
         listen: false,
       );
       // Force sync with actual audio player state
-      final actuallyPlaying = widget.audioPlayer.playing;
+      final actuallyPlaying = audioPlayer.playing;
       playerState.setPlaying(actuallyPlaying);
 
       // Trigger a rebuild to update UI
@@ -135,6 +137,7 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
 
   Future<void> _playSong(Map<String, dynamic> song) async {
     if (_isDisposed) return;
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     final playerState = Provider.of<PlayerStateProvider>(
       context,
       listen: false,
@@ -147,8 +150,8 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
       int index = _songs.indexWhere((s) => s['id'] == song['id']);
       playerState.setSongIndex(index == -1 ? 0 : index);
 
-      await widget.audioPlayer.stop();
-      await widget.audioPlayer.seek(Duration.zero);
+      await audioPlayer.stop();
+      await audioPlayer.seek(Duration.zero);
 
       final songId = song['id'];
       if (songId != null) {
@@ -178,8 +181,8 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
         if (downloadUrl != null && downloadUrl.isNotEmpty) {
           if (downloadUrl.contains('preview.saavncdn.com') ||
               downloadUrl.contains('aac.saavncdn.com')) {
-            await widget.audioPlayer.setUrl(downloadUrl);
-            await widget.audioPlayer.play();
+            await audioPlayer.setUrl(downloadUrl);
+            await audioPlayer.play();
             playerState.setPlaying(true);
           } else {
             throw Exception('Invalid audio URL format');
@@ -225,6 +228,7 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
   }
 
   void _openMusicPlayer(Map<String, dynamic> song) {
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     final playerState = Provider.of<PlayerStateProvider>(
       context,
       listen: false,
@@ -245,13 +249,13 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
       context,
       MaterialPageRoute(
         builder: (context) => StreamBuilder<bool>(
-          stream: widget.audioPlayer.playingStream,
+          stream: audioPlayer.playingStream,
           builder: (context, playingSnapshot) {
             return StreamBuilder<Duration>(
-              stream: widget.audioPlayer.positionStream,
+              stream: audioPlayer.positionStream,
               builder: (context, positionSnapshot) {
                 return StreamBuilder<Duration?>(
-                  stream: widget.audioPlayer.durationStream,
+                  stream: audioPlayer.durationStream,
                   builder: (context, durationSnapshot) {
                     final songTitle =
                         song['name'] ?? song['title'] ?? 'Unknown Song';
@@ -278,10 +282,10 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                       currentPosition: positionSnapshot.data ?? Duration.zero,
                       totalDuration: durationSnapshot.data ?? Duration.zero,
                       onPlayPause: () {
-                        if (widget.audioPlayer.playing) {
-                          widget.audioPlayer.pause();
+                        if (audioPlayer.playing) {
+                          audioPlayer.pause();
                         } else {
-                          widget.audioPlayer.play();
+                          audioPlayer.play();
                         }
                       },
                       onNext: () {
@@ -311,7 +315,7 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                       onSeek: (value) {
                         final position =
                             (durationSnapshot.data ?? Duration.zero) * value;
-                        widget.audioPlayer.seek(position);
+                        audioPlayer.seek(position);
                       },
                     );
                   },
@@ -476,6 +480,7 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     required Color primaryColor,
     required Color secondaryColor,
   }) {
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     final imageUrl = _getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
     String artist = 'Unknown Artist';
@@ -663,12 +668,12 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                                 try {
                                   if (isCurrentSong && playerState.isPlaying) {
                                     // Pause current song
-                                    await widget.audioPlayer.pause();
+                                    await audioPlayer.pause();
                                     playerState.setPlaying(false);
                                   } else if (isCurrentSong &&
                                       !playerState.isPlaying) {
                                     // Resume current song
-                                    await widget.audioPlayer.play();
+                                    await audioPlayer.play();
                                     playerState.setPlaying(true);
                                   } else {
                                     // Play a different song
@@ -677,8 +682,7 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                                 } catch (e) {
                                   print('Error in artist songs play/pause: $e');
                                   // Sync state with actual player state
-                                  final actuallyPlaying =
-                                      widget.audioPlayer.playing;
+                                  final actuallyPlaying = audioPlayer.playing;
                                   playerState.setPlaying(actuallyPlaying);
                                 }
                               },

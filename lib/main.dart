@@ -1,20 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:just_audio/just_audio.dart'; // <-- Add this import!
+import 'models/liked_song.dart';
 import 'screens/homepage.dart';
 import 'services/player_state_provider.dart';
 import 'services/pitch_black_theme_provider.dart';
 import 'services/custom_theme_provider.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  Hive.registerAdapter(LikedSongAdapter());
+  await Hive.openBox<LikedSong>('likedSongs');
+
   // Add error handling for native crashes
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
     debugPrint('Flutter Error: ${details.exception}');
   };
 
+  final audioPlayer = AudioPlayer(); // <-- Create a single instance!
+
   runApp(
     MultiProvider(
       providers: [
+        Provider<AudioPlayer>.value(
+          value: audioPlayer,
+        ), // <-- Provide globally!
         ChangeNotifierProvider(create: (_) => PlayerStateProvider()),
         ChangeNotifierProvider(create: (_) => PitchBlackThemeProvider()),
         ChangeNotifierProvider(create: (_) => CustomThemeProvider()),

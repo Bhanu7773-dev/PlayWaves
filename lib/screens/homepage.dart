@@ -55,7 +55,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final JioSaavnApiService _apiService = JioSaavnApiService();
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  // Use global AudioPlayer from Provider
   final PageController _bannerController = PageController();
 
   late AnimationController _animationController;
@@ -119,8 +119,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _loadData();
     _startBannerAutoScroll();
 
-    // Listen to audio player state and update provider accordingly
-    _audioPlayer.playingStream.listen((playing) {
+    // Listen to global AudioPlayer state and update provider accordingly
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+    audioPlayer.playingStream.listen((playing) {
       final playerState = Provider.of<PlayerStateProvider>(
         context,
         listen: false,
@@ -131,7 +132,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
     });
 
-    _audioPlayer.playerStateStream.listen((state) {
+    audioPlayer.playerStateStream.listen((state) {
       if (!mounted) return; // Check if widget is still mounted
 
       final playerState = Provider.of<PlayerStateProvider>(
@@ -139,14 +140,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         listen: false,
       );
 
-      print('Player state changed: ${state.processingState}');
+      print('Player state changed: [32m${state.processingState}[0m');
 
       if (state.processingState == ProcessingState.ready) {
         playerState.setSongLoading(false);
       } else if (state.processingState == ProcessingState.completed) {
         // Song finished, play next song automatically
         print('Song completed, scheduling next song...');
-        // Use post frame callback to ensure we're on the main thread
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             _playNextSong();
@@ -155,23 +155,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       }
     });
 
-    // Additional listener for position to detect near-end of song
-    _audioPlayer.positionStream.listen((position) {
+    audioPlayer.positionStream.listen((position) {
       if (!mounted) return;
-
-      final duration = _audioPlayer.duration;
+      final duration = audioPlayer.duration;
       if (duration != null) {
         final remaining = duration - position;
-        // If less than 500ms remaining and was playing, trigger next song
         if (remaining.inMilliseconds < 500 &&
             remaining.inMilliseconds > 0 &&
-            _audioPlayer.playing &&
+            audioPlayer.playing &&
             !_isAutoPlayTriggered) {
           print(
             'Song near completion: ${remaining.inMilliseconds}ms remaining - triggering next song',
           );
           _isAutoPlayTriggered = true;
-          // Trigger next song when very close to end
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               _playNextSong();
@@ -549,31 +545,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final primaryColor = customTheme.primaryColor;
     final secondaryColor = customTheme.secondaryColor;
 
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     final List<Widget> pages = [
       _buildBody(
         customColorsEnabled: customColorsEnabled,
         primaryColor: primaryColor,
         secondaryColor: secondaryColor,
       ),
-      SearchPage(
-        onNavTap: _onNavTap,
-        selectedNavIndex: _selectedNavIndex,
-        audioPlayer: _audioPlayer,
-        onPlayPause: () {
-          if (_audioPlayer.playing) {
-            _audioPlayer.pause();
-          } else {
-            _audioPlayer.play();
-          }
-        },
-        onNext: _playNextSong,
-        onPrevious: _playPreviousSong,
-      ),
+      SearchPage(onNavTap: _onNavTap, selectedNavIndex: _selectedNavIndex),
       LibraryScreen(onNavTap: _onNavTap, selectedNavIndex: _selectedNavIndex),
       SettingsPage(
         onLogout: () {
           // Implement your logout logic here
-          // For example: Navigator.pushReplacementNamed(context, '/login');
         },
         onNavTap: _onNavTap,
         selectedNavIndex: _selectedNavIndex,
@@ -627,17 +610,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               right: 16,
               child: MiniPlayer(
                 currentSong: playerState.currentSong,
-                audioPlayer: _audioPlayer,
+                audioPlayer: audioPlayer,
                 isSongLoading: playerState.isSongLoading,
                 onPlayPause: () {
-                  if (_audioPlayer.playing) {
-                    _audioPlayer.pause();
+                  if (audioPlayer.playing) {
+                    audioPlayer.pause();
                   } else {
-                    _audioPlayer.play();
+                    audioPlayer.play();
                   }
                 },
                 onClose: () {
-                  _audioPlayer.stop();
+                  audioPlayer.stop();
                   playerState.clearSong();
                 },
                 onTap: () {
@@ -648,13 +631,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     context,
                     MaterialPageRoute(
                       builder: (context) => StreamBuilder<Duration>(
-                        stream: _audioPlayer.positionStream,
+                        stream: audioPlayer.positionStream,
                         builder: (context, positionSnapshot) {
                           return StreamBuilder<Duration?>(
-                            stream: _audioPlayer.durationStream,
+                            stream: audioPlayer.durationStream,
                             builder: (context, durationSnapshot) {
                               return StreamBuilder<bool>(
-                                stream: _audioPlayer.playingStream,
+                                stream: audioPlayer.playingStream,
                                 builder: (context, playingSnapshot) {
                                   final song = playerState.currentSong;
                                   final songTitle =
@@ -689,10 +672,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                     totalDuration:
                                         durationSnapshot.data ?? Duration.zero,
                                     onPlayPause: () {
-                                      if (_audioPlayer.playing) {
-                                        _audioPlayer.pause();
+                                      if (audioPlayer.playing) {
+                                        audioPlayer.pause();
                                       } else {
-                                        _audioPlayer.play();
+                                        audioPlayer.play();
                                       }
                                     },
                                     onNext: _playNextSong,
@@ -704,7 +687,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                           (durationSnapshot.data ??
                                               Duration.zero) *
                                           value;
-                                      _audioPlayer.seek(position);
+                                      audioPlayer.seek(position);
                                     },
                                   );
                                 },
@@ -1123,6 +1106,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
     final songId = song['id'];
     final hasLyrics = songId == 'PIzj2ULl';
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
 
     String artist = 'Unknown Artist';
     if (song['artists'] != null) {
@@ -1274,21 +1258,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                             : () async {
                                 try {
                                   if (isCurrentSong && isPlaying) {
-                                    // Pause current song
-                                    await _audioPlayer.pause();
+                                    await audioPlayer.pause();
                                     playerState.setPlaying(false);
                                   } else if (isCurrentSong && !isPlaying) {
-                                    // Resume current song
-                                    await _audioPlayer.play();
+                                    await audioPlayer.play();
                                     playerState.setPlaying(true);
                                   } else {
-                                    // Play a different song
                                     _playSong(song, null, false);
                                   }
                                 } catch (e) {
                                   print('Error in banner play/pause: $e');
-                                  // Sync state with actual player state
-                                  final actuallyPlaying = _audioPlayer.playing;
+                                  final actuallyPlaying = audioPlayer.playing;
                                   playerState.setPlaying(actuallyPlaying);
                                 }
                               },
@@ -1305,19 +1285,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildAlbumsSection() {
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     return AlbumsSection(
       albums: _albums,
       onAlbumPlay: (album) => _playAlbum(album),
       getBestImageUrl: _getBestImageUrl,
-      audioPlayer: _audioPlayer,
     );
   }
 
   Widget _buildArtistsSection() {
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     return ArtistSection(
       artists: _artists,
       apiService: _apiService,
-      audioPlayer: _audioPlayer,
+      audioPlayer: audioPlayer,
     );
   }
 
@@ -1326,7 +1307,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       randomSongs: _randomSongs,
       onSongPlay: (song, index) => _playSong(song, index, true),
       getBestImageUrl: _getBestImageUrl,
-      audioPlayer: _audioPlayer,
     );
   }
 
@@ -1357,6 +1337,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     } else if (song['subtitle'] != null) {
       subtitle = song['subtitle'];
     }
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -1474,15 +1455,12 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     ? null
                     : () async {
                         if (isCurrentSong && playerState.isPlaying) {
-                          // Pause current song
                           playerState.setPlaying(false);
-                          await _audioPlayer.pause();
+                          await audioPlayer.pause();
                         } else if (isCurrentSong && !playerState.isPlaying) {
-                          // Resume current song
                           playerState.setPlaying(true);
-                          await _audioPlayer.play();
+                          await audioPlayer.play();
                         } else {
-                          // Play a different song
                           _playSong(song, index, useRandom);
                         }
                       },
@@ -1522,8 +1500,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     try {
       _isAutoPlayTriggered = false; // Reset auto-play flag for new song
       playerState.setSongLoading(true);
-      await _audioPlayer.stop();
-      await _audioPlayer.seek(Duration.zero);
+      final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+      await audioPlayer.stop();
+      await audioPlayer.seek(Duration.zero);
 
       final playlist = useRandom
           ? List<Map<String, dynamic>>.from(_randomSongs)
@@ -1571,8 +1550,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         if (downloadUrl != null && downloadUrl.isNotEmpty) {
           if (downloadUrl.contains('preview.saavncdn.com') ||
               downloadUrl.contains('aac.saavncdn.com')) {
-            await _audioPlayer.setUrl(downloadUrl);
-            await _audioPlayer.play();
+            await audioPlayer.setUrl(downloadUrl);
+            await audioPlayer.play();
             playerState.setPlaying(true);
           } else {
             throw Exception('Invalid audio URL format');
@@ -1602,8 +1581,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
     try {
       playerState.setSongLoading(true);
-      await _audioPlayer.stop();
-      await _audioPlayer.seek(Duration.zero);
+      final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+      await audioPlayer.stop();
+      await audioPlayer.seek(Duration.zero);
 
       final albumId = album['id'];
       if (albumId != null) {
@@ -1645,8 +1625,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             if (downloadUrl != null && downloadUrl.isNotEmpty) {
               if (downloadUrl.contains('preview.saavncdn.com') ||
                   downloadUrl.contains('aac.saavncdn.com')) {
-                await _audioPlayer.setUrl(downloadUrl);
-                await _audioPlayer.play();
+                await audioPlayer.setUrl(downloadUrl);
+                await audioPlayer.play();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Playing album: ${album['name']}'),
@@ -1708,7 +1688,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       playerState.setPlaying(false);
       playerState.setSongLoading(false);
       try {
-        await _audioPlayer.stop();
+        final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+        await audioPlayer.stop();
       } catch (e) {
         print('Error stopping audio player: $e');
       }
@@ -1745,7 +1726,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _bannerTimer?.cancel();
     _bannerController.dispose();
     _animationController.dispose();
-    _audioPlayer.dispose();
+    // Do not dispose global AudioPlayer here
     _pageTransitionController.dispose();
     _meteorsController.dispose();
     super.dispose();
