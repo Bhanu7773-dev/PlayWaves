@@ -13,6 +13,8 @@ import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
 import '../models/liked_song.dart';
+import '../models/playlist_song.dart';
+import '../services/playlist_service.dart';
 
 class MusicPlayerPage extends StatefulWidget {
   final String songTitle;
@@ -65,6 +67,8 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
   late Animation<double> _likeScale;
 
   late Box<LikedSong> likedSongsBox;
+  late Box<PlaylistSong> playlistSongsBox;
+  bool _isInPlaylist = false;
 
   @override
   void initState() {
@@ -82,6 +86,16 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
       end: 1.25,
     ).chain(CurveTween(curve: Curves.elasticOut)).animate(_likeController);
     likedSongsBox = Hive.box<LikedSong>('likedSongs');
+    playlistSongsBox = Hive.box<PlaylistSong>('playlistSongs');
+    final playerState = Provider.of<PlayerStateProvider>(
+      context,
+      listen: false,
+    );
+    final songId =
+        playerState.currentSong?['id'] ??
+        playerState.currentSong?['songId'] ??
+        '';
+    _isInPlaylist = PlaylistService.isInPlaylist(songId);
   }
 
   @override
@@ -627,44 +641,82 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(25),
-                                  color: Colors.white.withOpacity(0.1),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.3),
-                                    width: 1,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 10,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.playlist_add,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Add to Playlist',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
+                              GestureDetector(
+                                onTap: () {
+                                  final playerState =
+                                      Provider.of<PlayerStateProvider>(
+                                        context,
+                                        listen: false,
+                                      );
+                                  final song = playerState.currentSong;
+                                  if (song != null) {
+                                    PlaylistService.addToPlaylist(song);
+                                    setState(() {
+                                      final songId =
+                                          song['id'] ?? song['songId'] ?? '';
+                                      _isInPlaylist =
+                                          PlaylistService.isInPlaylist(songId);
+                                    });
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Added to My Playlist'),
+                                        backgroundColor: Colors.green,
+                                        behavior: SnackBarBehavior.floating,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        margin: const EdgeInsets.all(16),
                                       ),
+                                    );
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(25),
+                                    color: Colors.white.withOpacity(0.1),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.3),
+                                      width: 1,
                                     ),
-                                  ],
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 10,
+                                        spreadRadius: 1,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        _isInPlaylist
+                                            ? Icons.playlist_add_check
+                                            : Icons.playlist_add,
+                                        color: _isInPlaylist
+                                            ? Colors.greenAccent
+                                            : Colors.white,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _isInPlaylist
+                                            ? 'Added'
+                                            : 'Add to Playlist',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),

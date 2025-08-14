@@ -6,6 +6,7 @@ import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
 import '../widgets/animated_navbar.dart';
 import 'liked_songs_screen.dart';
+import 'my_playlist_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
   final Function(int)? onNavTap;
@@ -124,7 +125,12 @@ class _LibraryScreenState extends State<LibraryScreen>
         gradient: customColorsEnabled
             ? [primaryColor, primaryColor]
             : const [Color(0xFF667eea), Color(0xFF764ba2)],
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const MyPlaylistScreen()),
+          );
+        },
       ),
       LibraryItemData(
         title: "Recently Played",
