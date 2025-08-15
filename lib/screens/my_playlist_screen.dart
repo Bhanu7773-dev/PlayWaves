@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:just_audio/just_audio.dart';
@@ -294,6 +295,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     );
   }
 
+  /// FIXED: MediaItem now uses song.imageUrl for artUri and adds artist
   Future<void> _playPlaylistSong(
     PlaylistSong song,
     int index,
@@ -323,7 +325,22 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
         playerState.setPlaylist(playlist);
         playerState.setSongIndex(index);
         playerState.setSong(playlist[index]);
-        await audioPlayer.setUrl(song.downloadUrl!);
+        await audioPlayer.setAudioSource(
+          AudioSource.uri(
+            Uri.parse(song.downloadUrl!),
+            tag: MediaItem(
+              id: song.id,
+              album: '', // PlaylistSong does not have album, so fallback
+              title: song.title,
+              artist: song.artist,
+              artUri: song.imageUrl.isNotEmpty
+                  ? Uri.parse(song.imageUrl)
+                  : (song.downloadUrl != null
+                        ? Uri.parse(song.downloadUrl!)
+                        : null),
+            ),
+          ),
+        );
         await audioPlayer.play();
         playerState.setPlaying(true);
         playerState.setSongLoading(false);

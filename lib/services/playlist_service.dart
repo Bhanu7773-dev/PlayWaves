@@ -11,7 +11,7 @@ class PlaylistService {
   }
 
   static void addToPlaylist(Map<String, dynamic> song) {
-  print('Adding to playlist: $song');
+    print('Adding to playlist: $song');
     final songId = song['id'] ?? song['songId'] ?? '';
     if (songId.isEmpty) return;
     if (!isInPlaylist(songId)) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:audio_service/audio_service.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:just_audio/just_audio.dart';
@@ -1259,17 +1260,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                 try {
                                   if (isCurrentSong && isPlaying) {
                                     await audioPlayer.pause();
-                                    playerState.setPlaying(false);
                                   } else if (isCurrentSong && !isPlaying) {
                                     await audioPlayer.play();
-                                    playerState.setPlaying(true);
                                   } else {
                                     _playSong(song, null, false);
                                   }
                                 } catch (e) {
                                   print('Error in banner play/pause: $e');
-                                  final actuallyPlaying = audioPlayer.playing;
-                                  playerState.setPlaying(actuallyPlaying);
                                 }
                               },
                       );
@@ -1550,9 +1547,48 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         if (downloadUrl != null && downloadUrl.isNotEmpty) {
           if (downloadUrl.contains('preview.saavncdn.com') ||
               downloadUrl.contains('aac.saavncdn.com')) {
-            await audioPlayer.setUrl(downloadUrl);
+            await audioPlayer.setAudioSource(
+              AudioSource.uri(
+                Uri.parse(downloadUrl),
+                tag: MediaItem(
+                  id: songId ?? '',
+                  album: song['album']?['name'] ?? song['album'] ?? '',
+                  title: song['name'] ?? song['title'] ?? '',
+                  artist: (() {
+                    if (song['artists'] != null &&
+                        song['artists'] is Map &&
+                        song['artists']['primary'] is List &&
+                        (song['artists']['primary'] as List).isNotEmpty) {
+                      return song['artists']['primary'][0]['name'] ?? '';
+                    } else if (song['primaryArtists'] != null &&
+                        song['primaryArtists'].toString().isNotEmpty) {
+                      return song['primaryArtists'];
+                    } else if (song['subtitle'] != null &&
+                        song['subtitle'].toString().isNotEmpty) {
+                      return song['subtitle'];
+                    }
+                    return '';
+                  })(),
+                  artUri: (() {
+                    final imageField = song['image'];
+                    if (imageField is List && imageField.isNotEmpty) {
+                      final img = imageField.last ?? imageField.first;
+                      if (img is String) {
+                        return Uri.parse(img);
+                      } else if (img is Map && img['url'] != null) {
+                        return Uri.parse(img['url']);
+                      } else if (img is Map && img['link'] != null) {
+                        return Uri.parse(img['link']);
+                      }
+                    } else if (imageField is String) {
+                      return Uri.parse(imageField);
+                    }
+                    return Uri.parse(downloadUrl ?? '');
+                  })(),
+                ),
+              ),
+            );
             await audioPlayer.play();
-            playerState.setPlaying(true);
           } else {
             throw Exception('Invalid audio URL format');
           }
@@ -1625,7 +1661,50 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             if (downloadUrl != null && downloadUrl.isNotEmpty) {
               if (downloadUrl.contains('preview.saavncdn.com') ||
                   downloadUrl.contains('aac.saavncdn.com')) {
-                await audioPlayer.setUrl(downloadUrl);
+                await audioPlayer.setAudioSource(
+                  AudioSource.uri(
+                    Uri.parse(downloadUrl),
+                    tag: MediaItem(
+                      id: songId ?? '',
+                      album:
+                          songData['album']?['name'] ?? songData['album'] ?? '',
+                      title: songData['name'] ?? songData['title'] ?? '',
+                      artist: (() {
+                        if (songData['artists'] != null &&
+                            songData['artists'] is Map &&
+                            songData['artists']['primary'] is List &&
+                            (songData['artists']['primary'] as List)
+                                .isNotEmpty) {
+                          return songData['artists']['primary'][0]['name'] ??
+                              '';
+                        } else if (songData['primaryArtists'] != null &&
+                            songData['primaryArtists'].toString().isNotEmpty) {
+                          return songData['primaryArtists'];
+                        } else if (songData['subtitle'] != null &&
+                            songData['subtitle'].toString().isNotEmpty) {
+                          return songData['subtitle'];
+                        }
+                        return '';
+                      })(),
+                      artUri: (() {
+                        final imageField = songData['image'];
+                        if (imageField is List && imageField.isNotEmpty) {
+                          final img = imageField.last ?? imageField.first;
+                          if (img is String) {
+                            return Uri.parse(img);
+                          } else if (img is Map && img['url'] != null) {
+                            return Uri.parse(img['url']);
+                          } else if (img is Map && img['link'] != null) {
+                            return Uri.parse(img['link']);
+                          }
+                        } else if (imageField is String) {
+                          return Uri.parse(imageField);
+                        }
+                        return Uri.parse(downloadUrl ?? '');
+                      })(),
+                    ),
+                  ),
+                );
                 await audioPlayer.play();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

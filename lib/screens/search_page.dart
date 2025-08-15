@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:provider/provider.dart';
 import '../services/jiosaavn_api_service.dart';
@@ -6,7 +7,7 @@ import '../widgets/animated_navbar.dart';
 import '../widgets/mini_player.dart';
 import 'music_player.dart';
 import '../services/player_state_provider.dart';
-import '../services/pitch_black_theme_provider.dart'; // <-- ADD PROVIDER
+import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
 
 class SearchPage extends StatefulWidget {
@@ -41,8 +42,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-
-    // Main animation controller
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -50,14 +49,10 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-
-    // Meteor animation controller
     _meteorController = AnimationController(
       duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat();
-
-    // Search bar animation controller
     _searchController2 = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
@@ -73,7 +68,17 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
 
     final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     audioPlayer.playingStream.listen((playing) {
-      if (mounted) setState(() {});
+      if (mounted) {
+        final playerState = Provider.of<PlayerStateProvider>(
+          context,
+          listen: false,
+        );
+        // Only update if the current song is set
+        if (playerState.currentSong != null) {
+          playerState.setPlaying(playing);
+          setState(() {});
+        }
+      }
     });
     audioPlayer.playerStateStream.listen((state) {
       if (mounted) setState(() {});
@@ -253,9 +258,53 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
         if (downloadUrl != null && downloadUrl.isNotEmpty) {
           if (downloadUrl.contains('preview.saavncdn.com') ||
               downloadUrl.contains('aac.saavncdn.com')) {
-            await audioPlayer.setUrl(downloadUrl);
+            await audioPlayer.setAudioSource(
+              AudioSource.uri(
+                Uri.parse(downloadUrl),
+                tag: MediaItem(
+                  id: songId ?? '',
+                  album:
+                      songData?['album']?['name'] ?? songData?['album'] ?? '',
+                  title: songData?['title'] ?? songData?['name'] ?? '',
+                  artist: (() {
+                    if (songData?['artists'] != null &&
+                        songData?['artists'] is Map &&
+                        songData?['artists']['primary'] is List &&
+                        (songData?['artists']['primary'] as List).isNotEmpty) {
+                      return songData?['artists']['primary'][0]['name'] ?? '';
+                    } else if (songData?['primaryArtists'] != null) {
+                      final pa = songData?['primaryArtists'];
+                      if (pa != null && pa.toString().isNotEmpty) {
+                        return pa;
+                      }
+                    } else if (songData?['subtitle'] != null) {
+                      final sub = songData?['subtitle'];
+                      if (sub != null && sub.toString().isNotEmpty) {
+                        return sub;
+                      }
+                    }
+                    return '';
+                  })(),
+                  artUri: (() {
+                    final imageField = songData?['image'];
+                    if (imageField is List && imageField.isNotEmpty) {
+                      final img = imageField.last ?? imageField.first;
+                      if (img is String) {
+                        return Uri.parse(img);
+                      } else if (img is Map && img['url'] != null) {
+                        return Uri.parse(img['url']);
+                      } else if (img is Map && img['link'] != null) {
+                        return Uri.parse(img['link']);
+                      }
+                    } else if (imageField is String) {
+                      return Uri.parse(imageField);
+                    }
+                    return null;
+                  })(),
+                ),
+              ),
+            );
             await audioPlayer.play();
-            playerState.setPlaying(true);
             playerState.setSongLoading(false);
           } else {
             throw Exception('Invalid audio URL format');
@@ -379,7 +428,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
             ],
           ),
           border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
-          // Removed boxShadow for a cleaner look
         ),
         child: TextField(
           controller: _searchController,
@@ -509,13 +557,19 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
     final artist = _getArtistName(song);
 
-    // Get theme provider from context
     final customTheme = Provider.of<CustomThemeProvider>(
       context,
       listen: false,
     );
     final customColorsEnabled = customTheme.customColorsEnabled;
     final primaryColor = customTheme.primaryColor;
+
+    final playerState = Provider.of<PlayerStateProvider>(context);
+    final isCurrentSong =
+        playerState.currentSong != null &&
+        playerState.currentSong?['id'] == song['id'];
+    final isLoading = playerState.isSongLoading && isCurrentSong;
+    final isPlaying = isCurrentSong && playerState.isPlaying;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
@@ -545,7 +599,28 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () => _playSong(song, index),
+          onTap: () {
+            final audioPlayer = Provider.of<AudioPlayer>(
+              context,
+              listen: false,
+            );
+            final playerState = Provider.of<PlayerStateProvider>(
+              context,
+              listen: false,
+            );
+
+            if (isCurrentSong) {
+              if (playerState.isPlaying) {
+                audioPlayer.pause();
+                playerState.setPlaying(false);
+              } else {
+                audioPlayer.play();
+                playerState.setPlaying(true);
+              }
+            } else {
+              _playSong(song, index);
+            }
+          },
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -671,7 +746,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                   ],
                 ),
                 const SizedBox(width: 16),
-
                 // Song Info
                 Expanded(
                   child: Column(
@@ -714,7 +788,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
-
                 // Play Button
                 Container(
                   decoration: BoxDecoration(
@@ -738,16 +811,43 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(25),
-                      onTap: () => _playSong(song, index),
-                      child: const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: Icon(
-                          Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
+                      borderRadius: BorderRadius.circular(32),
+                      onTap: () {
+                        final audioPlayer = Provider.of<AudioPlayer>(
+                          context,
+                          listen: false,
+                        );
+                        final playerState = Provider.of<PlayerStateProvider>(
+                          context,
+                          listen: false,
+                        );
+
+                        if (isCurrentSong) {
+                          if (playerState.isPlaying) {
+                            audioPlayer.pause();
+                          } else {
+                            audioPlayer.play();
+                          }
+                        } else {
+                          _playSong(song, index);
+                        }
+                      },
+                      child: isLoading
+                          ? const SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : Icon(
+                              isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 37,
+                            ),
                     ),
                   ),
                 ),
@@ -907,13 +1007,12 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
       backgroundColor: isPitchBlack ? Colors.black : secondaryColor,
       body: Stack(
         children: [
-          // Animated Background
           _buildAnimatedBackground(isPitchBlack: isPitchBlack),
 
           SafeArea(
             child: Column(
               children: [
-                // Enhanced Header
+                // Header
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: const BoxDecoration(color: Colors.transparent),
@@ -978,10 +1077,8 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                   ),
                 ),
 
-                // Enhanced Search Bar
                 _buildEnhancedSearchBar(),
 
-                // Search Loading Indicator
                 if (_isSearching)
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -1008,7 +1105,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                     ),
                   ),
 
-                // Songs List
                 Expanded(
                   child: _isLoading
                       ? const Center(
@@ -1093,7 +1189,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Section Title
                             Padding(
                               padding: const EdgeInsets.fromLTRB(
                                 20,
@@ -1137,7 +1232,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                 ],
                               ),
                             ),
-                            // Songs List
                             Expanded(
                               child: ListView.builder(
                                 padding: const EdgeInsets.symmetric(
@@ -1157,7 +1251,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
             ),
           ),
 
-          // Mini Music Player (when song is loaded)
+          // MiniPlayer - FIXED play/pause sync
           if (playerState.currentSong != null)
             Positioned(
               bottom: 70,
@@ -1172,10 +1266,16 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                     context,
                     listen: false,
                   );
+                  final playerState = Provider.of<PlayerStateProvider>(
+                    context,
+                    listen: false,
+                  );
                   if (audioPlayer.playing) {
                     audioPlayer.pause();
+                    playerState.setPlaying(false);
                   } else {
                     audioPlayer.play();
+                    playerState.setPlaying(true);
                   }
                 },
                 onClose: () {
@@ -1247,10 +1347,22 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                           durationSnapshot.data ??
                                           Duration.zero,
                                       onPlayPause: () {
+                                        final audioPlayer =
+                                            Provider.of<AudioPlayer>(
+                                              context,
+                                              listen: false,
+                                            );
+                                        final playerState =
+                                            Provider.of<PlayerStateProvider>(
+                                              context,
+                                              listen: false,
+                                            );
                                         if (audioPlayer.playing) {
                                           audioPlayer.pause();
+                                          playerState.setPlaying(false);
                                         } else {
                                           audioPlayer.play();
+                                          playerState.setPlaying(true);
                                         }
                                       },
                                       onNext: _playNextSong,
@@ -1295,7 +1407,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
               ),
             ),
 
-          // Bottom Navigation
           Positioned(
             bottom: 0,
             left: 0,

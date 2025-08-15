@@ -6,6 +6,7 @@ import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart'; // <-- Add this import
 import '../services/custom_theme_provider.dart';
 import 'music_player.dart';
+import 'package:audio_service/audio_service.dart';
 
 class ArtistSongsPage extends StatefulWidget {
   final String artistName;
@@ -179,14 +180,47 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
         }
 
         if (downloadUrl != null && downloadUrl.isNotEmpty) {
-          if (downloadUrl.contains('preview.saavncdn.com') ||
-              downloadUrl.contains('aac.saavncdn.com')) {
-            await audioPlayer.setUrl(downloadUrl);
-            await audioPlayer.play();
-            playerState.setPlaying(true);
-          } else {
-            throw Exception('Invalid audio URL format');
+          // --- METADATA EXTRACTION ---
+          final title = songData['title'] ?? songData['name'] ?? 'Unknown Song';
+          final album = songData['album']?['name'] ?? 'Unknown Album';
+          final imageField = songData['image'];
+          String? artUri;
+          if (imageField != null) {
+            if (imageField is List && imageField.isNotEmpty) {
+              for (var img in imageField.reversed) {
+                if (img is Map && img['link'] != null) {
+                  artUri = img['link'];
+                  break;
+                }
+                if (img is Map && img['url'] != null) {
+                  artUri = img['url'];
+                  break;
+                }
+              }
+            } else if (imageField is String) {
+              artUri = imageField;
+            }
           }
+          final artist = (songData['artists'] != null && songData['artists']['primary'] != null && songData['artists']['primary'].isNotEmpty)
+              ? songData['artists']['primary'][0]['name']
+              : (songData['subtitle'] ?? 'Unknown Artist');
+          // Set MediaItem for notification and background
+          final mediaItem = MediaItem(
+            id: songId,
+            album: album,
+            title: title,
+            artist: artist,
+            artUri: artUri != null ? Uri.parse(artUri) : null,
+            extras: songData,
+          );
+          await audioPlayer.setAudioSource(
+            AudioSource.uri(
+              Uri.parse(downloadUrl),
+              tag: mediaItem,
+            ),
+          );
+          await audioPlayer.play();
+          playerState.setPlaying(true);
         } else {
           throw Exception('No download URL found in response');
         }
