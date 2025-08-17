@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:audio_service/audio_service.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 import '../models/liked_song.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
@@ -21,6 +22,11 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   late AnimationController _meteorController;
+  StreamSubscription<bool>? _playingSub;
+  StreamSubscription<int?>? _currentIndexSub;
+  late AudioPlayer audioPlayer;
+  late PlayerStateProvider playerState;
+  bool _isDisposed = false;
 
   @override
   void initState() {
@@ -37,40 +43,51 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
       vsync: this,
     )..repeat();
     _fadeController.forward();
-
     WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
-      audioPlayer.playingStream.listen((playing) {
-        final playerState = Provider.of<PlayerStateProvider>(
-          context,
-          listen: false,
-        );
+      audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+      playerState = Provider.of<PlayerStateProvider>(context, listen: false);
+
+      _playingSub = audioPlayer.playingStream.listen((playing) {
         playerState.setPlaying(playing);
+        if (mounted && !_isDisposed) setState(() {});
+      });
+
+      _currentIndexSub = audioPlayer.currentIndexStream.listen((index) {
+        final likedSongs = Hive.box<LikedSong>('likedSongs').values.toList();
+        if (playerState.currentContext == "liked" &&
+            index != null &&
+            index >= 0 &&
+            index < likedSongs.length) {
+          playerState.setSongIndex(index);
+          playerState.setSong({
+            'id': likedSongs[index].id,
+            'name': likedSongs[index].title,
+            'primaryArtists': likedSongs[index].artist,
+            'image': likedSongs[index].imageUrl,
+            'downloadUrl': likedSongs[index].downloadUrl,
+          });
+          if (mounted && !_isDisposed) setState(() {});
+        }
       });
     });
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
     _fadeController.dispose();
     _meteorController.dispose();
     WidgetsBinding.instance.removeObserver(this);
+    _playingSub?.cancel();
+    _currentIndexSub?.cancel();
     super.dispose();
   }
 
   void _syncPlayerState() {
-    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
-    final playerState = Provider.of<PlayerStateProvider>(
-      context,
-      listen: false,
-    );
-    final actuallyPlaying = audioPlayer.playing;
-    playerState.setPlaying(actuallyPlaying);
-    if (mounted) {
-      setState(() {});
-    }
+    playerState.setPlaying(audioPlayer.playing);
+    if (mounted && !_isDisposed) setState(() {});
   }
 
   @override
@@ -81,234 +98,34 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
     }
   }
 
-  Widget _buildAnimatedBackground({
-    required bool isPitchBlack,
-    required bool customColorsEnabled,
-    required Color primaryColor,
-    required Color secondaryColor,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: isPitchBlack
-            ? null
-            : customColorsEnabled
-            ? RadialGradient(
-                center: Alignment.topLeft,
-                radius: 1.5,
-                colors: [
-                  secondaryColor,
-                  secondaryColor.withOpacity(0.8),
-                  Colors.black,
-                ],
-              )
-            : const RadialGradient(
-                center: Alignment.topLeft,
-                radius: 1.5,
-                colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
-              ),
-        color: isPitchBlack ? Colors.black : null,
-      ),
-      child: Stack(
-        children: List.generate(
-          8,
-          (index) =>
-              _buildMeteor(index, customColorsEnabled ? primaryColor : null),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMeteor(int index, [Color? meteorColor]) {
-    return AnimatedBuilder(
-      animation: _meteorController,
-      builder: (context, child) {
-        final offset = _meteorController.value * 2 - 1;
-        return Positioned(
-          top:
-              (index * 80.0 + offset * 120) %
-              MediaQuery.of(context).size.height,
-          left: (index * 110.0) % MediaQuery.of(context).size.width,
-          child: Transform.rotate(
-            angle: 3.14159 * 1.2,
-            child: Container(
-              width: 2,
-              height: 20,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(1),
-                gradient: LinearGradient(
-                  colors: meteorColor != null
-                      ? [
-                          meteorColor.withOpacity(0.8),
-                          meteorColor.withOpacity(0.3),
-                          Colors.transparent,
-                        ]
-                      : [
-                          Colors.white.withOpacity(0.8),
-                          Colors.white.withOpacity(0.3),
-                          Colors.transparent,
-                        ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildHeader({
-    required bool customColorsEnabled,
-    required Color primaryColor,
-    required Color secondaryColor,
-    required int songsCount,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: customColorsEnabled
-              ? [secondaryColor, Colors.black.withOpacity(0.8)]
-              : [const Color(0xFF1a1a2e), Colors.black.withOpacity(0.8)],
-        ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withOpacity(0.2)),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: customColorsEnabled
-                            ? [primaryColor, primaryColor.withOpacity(0.8)]
-                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '$songsCount Songs',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: customColorsEnabled
-                            ? [primaryColor, primaryColor.withOpacity(0.7)]
-                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                      ),
-                      borderRadius: const BorderRadius.all(Radius.circular(2)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: customColorsEnabled
-                                      ? [
-                                          primaryColor.withOpacity(0.3),
-                                          primaryColor.withOpacity(0.1),
-                                        ]
-                                      : [
-                                          Color(0xFFff7d78).withOpacity(0.3),
-                                          Color(0xFF9c27b0).withOpacity(0.3),
-                                        ],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.favorite,
-                                color: customColorsEnabled
-                                    ? primaryColor
-                                    : Color(0xFFff7d78),
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'Liked Songs',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Your favorite tracks',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _playLikedSong(
     LikedSong song,
     int index,
     List<LikedSong> likedSongs,
   ) async {
-    final playerState = Provider.of<PlayerStateProvider>(
-      context,
-      listen: false,
-    );
-    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
-
     try {
       playerState.setSongLoading(true);
-      if (song.downloadUrl != null && song.downloadUrl!.isNotEmpty) {
-        await audioPlayer.stop();
-        List<Map<String, dynamic>> playlist = likedSongs
+
+      // Build liked songs playlist
+      final sources = likedSongs
+          .map(
+            (s) => AudioSource.uri(
+              Uri.parse(s.downloadUrl ?? ''),
+              tag: MediaItem(
+                id: s.id,
+                album: '',
+                title: s.title,
+                artist: s.artist,
+                artUri: s.imageUrl.isNotEmpty ? Uri.parse(s.imageUrl) : null,
+              ),
+            ),
+          )
+          .toList();
+
+      final playlistSource = ConcatenatingAudioSource(children: sources);
+
+      playerState.setPlaylist(
+        likedSongs
             .map(
               (s) => {
                 'id': s.id,
@@ -318,52 +135,41 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                 'downloadUrl': s.downloadUrl,
               },
             )
-            .toList();
-        playerState.setPlaylist(playlist);
-        playerState.setSongIndex(index);
-        playerState.setSong(playlist[index]);
-        await audioPlayer.setAudioSource(
-          AudioSource.uri(
-            Uri.parse(song.downloadUrl!),
-            tag: MediaItem(
-              id: song.id,
-              album: '', // LikedSong does not have album, so fallback
-              title: song.title,
-              artist: song.artist,
-              artUri: song.imageUrl.isNotEmpty
-                  ? Uri.parse(song.imageUrl)
-                  : (song.downloadUrl != null
-                        ? Uri.parse(song.downloadUrl!)
-                        : null),
-            ),
-          ),
-        );
-        await audioPlayer.play();
-        playerState.setPlaying(true);
-        playerState.setSongLoading(false);
-      } else {
-        playerState.setSongLoading(false);
+            .toList(),
+      );
+      playerState.setSongIndex(index);
+      playerState.setSong({
+        'id': song.id,
+        'name': song.title,
+        'primaryArtists': song.artist,
+        'image': song.imageUrl,
+        'downloadUrl': song.downloadUrl,
+      });
+
+      // Mark context as liked
+      playerState.setCurrentContext("liked");
+
+      await audioPlayer.setAudioSource(playlistSource, initialIndex: index);
+      await audioPlayer.play();
+      playerState.setPlaying(true);
+      playerState.setSongLoading(false);
+    } catch (e) {
+      playerState.setSongLoading(false);
+      if (mounted && !_isDisposed) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No audio URL available for this song.'),
+          SnackBar(
+            content: Text('Error playing song: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
-    } catch (e) {
-      playerState.setSongLoading(false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error playing song: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
     }
-    setState(() {});
+    if (mounted && !_isDisposed) setState(() {});
   }
 
   void _openMusicPlayer(
@@ -371,21 +177,16 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
     int index,
     List<LikedSong> likedSongs,
   ) async {
-    final playerState = Provider.of<PlayerStateProvider>(
-      context,
-      listen: false,
-    );
-    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
-
     final isCurrentSong =
         playerState.currentSong != null &&
-        playerState.currentSong!['id'] == song.id;
+        playerState.currentSong!['id'] == song.id &&
+        playerState.currentContext == "liked";
 
     if (!isCurrentSong) {
       await _playLikedSong(song, index, likedSongs);
     }
 
-    Navigator.of(context)
+    await Navigator.of(context)
         .push(
           MaterialPageRoute(
             builder: (context) => StreamBuilder<bool>(
@@ -464,7 +265,9 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
             ),
           ),
         )
-        .then((_) => setState(() {}));
+        .then((_) {
+          if (mounted && !_isDisposed) setState(() {});
+        });
   }
 
   Widget _buildSongCard(
@@ -479,7 +282,10 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
     Color secondaryColor,
     VoidCallback onDelete,
   ) {
-    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+    final shouldShowPause =
+        isCurrentSong && isPlaying && playerState.currentContext == "liked";
+    final showLoader =
+        isCurrentSong && isLoading && playerState.currentContext == "liked";
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -629,64 +435,37 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                       ),
                     ],
                   ),
-                  child: StreamBuilder<bool>(
-                    stream: audioPlayer.playingStream,
-                    builder: (context, snap) {
-                      final isActuallyPlaying = snap.data ?? false;
-                      final isCurrent =
-                          Provider.of<PlayerStateProvider>(
-                            context,
-                          ).currentSong?['id'] ==
-                          song.id;
-                      final shouldShowPause = isActuallyPlaying && isCurrent;
-                      final playerState = Provider.of<PlayerStateProvider>(
-                        context,
-                      );
-
-                      return IconButton(
-                        icon: isLoading
-                            ? SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : Icon(
-                                shouldShowPause
-                                    ? Icons.pause
-                                    : Icons.play_arrow,
-                                color: Colors.white,
-                                size: 24,
+                  child: IconButton(
+                    icon: showLoader
+                        ? SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
                               ),
-                        onPressed: isLoading
-                            ? null
-                            : () async {
-                                try {
-                                  if (isCurrent && shouldShowPause) {
-                                    await audioPlayer.pause();
-                                    playerState.setPlaying(false);
-                                  } else if (isCurrent && !shouldShowPause) {
-                                    await audioPlayer.play();
-                                    playerState.setPlaying(true);
-                                  } else {
-                                    await _playLikedSong(
-                                      song,
-                                      index,
-                                      likedSongs,
-                                    );
-                                  }
-                                  setState(() {});
-                                } catch (e) {
-                                  final actuallyPlaying = audioPlayer.playing;
-                                  playerState.setPlaying(actuallyPlaying);
-                                }
-                              },
-                      );
-                    },
+                            ),
+                          )
+                        : Icon(
+                            shouldShowPause ? Icons.pause : Icons.play_arrow,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                    onPressed: showLoader
+                        ? null
+                        : () async {
+                            if (isCurrentSong && shouldShowPause) {
+                              await audioPlayer.pause();
+                              playerState.setPlaying(false);
+                            } else if (isCurrentSong && !shouldShowPause) {
+                              await audioPlayer.play();
+                              playerState.setPlaying(true);
+                            } else {
+                              await _playLikedSong(song, index, likedSongs);
+                            }
+                            if (mounted && !_isDisposed) setState(() {});
+                          },
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -819,56 +598,267 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
     );
   }
 
+  Widget _buildAnimatedBackground({
+    required bool isPitchBlack,
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: isPitchBlack
+            ? null
+            : customColorsEnabled
+            ? RadialGradient(
+                center: Alignment.topLeft,
+                radius: 1.5,
+                colors: [
+                  secondaryColor,
+                  secondaryColor.withOpacity(0.8),
+                  Colors.black,
+                ],
+              )
+            : const RadialGradient(
+                center: Alignment.topLeft,
+                radius: 1.5,
+                colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
+              ),
+        color: isPitchBlack ? Colors.black : null,
+      ),
+      child: Stack(
+        children: List.generate(
+          8,
+          (index) =>
+              _buildMeteor(index, customColorsEnabled ? primaryColor : null),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMeteor(int index, [Color? meteorColor]) {
+    return AnimatedBuilder(
+      animation: _meteorController,
+      builder: (context, child) {
+        final offset = _meteorController.value * 2 - 1;
+        return Positioned(
+          top:
+              (index * 80.0 + offset * 120) %
+              MediaQuery.of(context).size.height,
+          left: (index * 110.0) % MediaQuery.of(context).size.width,
+          child: Transform.rotate(
+            angle: 3.14159 * 1.2,
+            child: Container(
+              width: 2,
+              height: 20,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(1),
+                gradient: LinearGradient(
+                  colors: meteorColor != null
+                      ? [
+                          meteorColor.withOpacity(0.8),
+                          meteorColor.withOpacity(0.3),
+                          Colors.transparent,
+                        ]
+                      : [
+                          Colors.white.withOpacity(0.8),
+                          Colors.white.withOpacity(0.3),
+                          Colors.transparent,
+                        ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHeader({
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+    required int songsCount,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: customColorsEnabled
+              ? [secondaryColor, Colors.black.withOpacity(0.8)]
+              : [const Color(0xFF1a1a2e), Colors.black.withOpacity(0.8)],
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: customColorsEnabled
+                            ? [primaryColor, primaryColor.withOpacity(0.8)]
+                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$songsCount Songs',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: customColorsEnabled
+                            ? [primaryColor, primaryColor.withOpacity(0.7)]
+                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                      ),
+                      borderRadius: BorderRadius.all(Radius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: customColorsEnabled
+                                      ? [
+                                          primaryColor.withOpacity(0.3),
+                                          primaryColor.withOpacity(0.1),
+                                        ]
+                                      : [
+                                          Color(0xFFff7d78).withOpacity(0.3),
+                                          Color(0xFF9c27b0).withOpacity(0.3),
+                                        ],
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.favorite,
+                                color: customColorsEnabled
+                                    ? primaryColor
+                                    : Color(0xFFff7d78),
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Liked Songs',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Your favorite tracks',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final likedSongsBox = Hive.box<LikedSong>('likedSongs');
-    final isPitchBlack = context.watch<PitchBlackThemeProvider>().isPitchBlack;
-    final customTheme = context.watch<CustomThemeProvider>();
-    final customColorsEnabled = customTheme.customColorsEnabled;
-    final primaryColor = customColorsEnabled
-        ? customTheme.primaryColor
-        : const Color(0xFFff7d78);
-    final secondaryColor = customColorsEnabled
-        ? customTheme.secondaryColor
-        : const Color(0xFF16213e);
+    return Consumer<PlayerStateProvider>(
+      builder: (context, playerState, _) {
+        final likedSongsBox = Hive.box<LikedSong>('likedSongs');
+        final isPitchBlack = context
+            .watch<PitchBlackThemeProvider>()
+            .isPitchBlack;
+        final customTheme = context.watch<CustomThemeProvider>();
+        final customColorsEnabled = customTheme.customColorsEnabled;
+        final primaryColor = customColorsEnabled
+            ? customTheme.primaryColor
+            : const Color(0xFFff7d78);
+        final secondaryColor = customColorsEnabled
+            ? customTheme.secondaryColor
+            : const Color(0xFF16213e);
 
-    return Scaffold(
-      backgroundColor: isPitchBlack ? Colors.black : secondaryColor,
-      body: Stack(
-        children: [
-          _buildAnimatedBackground(
-            isPitchBlack: isPitchBlack,
-            customColorsEnabled: customColorsEnabled,
-            primaryColor: primaryColor,
-            secondaryColor: secondaryColor,
-          ),
-          ValueListenableBuilder(
-            valueListenable: likedSongsBox.listenable(),
-            builder: (context, Box<LikedSong> box, _) {
-              final songs = box.values.toList();
+        return Scaffold(
+          backgroundColor: isPitchBlack ? Colors.black : secondaryColor,
+          body: Stack(
+            children: [
+              _buildAnimatedBackground(
+                isPitchBlack: isPitchBlack,
+                customColorsEnabled: customColorsEnabled,
+                primaryColor: primaryColor,
+                secondaryColor: secondaryColor,
+              ),
+              ValueListenableBuilder(
+                valueListenable: likedSongsBox.listenable(),
+                builder: (context, Box<LikedSong> box, _) {
+                  final songs = box.values.toList();
 
-              return Column(
-                children: [
-                  _buildHeader(
-                    customColorsEnabled: customColorsEnabled,
-                    primaryColor: primaryColor,
-                    secondaryColor: secondaryColor,
-                    songsCount: songs.length,
-                  ),
-                  Expanded(
-                    child: songs.isEmpty
-                        ? _buildEmptyState(
-                            customColorsEnabled: customColorsEnabled,
-                            primaryColor: primaryColor,
-                          )
-                        : FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: Consumer<PlayerStateProvider>(
-                              builder: (context, playerState, _) {
-                                final currentSongId =
-                                    playerState.currentSong?['id'];
-
-                                return ListView.builder(
+                  return Column(
+                    children: [
+                      _buildHeader(
+                        customColorsEnabled: customColorsEnabled,
+                        primaryColor: primaryColor,
+                        secondaryColor: secondaryColor,
+                        songsCount: songs.length,
+                      ),
+                      Expanded(
+                        child: songs.isEmpty
+                            ? _buildEmptyState(
+                                customColorsEnabled: customColorsEnabled,
+                                primaryColor: primaryColor,
+                              )
+                            : FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: ListView.builder(
                                   padding: const EdgeInsets.only(
                                     top: 10,
                                     bottom: 20,
@@ -877,7 +867,9 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                                   itemBuilder: (context, index) {
                                     final song = songs[index];
                                     final isCurrentSong =
-                                        currentSongId == song.id;
+                                        playerState.currentSong?['id'] ==
+                                            song.id &&
+                                        playerState.currentContext == "liked";
 
                                     return _buildSongCard(
                                       song,
@@ -893,17 +885,17 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                                       () => likedSongsBox.delete(song.id),
                                     );
                                   },
-                                );
-                              },
-                            ),
-                          ),
-                  ),
-                ],
-              );
-            },
+                                ),
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

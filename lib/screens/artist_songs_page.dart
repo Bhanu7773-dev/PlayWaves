@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../services/player_state_provider.dart';
-import '../services/pitch_black_theme_provider.dart'; // <-- Add this import
+import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
 import 'music_player.dart';
 import 'package:audio_service/audio_service.dart';
@@ -44,19 +44,29 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
-    // Add this widget as an observer for app lifecycle changes
     WidgetsBinding.instance.addObserver(this);
 
-    // Listen to audio player state changes to keep UI in sync
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+      final playerState = Provider.of<PlayerStateProvider>(
+        context,
+        listen: false,
+      );
+      // Listen to playing state
       audioPlayer.playingStream.listen((playing) {
         if (!_isDisposed && mounted) {
-          final playerState = Provider.of<PlayerStateProvider>(
-            context,
-            listen: false,
-          );
           playerState.setPlaying(playing);
+        }
+      });
+      // Listen to current index changes to update current song
+      audioPlayer.currentIndexStream.listen((index) {
+        if (!_isDisposed &&
+            mounted &&
+            index != null &&
+            index >= 0 &&
+            index < _songs.length) {
+          playerState.setSongIndex(index);
+          playerState.setSong(_songs[index]);
         }
       });
     });
@@ -76,7 +86,6 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      // App regained focus, sync the state
       _syncPlayerState();
     }
   }
@@ -88,11 +97,9 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
         context,
         listen: false,
       );
-      // Force sync with actual audio player state
       final actuallyPlaying = audioPlayer.playing;
       playerState.setPlaying(actuallyPlaying);
 
-      // Trigger a rebuild to update UI
       if (mounted) {
         setState(() {});
       }
@@ -145,23 +152,14 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     );
     try {
       playerState.setSongLoading(true);
-
-      // Set playlist first before playing song
       playerState.setPlaylist(_songs);
       int index = _songs.indexWhere((s) => s['id'] == song['id']);
       playerState.setSongIndex(index == -1 ? 0 : index);
 
-      await audioPlayer.stop();
-      await audioPlayer.seek(Duration.zero);
-
-      final songId = song['id'];
-      if (songId != null) {
-        final songDetails = await widget.apiService.getSongById(songId);
-        String? downloadUrl;
-        final songData = songDetails['data']?[0];
-
-        if (songData != null) {
-          playerState.setSong(Map<String, dynamic>.from(songData));
+      // Build the playlist
+      final playlist = ConcatenatingAudioSource(
+        children: _songs.map((songData) {
+          String? downloadUrl;
           if (songData['downloadUrl'] != null &&
               songData['downloadUrl'] is List) {
             final downloadUrls = songData['downloadUrl'] as List;
@@ -177,12 +175,14 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                 songData['preview_url'] ??
                 songData['stream_url'];
           }
-        }
-
-        if (downloadUrl != null && downloadUrl.isNotEmpty) {
-          // --- METADATA EXTRACTION ---
           final title = songData['title'] ?? songData['name'] ?? 'Unknown Song';
           final album = songData['album']?['name'] ?? 'Unknown Album';
+          final artist =
+              (songData['artists'] != null &&
+                  songData['artists']['primary'] != null &&
+                  songData['artists']['primary'].isNotEmpty)
+              ? songData['artists']['primary'][0]['name']
+              : (songData['subtitle'] ?? 'Unknown Artist');
           final imageField = songData['image'];
           String? artUri;
           if (imageField != null) {
@@ -201,32 +201,28 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
               artUri = imageField;
             }
           }
-          final artist = (songData['artists'] != null && songData['artists']['primary'] != null && songData['artists']['primary'].isNotEmpty)
-              ? songData['artists']['primary'][0]['name']
-              : (songData['subtitle'] ?? 'Unknown Artist');
-          // Set MediaItem for notification and background
           final mediaItem = MediaItem(
-            id: songId,
+            id: songData['id'],
             album: album,
             title: title,
             artist: artist,
             artUri: artUri != null ? Uri.parse(artUri) : null,
             extras: songData,
           );
-          await audioPlayer.setAudioSource(
-            AudioSource.uri(
-              Uri.parse(downloadUrl),
-              tag: mediaItem,
-            ),
-          );
-          await audioPlayer.play();
-          playerState.setPlaying(true);
-        } else {
-          throw Exception('No download URL found in response');
-        }
-      } else {
-        throw Exception('No song ID found');
-      }
+          return AudioSource.uri(Uri.parse(downloadUrl ?? ""), tag: mediaItem);
+        }).toList(),
+      );
+
+      await audioPlayer.stop();
+      await audioPlayer.seek(Duration.zero);
+
+      await audioPlayer.setAudioSource(playlist, initialIndex: index);
+      // Immediately update provider for first time sync
+      playerState.setSongIndex(index);
+      playerState.setSong(_songs[index]);
+      await audioPlayer.play();
+      playerState.setPlaying(true);
+      playerState.setSong(_songs[index]);
     } catch (e) {
       if (!_isDisposed) {
         playerState.setSongLoading(false);
@@ -268,88 +264,75 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
       listen: false,
     );
 
-    // Only play the song if it's not already the current song
     final isCurrentSong =
         playerState.currentSong != null &&
         playerState.currentSong!['id'] == song['id'];
 
     if (!isCurrentSong) {
-      // Play the song only if it's different from current
       _playSong(song);
     }
 
-    // Then open the music player
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => StreamBuilder<bool>(
-          stream: audioPlayer.playingStream,
-          builder: (context, playingSnapshot) {
-            return StreamBuilder<Duration>(
-              stream: audioPlayer.positionStream,
-              builder: (context, positionSnapshot) {
-                return StreamBuilder<Duration?>(
-                  stream: audioPlayer.durationStream,
-                  builder: (context, durationSnapshot) {
-                    final songTitle =
-                        song['name'] ?? song['title'] ?? 'Unknown Song';
-                    String artistName = 'Unknown Artist';
-                    if (song['artists'] != null) {
-                      final artists = song['artists'];
-                      if (artists['primary'] != null &&
-                          artists['primary'].isNotEmpty) {
-                        artistName =
-                            artists['primary'][0]['name'] ?? 'Unknown Artist';
-                      }
-                    } else if (song['subtitle'] != null) {
-                      artistName = song['subtitle'];
-                    }
-                    final albumArtUrl = _getBestImageUrl(song['image']) ?? '';
-
-                    return MusicPlayerPage(
-                      songTitle: songTitle,
-                      artistName: artistName,
-                      albumArtUrl: albumArtUrl,
-                      songId: song['id'],
-                      isPlaying: playingSnapshot.data ?? false,
-                      isLoading: playerState.isSongLoading,
-                      currentPosition: positionSnapshot.data ?? Duration.zero,
-                      totalDuration: durationSnapshot.data ?? Duration.zero,
-                      onPlayPause: () {
-                        if (audioPlayer.playing) {
-                          audioPlayer.pause();
-                        } else {
-                          audioPlayer.play();
-                        }
-                      },
-                      onNext: () {
-                        // Simple next song logic - play next song in list
-                        final currentIndex = _songs.indexWhere(
-                          (s) => s['id'] == song['id'],
+        builder: (context) => Consumer<PlayerStateProvider>(
+          builder: (context, playerState, _) {
+            final currentSong = playerState.currentSong ?? song;
+            final songTitle =
+                currentSong['name'] ?? currentSong['title'] ?? 'Unknown Song';
+            String artistName = 'Unknown Artist';
+            if (currentSong['artists'] != null) {
+              final artists = currentSong['artists'];
+              if (artists['primary'] != null && artists['primary'].isNotEmpty) {
+                artistName = artists['primary'][0]['name'] ?? 'Unknown Artist';
+              }
+            } else if (currentSong['subtitle'] != null) {
+              artistName = currentSong['subtitle'];
+            }
+            final albumArtUrl = _getBestImageUrl(currentSong['image']) ?? '';
+            return StreamBuilder<bool>(
+              stream: audioPlayer.playingStream,
+              builder: (context, playingSnapshot) {
+                return StreamBuilder<Duration>(
+                  stream: audioPlayer.positionStream,
+                  builder: (context, positionSnapshot) {
+                    return StreamBuilder<Duration?>(
+                      stream: audioPlayer.durationStream,
+                      builder: (context, durationSnapshot) {
+                        return MusicPlayerPage(
+                          songTitle: songTitle,
+                          artistName: artistName,
+                          albumArtUrl: albumArtUrl,
+                          songId: currentSong['id'],
+                          isPlaying: playingSnapshot.data ?? false,
+                          isLoading: playerState.isSongLoading,
+                          currentPosition:
+                              positionSnapshot.data ?? Duration.zero,
+                          totalDuration: durationSnapshot.data ?? Duration.zero,
+                          onPlayPause: () {
+                            if (audioPlayer.playing) {
+                              audioPlayer.pause();
+                            } else {
+                              audioPlayer.play();
+                            }
+                          },
+                          onNext: () async {
+                            await audioPlayer.seekToNext();
+                          },
+                          onPrevious: () async {
+                            await audioPlayer.seekToPrevious();
+                          },
+                          onJumpToSong: (index) async {
+                            await audioPlayer.seek(Duration.zero, index: index);
+                            await audioPlayer.play();
+                          },
+                          onSeek: (value) {
+                            final position =
+                                (durationSnapshot.data ?? Duration.zero) *
+                                value;
+                            audioPlayer.seek(position);
+                          },
                         );
-                        if (currentIndex != -1 &&
-                            currentIndex < _songs.length - 1) {
-                          _playSong(_songs[currentIndex + 1]);
-                        }
-                      },
-                      onPrevious: () {
-                        // Simple previous song logic - play previous song in list
-                        final currentIndex = _songs.indexWhere(
-                          (s) => s['id'] == song['id'],
-                        );
-                        if (currentIndex > 0) {
-                          _playSong(_songs[currentIndex - 1]);
-                        }
-                      },
-                      onJumpToSong: (index) {
-                        if (index >= 0 && index < _songs.length) {
-                          _playSong(_songs[index]);
-                        }
-                      },
-                      onSeek: (value) {
-                        final position =
-                            (durationSnapshot.data ?? Duration.zero) * value;
-                        audioPlayer.seek(position);
                       },
                     );
                   },
@@ -360,9 +343,224 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
         ),
       ),
     ).then((_) {
-      // Sync state when returning from music player
       _syncPlayerState();
     });
+  }
+
+  Widget _buildSongCard(
+    Map<String, dynamic> song,
+    int index, {
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+    final imageUrl = _getBestImageUrl(song['image']);
+    final title = song['name'] ?? song['title'] ?? 'Unknown Song';
+    String artist = 'Unknown Artist';
+    if (song['artists'] != null) {
+      final artists = song['artists'];
+      if (artists['primary'] != null && artists['primary'].isNotEmpty) {
+        artist = artists['primary'][0]['name'] ?? 'Unknown Artist';
+      }
+    } else if (song['subtitle'] != null) {
+      artist = song['subtitle'];
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.08),
+            Colors.white.withOpacity(0.03),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _openMusicPlayer(song),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: customColorsEnabled
+                          ? [
+                              primaryColor.withOpacity(0.3),
+                              primaryColor.withOpacity(0.1),
+                            ]
+                          : [
+                              const Color(0xFFff7d78).withOpacity(0.3),
+                              const Color(0xFF9c27b0).withOpacity(0.3),
+                            ],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFff7d78).withOpacity(0.3),
+                        const Color(0xFF9c27b0).withOpacity(0.3),
+                      ],
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: imageUrl != null
+                        ? Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(
+                                Icons.music_note,
+                                color: Colors.white,
+                                size: 24,
+                              );
+                            },
+                          )
+                        : const Icon(
+                            Icons.music_note,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        artist,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: customColorsEnabled
+                          ? [primaryColor, primaryColor.withOpacity(0.8)]
+                          : [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: customColorsEnabled
+                            ? primaryColor.withOpacity(0.4)
+                            : const Color(0xFFff7d78).withOpacity(0.4),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Consumer<PlayerStateProvider>(
+                    builder: (context, playerState, child) {
+                      final isCurrentSong =
+                          playerState.currentSong != null &&
+                          playerState.currentSong!['id'] == song['id'];
+                      final isPlaying = playerState.isPlaying && isCurrentSong;
+                      final isLoading =
+                          playerState.isSongLoading && isCurrentSong;
+
+                      return IconButton(
+                        icon: isLoading
+                            ? SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                isPlaying ? Icons.pause : Icons.play_arrow,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                        onPressed: isLoading
+                            ? null
+                            : () async {
+                                try {
+                                  if (isCurrentSong && playerState.isPlaying) {
+                                    await audioPlayer.pause();
+                                    playerState.setPlaying(false);
+                                  } else if (isCurrentSong &&
+                                      !playerState.isPlaying) {
+                                    await audioPlayer.play();
+                                    playerState.setPlaying(true);
+                                  } else {
+                                    _playSong(song);
+                                  }
+                                } catch (e) {
+                                  final actuallyPlaying = audioPlayer.playing;
+                                  playerState.setPlaying(actuallyPlaying);
+                                }
+                              },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildAnimatedBackground({
@@ -427,7 +625,6 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
                       onPressed: () {
-                        // Use Future.microtask to avoid freeze on animation
                         if (Navigator.canPop(context)) {
                           Future.microtask(() => Navigator.pop(context));
                         }
@@ -507,245 +704,16 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     );
   }
 
-  Widget _buildSongCard(
-    Map<String, dynamic> song,
-    int index, {
-    required bool customColorsEnabled,
-    required Color primaryColor,
-    required Color secondaryColor,
-  }) {
-    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
-    final imageUrl = _getBestImageUrl(song['image']);
-    final title = song['name'] ?? song['title'] ?? 'Unknown Song';
-    String artist = 'Unknown Artist';
-    if (song['artists'] != null) {
-      final artists = song['artists'];
-      if (artists['primary'] != null && artists['primary'].isNotEmpty) {
-        artist = artists['primary'][0]['name'] ?? 'Unknown Artist';
-      }
-    } else if (song['subtitle'] != null) {
-      artist = song['subtitle'];
-    }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.08),
-            Colors.white.withOpacity(0.03),
-          ],
-        ),
-        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _openMusicPlayer(song),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Track Number
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: customColorsEnabled
-                          ? [
-                              primaryColor.withOpacity(0.3),
-                              primaryColor.withOpacity(0.1),
-                            ]
-                          : [
-                              const Color(0xFFff7d78).withOpacity(0.3),
-                              const Color(0xFF9c27b0).withOpacity(0.3),
-                            ],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${index + 1}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Album Art
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFFff7d78).withOpacity(0.3),
-                        const Color(0xFF9c27b0).withOpacity(0.3),
-                      ],
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: imageUrl != null
-                        ? Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(
-                                Icons.music_note,
-                                color: Colors.white,
-                                size: 24,
-                              );
-                            },
-                          )
-                        : const Icon(
-                            Icons.music_note,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Song Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        artist,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 14,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                // Play Button
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: customColorsEnabled
-                          ? [primaryColor, primaryColor.withOpacity(0.8)]
-                          : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: customColorsEnabled
-                            ? primaryColor.withOpacity(0.4)
-                            : const Color(0xFFff7d78).withOpacity(0.4),
-                        blurRadius: 8,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Consumer<PlayerStateProvider>(
-                    builder: (context, playerState, child) {
-                      final isCurrentSong =
-                          playerState.currentSong != null &&
-                          playerState.currentSong!['id'] == song['id'];
-                      final isPlaying = playerState.isPlaying && isCurrentSong;
-                      final isLoading =
-                          playerState.isSongLoading && isCurrentSong;
-
-                      return IconButton(
-                        icon: isLoading
-                            ? SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : Icon(
-                                isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                        onPressed: isLoading
-                            ? null // Disable button when loading
-                            : () async {
-                                try {
-                                  if (isCurrentSong && playerState.isPlaying) {
-                                    // Pause current song
-                                    await audioPlayer.pause();
-                                    playerState.setPlaying(false);
-                                  } else if (isCurrentSong &&
-                                      !playerState.isPlaying) {
-                                    // Resume current song
-                                    await audioPlayer.play();
-                                    playerState.setPlaying(true);
-                                  } else {
-                                    // Play a different song
-                                    _playSong(song);
-                                  }
-                                } catch (e) {
-                                  print('Error in artist songs play/pause: $e');
-                                  // Sync state with actual player state
-                                  final actuallyPlaying = audioPlayer.playing;
-                                  playerState.setPlaying(actuallyPlaying);
-                                }
-                              },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isPitchBlack = context
-        .watch<PitchBlackThemeProvider>()
-        .isPitchBlack; // <-- Read provider
+    final isPitchBlack = context.watch<PitchBlackThemeProvider>().isPitchBlack;
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
     final primaryColor = customTheme.primaryColor;
     final secondaryColor = customTheme.secondaryColor;
 
     return Scaffold(
-      backgroundColor: isPitchBlack
-          ? Colors.black
-          : Colors.black, // <-- Use provider
+      backgroundColor: isPitchBlack ? Colors.black : Colors.black,
       body: Stack(
         children: [
           _buildAnimatedBackground(
@@ -753,7 +721,7 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
             customColorsEnabled: customColorsEnabled,
             primaryColor: primaryColor,
             secondaryColor: secondaryColor,
-          ), // <-- Pass provider
+          ),
           Column(
             children: [
               _buildHeader(

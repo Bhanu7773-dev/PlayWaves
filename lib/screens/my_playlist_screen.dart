@@ -24,8 +24,10 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
   late AnimationController _meteorController;
 
   StreamSubscription<bool>? _playingSub;
+  StreamSubscription<int?>? _currentIndexSub;
   late AudioPlayer audioPlayer;
   late PlayerStateProvider playerState;
+  bool _isDisposed = false;
 
   @override
   void initState() {
@@ -49,10 +51,22 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
       if (!mounted) return;
       audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
       playerState = Provider.of<PlayerStateProvider>(context, listen: false);
+
       _playingSub = audioPlayer.playingStream.listen((playing) {
-        if (mounted) {
-          playerState.setPlaying(playing);
-          setState(() {});
+        playerState.setPlaying(playing);
+        if (mounted && !_isDisposed) setState(() {});
+      });
+
+      _currentIndexSub = audioPlayer.currentIndexStream.listen((index) {
+        final playlist = playerState.currentPlaylist;
+        if (playerState.currentContext == "playlist" &&
+            playlist.isNotEmpty &&
+            index != null &&
+            index >= 0 &&
+            index < playlist.length) {
+          playerState.setSongIndex(index);
+          playerState.setSong(playlist[index]);
+          if (mounted && !_isDisposed) setState(() {});
         }
       });
     });
@@ -60,19 +74,19 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
 
   @override
   void dispose() {
+    _isDisposed = true;
     _fadeController.dispose();
     _meteorController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _playingSub?.cancel();
+    _currentIndexSub?.cancel();
     super.dispose();
   }
 
   void _syncPlayerState() {
     final actuallyPlaying = audioPlayer.playing;
     playerState.setPlaying(actuallyPlaying);
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted && !_isDisposed) setState(() {});
   }
 
   @override
@@ -295,7 +309,6 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     );
   }
 
-  /// FIXED: MediaItem now uses song.imageUrl for artUri and adds artist
   Future<void> _playPlaylistSong(
     PlaylistSong song,
     int index,
@@ -310,7 +323,27 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     try {
       playerState.setSongLoading(true);
       if (song.downloadUrl != null && song.downloadUrl!.isNotEmpty) {
+        await audioPlayer.pause();
         await audioPlayer.stop();
+        final sources = playlistSongs
+            .map(
+              (s) => AudioSource.uri(
+                Uri.parse(s.downloadUrl ?? ''),
+                tag: MediaItem(
+                  id: s.id,
+                  album: '',
+                  title: s.title,
+                  artist: s.artist,
+                  artUri: s.imageUrl.isNotEmpty
+                      ? Uri.parse(s.imageUrl)
+                      : (s.downloadUrl != null
+                            ? Uri.parse(s.downloadUrl!)
+                            : null),
+                ),
+              ),
+            )
+            .toList();
+        final playlistSource = ConcatenatingAudioSource(children: sources);
         List<Map<String, dynamic>> playlist = playlistSongs
             .map(
               (s) => {
@@ -325,48 +358,36 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
         playerState.setPlaylist(playlist);
         playerState.setSongIndex(index);
         playerState.setSong(playlist[index]);
-        await audioPlayer.setAudioSource(
-          AudioSource.uri(
-            Uri.parse(song.downloadUrl!),
-            tag: MediaItem(
-              id: song.id,
-              album: '', // PlaylistSong does not have album, so fallback
-              title: song.title,
-              artist: song.artist,
-              artUri: song.imageUrl.isNotEmpty
-                  ? Uri.parse(song.imageUrl)
-                  : (song.downloadUrl != null
-                        ? Uri.parse(song.downloadUrl!)
-                        : null),
-            ),
-          ),
-        );
+        playerState.setCurrentContext("playlist");
+        await audioPlayer.setAudioSource(playlistSource, initialIndex: index);
         await audioPlayer.play();
         playerState.setPlaying(true);
-        playerState.setSongLoading(false);
       } else {
-        playerState.setSongLoading(false);
+        if (mounted && !_isDisposed) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No audio URL available for this song.'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted && !_isDisposed) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No audio URL available for this song.'),
+          SnackBar(
+            content: Text('Error playing song: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
-    } catch (e) {
-      playerState.setSongLoading(false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error playing song: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
     }
-    setState(() {});
+    playerState.setSongLoading(false);
+    if (mounted && !_isDisposed) setState(() {});
   }
 
   void _openMusicPlayer(
@@ -382,9 +403,11 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
 
     final isCurrentSong =
         playerState.currentSong != null &&
-        playerState.currentSong!['id'] == song.id;
+        playerState.currentSong!['id'] == song.id &&
+        playerState.currentContext == "playlist";
 
     if (!isCurrentSong) {
+      playerState.setSongLoading(true); // Show loader immediately on tap!
       await _playPlaylistSong(song, index, playlistSongs);
     }
 
@@ -467,7 +490,9 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
             ),
           ),
         )
-        .then((_) => setState(() {}));
+        .then((_) {
+          if (mounted && !_isDisposed) setState(() {});
+        });
   }
 
   Widget _buildSongCard(
@@ -483,6 +508,11 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     VoidCallback onDelete,
   ) {
     final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+
+    final shouldShowPause =
+        isCurrentSong && isPlaying && playerState.currentContext == "playlist";
+    final showLoader =
+        isCurrentSong && isLoading && playerState.currentContext == "playlist";
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -637,63 +667,44 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                       ),
                     ],
                   ),
-                  child: StreamBuilder<bool>(
-                    stream: audioPlayer.playingStream,
-                    builder: (context, snap) {
-                      final isActuallyPlaying = snap.data ?? false;
-                      final isCurrent =
-                          Provider.of<PlayerStateProvider>(
-                            context,
-                          ).currentSong?['id'] ==
-                          song.id;
-                      final shouldShowPause = isActuallyPlaying && isCurrent;
-                      final playerState = Provider.of<PlayerStateProvider>(
-                        context,
-                      );
-                      return IconButton(
-                        icon: isLoading
-                            ? SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : Icon(
-                                shouldShowPause
-                                    ? Icons.pause
-                                    : Icons.play_arrow,
-                                color: Colors.white,
-                                size: 24,
+                  child: IconButton(
+                    icon: showLoader
+                        ? SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
                               ),
-                        onPressed: isLoading
-                            ? null
-                            : () async {
-                                try {
-                                  if (isCurrent && shouldShowPause) {
-                                    await audioPlayer.pause();
-                                    playerState.setPlaying(false);
-                                  } else if (isCurrent && !shouldShowPause) {
-                                    await audioPlayer.play();
-                                    playerState.setPlaying(true);
-                                  } else {
-                                    await _playPlaylistSong(
-                                      song,
-                                      index,
-                                      playlistSongs,
-                                    );
-                                  }
-                                  setState(() {});
-                                } catch (e) {
-                                  final actuallyPlaying = audioPlayer.playing;
-                                  playerState.setPlaying(actuallyPlaying);
-                                }
-                              },
-                      );
-                    },
+                            ),
+                          )
+                        : Icon(
+                            shouldShowPause ? Icons.pause : Icons.play_arrow,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                    onPressed: showLoader
+                        ? null
+                        : () async {
+                            if (isCurrentSong && shouldShowPause) {
+                              await audioPlayer.pause();
+                              playerState.setPlaying(false);
+                            } else if (isCurrentSong && !shouldShowPause) {
+                              await audioPlayer.play();
+                              playerState.setPlaying(true);
+                            } else {
+                              playerState.setSongLoading(
+                                true,
+                              ); // Show loader right away!
+                              await _playPlaylistSong(
+                                song,
+                                index,
+                                playlistSongs,
+                              );
+                            }
+                            if (mounted && !_isDisposed) setState(() {});
+                          },
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -828,60 +839,59 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (!Hive.isBoxOpen('playlistSongs')) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('My Playlist')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-    final playlistBox = Hive.box<PlaylistSong>('playlistSongs');
-    final isPitchBlack = context.watch<PitchBlackThemeProvider>().isPitchBlack;
-    final customTheme = context.watch<CustomThemeProvider>();
-    final customColorsEnabled = customTheme.customColorsEnabled;
-    final primaryColor = customColorsEnabled
-        ? customTheme.primaryColor
-        : const Color(0xFFff7d78);
-    final secondaryColor = customColorsEnabled
-        ? customTheme.secondaryColor
-        : const Color(0xFF16213e);
+    return Consumer<PlayerStateProvider>(
+      builder: (context, playerState, _) {
+        if (!Hive.isBoxOpen('playlistSongs')) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('My Playlist')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        final playlistBox = Hive.box<PlaylistSong>('playlistSongs');
+        final isPitchBlack = context
+            .watch<PitchBlackThemeProvider>()
+            .isPitchBlack;
+        final customTheme = context.watch<CustomThemeProvider>();
+        final customColorsEnabled = customTheme.customColorsEnabled;
+        final primaryColor = customColorsEnabled
+            ? customTheme.primaryColor
+            : const Color(0xFFff7d78);
+        final secondaryColor = customColorsEnabled
+            ? customTheme.secondaryColor
+            : const Color(0xFF16213e);
 
-    return Scaffold(
-      backgroundColor: isPitchBlack ? Colors.black : secondaryColor,
-      body: Stack(
-        children: [
-          _buildAnimatedBackground(
-            isPitchBlack: isPitchBlack,
-            customColorsEnabled: customColorsEnabled,
-            primaryColor: primaryColor,
-            secondaryColor: secondaryColor,
-          ),
-          ValueListenableBuilder(
-            valueListenable: playlistBox.listenable(),
-            builder: (context, Box<PlaylistSong> box, _) {
-              final songs = box.values.toList();
+        return Scaffold(
+          backgroundColor: isPitchBlack ? Colors.black : secondaryColor,
+          body: Stack(
+            children: [
+              _buildAnimatedBackground(
+                isPitchBlack: isPitchBlack,
+                customColorsEnabled: customColorsEnabled,
+                primaryColor: primaryColor,
+                secondaryColor: secondaryColor,
+              ),
+              ValueListenableBuilder(
+                valueListenable: playlistBox.listenable(),
+                builder: (context, Box<PlaylistSong> box, _) {
+                  final songs = box.values.toList();
 
-              return Column(
-                children: [
-                  _buildHeader(
-                    customColorsEnabled: customColorsEnabled,
-                    primaryColor: primaryColor,
-                    secondaryColor: secondaryColor,
-                    songsCount: songs.length,
-                  ),
-                  Expanded(
-                    child: songs.isEmpty
-                        ? _buildEmptyState(
-                            customColorsEnabled: customColorsEnabled,
-                            primaryColor: primaryColor,
-                          )
-                        : FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: Consumer<PlayerStateProvider>(
-                              builder: (context, playerState, _) {
-                                final currentSongId =
-                                    playerState.currentSong?['id'];
-
-                                return ListView.builder(
+                  return Column(
+                    children: [
+                      _buildHeader(
+                        customColorsEnabled: customColorsEnabled,
+                        primaryColor: primaryColor,
+                        secondaryColor: secondaryColor,
+                        songsCount: songs.length,
+                      ),
+                      Expanded(
+                        child: songs.isEmpty
+                            ? _buildEmptyState(
+                                customColorsEnabled: customColorsEnabled,
+                                primaryColor: primaryColor,
+                              )
+                            : FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: ListView.builder(
                                   padding: const EdgeInsets.only(
                                     top: 10,
                                     bottom: 20,
@@ -890,7 +900,10 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                                   itemBuilder: (context, index) {
                                     final song = songs[index];
                                     final isCurrentSong =
-                                        currentSongId == song.id;
+                                        playerState.currentSong?['id'] ==
+                                            song.id &&
+                                        playerState.currentContext ==
+                                            "playlist";
 
                                     return _buildSongCard(
                                       song,
@@ -906,17 +919,17 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                                       () => playlistBox.delete(song.id),
                                     );
                                   },
-                                );
-                              },
-                            ),
-                          ),
-                  ),
-                ],
-              );
-            },
+                                ),
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

@@ -12,6 +12,14 @@ class PlayerStateProvider extends ChangeNotifier {
   String? _audioQuality = 'High (320 kbps)';
   String? _downloadQuality = 'High (320 kbps)';
 
+  // Add playback context tracking
+  String? _currentContext;
+  String? get currentContext => _currentContext;
+  void setCurrentContext(String? value) {
+    _currentContext = value;
+    notifyListeners();
+  }
+
   Map<String, dynamic>? get currentSong => _currentSong;
   List<Map<String, dynamic>> get currentPlaylist => _currentPlaylist;
   int get currentSongIndex => _currentSongIndex;
@@ -62,6 +70,7 @@ class PlayerStateProvider extends ChangeNotifier {
     _isSongLoading = false;
     _currentPlaylist = [];
     _currentSongIndex = 0;
+    _currentContext = null; // reset context
     notifyListeners();
   }
 }
