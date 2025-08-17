@@ -680,15 +680,7 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
     required int songsCount,
   }) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: customColorsEnabled
-              ? [secondaryColor, Colors.black.withOpacity(0.8)]
-              : [const Color(0xFF1a1a2e), Colors.black.withOpacity(0.8)],
-        ),
-      ),
+      decoration: BoxDecoration(color: Colors.transparent),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
