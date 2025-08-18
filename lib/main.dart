@@ -20,7 +20,6 @@ void main() async {
   Hive.registerAdapter(PlaylistSongAdapter());
   await Hive.openBox<LikedSong>('likedSongs');
   await Hive.openBox<PlaylistSong>('playlistSongs');
-
   // Initialize JustAudioBackground for background playback and notifications
   await JustAudioBackground.init(
     androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',

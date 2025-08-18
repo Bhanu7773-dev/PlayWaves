@@ -179,9 +179,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     required int songsCount,
   }) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-      ),
+      decoration: BoxDecoration(color: Colors.transparent),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),

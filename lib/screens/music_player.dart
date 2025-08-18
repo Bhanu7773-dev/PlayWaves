@@ -1,6 +1,3 @@
-// Debug print to check primaryColor value from provider
-// Debug print to check secondaryColor value from provider
-// Debug print to check secondaryColor value
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -9,12 +6,22 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:http/http.dart' as http;
+
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
 import '../models/liked_song.dart';
 import '../models/playlist_song.dart';
 import '../services/playlist_service.dart';
+import 'package:just_audio/just_audio.dart';
+
+// LRC line model
+class _LrcLine {
+  final Duration timestamp;
+  final String text;
+  _LrcLine(this.timestamp, this.text);
+}
 
 class MusicPlayerPage extends StatefulWidget {
   final String songTitle;
@@ -54,21 +61,24 @@ class MusicPlayerPage extends StatefulWidget {
 
 class _MusicPlayerPageState extends State<MusicPlayerPage>
     with TickerProviderStateMixin {
-  bool _isDragging = false;
-  double _dragValue = 0.0;
-  final PageController _pageController = PageController();
-
-  bool _isQueueOpen = false;
-  static const int _queueTargetCount = 30;
-  bool _isDownloading = false;
   late AnimationController _meteorsController;
-  bool _isLiked = false;
   late AnimationController _likeController;
   late Animation<double> _likeScale;
-
   late Box<LikedSong> likedSongsBox;
   late Box<PlaylistSong> playlistSongsBox;
   bool _isInPlaylist = false;
+  String? _lyrics;
+  bool _lyricsLoading = false;
+  String? _lyricsError;
+  List<_LrcLine>? _syncedLyrics;
+  int _currentLrcIndex = 0;
+  bool _isDragging = false;
+  double _dragValue = 0.0;
+  final PageController _pageController = PageController();
+  bool _isQueueOpen = false;
+  static const int _queueTargetCount = 30;
+  bool _isDownloading = false;
+  bool _isLiked = false;
 
   @override
   void initState() {
@@ -96,6 +106,147 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
         playerState.currentSong?['songId'] ??
         '';
     _isInPlaylist = PlaylistService.isInPlaylist(songId);
+    _fetchLyrics();
+  }
+
+  @override
+  void didUpdateWidget(MusicPlayerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.songTitle != oldWidget.songTitle ||
+        widget.artistName != oldWidget.artistName) {
+      _fetchLyrics();
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_syncedLyrics != null && _syncedLyrics!.isNotEmpty) {
+        _updateLrcIndex(widget.currentPosition);
+      }
+    });
+  }
+
+  Future<void> _fetchLyrics() async {
+    print(
+      '[Lyrics] Fetching lyrics for artist: ${widget.artistName}, title: ${widget.songTitle}',
+    );
+    setState(() {
+      _lyricsLoading = true;
+      _lyricsError = null;
+      _lyrics = null;
+      _syncedLyrics = null;
+      _currentLrcIndex = 0;
+    });
+    final artist = widget.artistName;
+    final title = widget.songTitle;
+    final url = Uri.parse(
+      'https://lrclib.net/api/get?artist_name=${Uri.encodeComponent(artist)}&track_name=${Uri.encodeComponent(title)}',
+    );
+    try {
+      final response = await http.get(url);
+      print('[Lyrics] Response status: ${response.statusCode}');
+      print(
+        '[Lyrics] Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}',
+      );
+      if (response.statusCode == 200) {
+        final data = response.body;
+        final syncedMatch = RegExp(
+          r'"syncedLyrics"\s*:\s*"([^"]*)"',
+        ).firstMatch(data);
+        if (syncedMatch != null &&
+            syncedMatch.group(1) != null &&
+            syncedMatch.group(1)!.isNotEmpty) {
+          final lrcRaw = syncedMatch.group(1)!.replaceAll(r'\n', '\n');
+          print('[Lyrics] Synced lyrics found. Parsing LRC...');
+          setState(() {
+            _syncedLyrics = _parseLrc(lrcRaw);
+            _lyricsLoading = false;
+          });
+          print('[Lyrics] Parsed ${_syncedLyrics?.length ?? 0} LRC lines.');
+        } else {
+          print(
+            '[Lyrics] No synced lyrics found, checking for plain lyrics...',
+          );
+          final lyricsMatch = RegExp(
+            r'"plainLyrics"\s*:\s*"([^"]*)"',
+          ).firstMatch(data);
+          if (lyricsMatch != null) {
+            final lyrics = lyricsMatch.group(1);
+            setState(() {
+              _lyrics = lyrics?.replaceAll(r'\n', '\n') ?? 'Lyrics not found.';
+              _lyricsLoading = false;
+            });
+            print('[Lyrics] Plain lyrics found.');
+          } else {
+            setState(() {
+              _lyricsError = 'Lyrics not found.';
+              _lyricsLoading = false;
+            });
+            print('[Lyrics] No lyrics found in response.');
+          }
+        }
+      } else if (response.statusCode == 404) {
+        setState(() {
+          _lyricsError = 'Lyrics not found.';
+          _lyricsLoading = false;
+        });
+        print('[Lyrics] API returned 404. Lyrics not found.');
+      } else {
+        setState(() {
+          _lyricsError = 'Error fetching lyrics.';
+          _lyricsLoading = false;
+        });
+        print('[Lyrics] API error. Status: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        _lyricsError = 'Error fetching lyrics.';
+        _lyricsLoading = false;
+      });
+      print('[Lyrics] Exception: $e');
+    }
+  }
+
+  List<_LrcLine> _parseLrc(String lrcRaw) {
+    final lines = lrcRaw.split('\n');
+    final lrcList = <_LrcLine>[];
+    final timeExp = RegExp(r'\[(\d+):(\d+)(?:\.(\d+))?\]');
+    for (final line in lines) {
+      final match = timeExp.firstMatch(line);
+      if (match != null) {
+        final min = int.parse(match.group(1)!);
+        final sec = int.parse(match.group(2)!);
+        final ms = match.group(3) != null
+            ? int.parse(match.group(3)!.padRight(3, '0'))
+            : 0;
+        final time = Duration(minutes: min, seconds: sec, milliseconds: ms);
+        final text = line.replaceAll(timeExp, '').trim();
+        lrcList.add(_LrcLine(time, text));
+      }
+    }
+    return lrcList;
+  }
+
+  void _updateLrcIndex(Duration position) {
+    if (_syncedLyrics == null || _syncedLyrics!.isEmpty) return;
+    int idx = 0;
+    for (int i = 0; i < _syncedLyrics!.length; i++) {
+      if (position >= _syncedLyrics![i].timestamp) {
+        idx = i;
+      } else {
+        break;
+      }
+    }
+    if (_currentLrcIndex != idx) {
+      print(
+        '[Lyrics] Updating current LRC index: $_currentLrcIndex -> $idx for position ${position.inMilliseconds}ms',
+      );
+      setState(() {
+        _currentLrcIndex = idx;
+      });
+    }
   }
 
   @override
@@ -226,11 +377,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     if (isLiked(songId)) {
       likedSongsBox.delete(songId);
     } else {
-      // Improved image extraction logic
       String imageUrl = '';
       final img = song['image'];
       if (img is List && img.isNotEmpty) {
-        // Prefer 500x500 image if available
         for (var item in img) {
           if (item is Map &&
               item['link'] != null &&
@@ -239,7 +388,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
             break;
           }
         }
-        // If not found, fallback to highest available resolution
         if (imageUrl.isEmpty) {
           for (var item in img.reversed) {
             if (item is Map &&
@@ -256,14 +404,12 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
             }
           }
         }
-        // Fallback to last item's link if none found
         if (imageUrl.isEmpty && img.last is Map && img.last['link'] != null) {
           imageUrl = img.last['link'];
         }
       } else if (img is String && img.isNotEmpty) {
         imageUrl = img;
       }
-      // Extract artist name from best available field
       String artistName = '';
       if (song['artists'] != null &&
           song['artists'] is Map &&
@@ -277,7 +423,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
           song['subtitle'].toString().isNotEmpty) {
         artistName = song['subtitle'];
       }
-      // Extract downloadUrl
       String downloadUrl = '';
       if (song['downloadUrl'] != null &&
           song['downloadUrl'] is List &&
@@ -305,9 +450,118 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     setState(() {});
   }
 
+  Widget _lyricsWidget(
+    BuildContext context,
+    CustomThemeProvider customTheme,
+    bool customColorsEnabled,
+    Color primaryColor,
+  ) {
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+    return StreamBuilder<Duration>(
+      stream: Stream.periodic(
+        Duration(milliseconds: 50),
+        (_) => audioPlayer.position,
+      ),
+      builder: (context, snapshot) {
+        final position = snapshot.data ?? Duration.zero;
+        int lrcIndex = 0;
+        if (_syncedLyrics != null && _syncedLyrics!.isNotEmpty) {
+          for (int i = 0; i < _syncedLyrics!.length; i++) {
+            if (position >= _syncedLyrics![i].timestamp) {
+              lrcIndex = i;
+            } else {
+              break;
+            }
+          }
+        }
+        if (_lyricsLoading) {
+          return CircularProgressIndicator(
+            color: customColorsEnabled ? primaryColor : Colors.white,
+          );
+        } else if (_lyricsError != null) {
+          return Text(
+            _lyricsError!,
+            style: TextStyle(color: Colors.white, fontSize: 16),
+            textAlign: TextAlign.center,
+          );
+        } else if (_syncedLyrics != null && _syncedLyrics!.isNotEmpty) {
+          // Lyrics auto-scroll and center highlight
+          final scrollController = ScrollController();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (scrollController.hasClients) {
+              scrollController.animateTo(
+                (lrcIndex * 40.0) - (MediaQuery.of(context).size.height * 0.20),
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+          });
+          return Expanded(
+            child: ListView.builder(
+              controller: scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: _syncedLyrics!.length,
+              itemBuilder: (context, idx) {
+                final line = _syncedLyrics![idx];
+                final isCurrent = idx == lrcIndex;
+                return Container(
+                  height: 40,
+                  alignment: Alignment.center,
+                  child: AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    style: TextStyle(
+                      color: isCurrent
+                          ? (customColorsEnabled
+                                ? primaryColor
+                                : Colors.amberAccent)
+                          : Colors.white,
+                      fontSize: isCurrent ? 20 : 16,
+                      fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    child: Text(line.text, textAlign: TextAlign.center),
+                  ),
+                );
+              },
+            ),
+          );
+        } else if (_lyrics != null) {
+          return Column(
+            children: [
+              Text(
+                'No synced lyrics available for this song.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    _lyrics!,
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
+          );
+        } else {
+          return Text(
+            'Lyrics will appear here.',
+            style: TextStyle(color: Colors.white, fontSize: 16),
+            textAlign: TextAlign.center,
+          );
+        }
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ---- Custom theme logic here ----
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
     final primaryColor = customColorsEnabled
@@ -315,9 +569,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
         : const Color(0xFFff7d78);
     final secondaryColor = customColorsEnabled
         ? customTheme.secondaryColor
-        : Colors.black; // Changed from purple to black
-    // Debug print to check secondaryColor value
-    print('[MusicPlayerPage] secondaryColor: ' + secondaryColor.toString());
+        : Colors.black;
 
     final double progress = widget.totalDuration.inSeconds > 0
         ? (widget.currentPosition.inSeconds / widget.totalDuration.inSeconds)
@@ -325,19 +577,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
         : 0.0;
     final double displayProgress = _isDragging ? _dragValue : progress;
 
-    final isPitchBlack = context
-        .watch<PitchBlackThemeProvider>()
-        .isPitchBlack; // <-- Read theme
+    final isPitchBlack = context.watch<PitchBlackThemeProvider>().isPitchBlack;
 
-    // Always sync _isLiked with the current song
     return Scaffold(
       backgroundColor: isPitchBlack
           ? Colors.black
           : customColorsEnabled
           ? customTheme.secondaryColor
-          : const Color(
-              0xFF0F0F23,
-            ), // Deep space color to match galaxy background
+          : const Color(0xFF0F0F23),
       body: GestureDetector(
         onVerticalDragUpdate: (details) {
           if (details.delta.dy < -10) {
@@ -346,7 +593,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
         },
         child: Stack(
           children: [
-            // Animated background with meteors
             _buildAnimatedBackground(isPitchBlack: isPitchBlack),
             SafeArea(
               child: Consumer<PlayerStateProvider>(
@@ -381,13 +627,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                     currentAlbumArtUrl = widget.albumArtUrl;
                   }
 
-                  // Sync _isLiked with the current song
                   final songId = song?['id'] ?? song?['title'];
                   final actuallyLiked = songId != null
                       ? isLiked(songId)
                       : false;
                   if (_isLiked != actuallyLiked) {
-                    // Only update if changed to avoid unnecessary rebuilds
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (mounted)
                         setState(() {
@@ -444,48 +688,86 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 32.0),
                         child: SizedBox(
-                          height:
-                              MediaQuery.of(context).size.height *
-                              0.40, // Restored to original size
-                          child: Center(
-                            child: AspectRatio(
-                              aspectRatio: 1,
-                              child: Hero(
-                                tag:
-                                    'album_art_${widget.songTitle}_${widget.artistName}',
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(32),
-                                  child: currentAlbumArtUrl.isNotEmpty
-                                      ? Image.network(
-                                          currentAlbumArtUrl,
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) {
-                                                return Container(
-                                                  color: Colors.grey[800],
-                                                  child: Icon(
-                                                    Icons.music_note,
-                                                    color: customColorsEnabled
-                                                        ? primaryColor
-                                                        : Colors.white,
-                                                    size: 80,
-                                                  ),
-                                                );
-                                              },
-                                        )
-                                      : Container(
-                                          color: Colors.grey[800],
-                                          child: Icon(
-                                            Icons.music_note,
-                                            color: customColorsEnabled
-                                                ? primaryColor
-                                                : Colors.white,
-                                            size: 80,
-                                          ),
-                                        ),
+                          height: MediaQuery.of(context).size.height * 0.40,
+                          child: PageView(
+                            controller: _pageController,
+                            children: [
+                              Center(
+                                child: AspectRatio(
+                                  aspectRatio: 1,
+                                  child: Hero(
+                                    tag:
+                                        'album_art_${widget.songTitle}_${widget.artistName}',
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(32),
+                                      child: currentAlbumArtUrl.isNotEmpty
+                                          ? Image.network(
+                                              currentAlbumArtUrl,
+                                              fit: BoxFit.cover,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                    return Container(
+                                                      color: Colors.grey[800],
+                                                      child: Icon(
+                                                        Icons.music_note,
+                                                        color:
+                                                            customColorsEnabled
+                                                            ? primaryColor
+                                                            : Colors.white,
+                                                        size: 80,
+                                                      ),
+                                                    );
+                                                  },
+                                            )
+                                          : Container(
+                                              color: Colors.grey[800],
+                                              child: Icon(
+                                                Icons.music_note,
+                                                color: customColorsEnabled
+                                                    ? primaryColor
+                                                    : Colors.white,
+                                                size: 80,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                              // Lyrics Page
+                              Container(
+                                alignment: Alignment.center,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.lyrics,
+                                      size: 48,
+                                      color: customColorsEnabled
+                                          ? primaryColor
+                                          : Colors.white,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'Lyrics',
+                                      style: TextStyle(
+                                        color: customColorsEnabled
+                                            ? primaryColor
+                                            : Colors.white,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _lyricsWidget(
+                                      context,
+                                      customTheme,
+                                      customColorsEnabled,
+                                      primaryColor,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -945,22 +1227,20 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xFF0F0F23), // Deep space blue
-                  Color(0xFF1A1A2E), // Dark navy
-                  Color(0xFF16213E), // Midnight blue
-                  Color(0xFF0F0F23), // Back to deep space
+                  Color(0xFF0F0F23),
+                  Color(0xFF1A1A2E),
+                  Color(0xFF16213E),
+                  Color(0xFF0F0F23),
                 ],
                 stops: [0.0, 0.3, 0.7, 1.0],
               ),
             ),
       child: Stack(
         children: [
-          // Add some static stars
           ...List.generate(
             50,
             (index) => _buildStaticStar(index, isPitchBlack: isPitchBlack),
           ),
-          // Add moving meteors/shooting stars
           ...List.generate(
             15,
             (index) => _buildMeteor(index, isPitchBlack: isPitchBlack),
@@ -974,12 +1254,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
 
-    // Different star colors for galaxy effect
     final List<Color> starColors = [
       Colors.white.withOpacity(0.8),
       Colors.blue.shade100.withOpacity(0.6),
       Colors.purple.shade100.withOpacity(0.5),
-      const Color(0xFFFFE5B4).withOpacity(0.7), // Warm white
+      const Color(0xFFFFE5B4).withOpacity(0.7),
     ];
 
     final starColor = customColorsEnabled
@@ -1014,11 +1293,10 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
 
-    // Galaxy shooting star colors
     final List<Color> meteorColors = [
-      const Color(0xFFFFE5B4), // Warm white
-      const Color(0xFFB8E6FF), // Light blue
-      const Color(0xFFE6B8FF), // Light purple
+      const Color(0xFFFFE5B4),
+      const Color(0xFFB8E6FF),
+      const Color(0xFFE6B8FF),
       Colors.white,
     ];
 
