@@ -7,7 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
-
+import 'dart:convert';
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
@@ -15,6 +15,15 @@ import '../models/liked_song.dart';
 import '../models/playlist_song.dart';
 import '../services/playlist_service.dart';
 import 'package:just_audio/just_audio.dart';
+
+// Decodes Unicode escapes in a string (e.g., \u0a38)
+String decodeUnicodeEscapes(String input) {
+  // Replace Unicode escapes with actual characters
+  return input.replaceAllMapped(
+    RegExp(r'\\u([0-9a-fA-F]{4})'),
+    (Match m) => String.fromCharCode(int.parse(m.group(1)!, radix: 16)),
+  );
+}
 
 // LRC line model
 class _LrcLine {
@@ -113,6 +122,15 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
         '';
     _isInPlaylist = PlaylistService.isInPlaylist(songId);
     _fetchLyrics();
+    _pageController.addListener(() {
+      if (_pageController.page?.round() == 1 && _syncedLyrics != null && _syncedLyrics!.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _scrollToCurrentLyric(_currentLrcIndex);
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -122,6 +140,16 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
         widget.artistName != oldWidget.artistName) {
       _fetchLyrics();
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_syncedLyrics != null && _syncedLyrics!.isNotEmpty) {
+        _updateLrcIndex(widget.currentPosition);
+      }
+    });
   }
 
   Future<void> _fetchLyrics() async {
@@ -141,21 +169,41 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     final url = Uri.parse(
       'https://lrclib.net/api/get?artist_name=${Uri.encodeComponent(artist)}&track_name=${Uri.encodeComponent(title)}',
     );
+    print(
+      '[Lyrics] API call URL: '
+      'https://lrclib.net/api/get?artist_name=${Uri.encodeComponent(artist)}&track_name=${Uri.encodeComponent(title)}',
+    );
     try {
       final response = await http.get(url);
       print('[Lyrics] Response status: ${response.statusCode}');
+      print('[Lyrics] Response body length: ${response.body.length}');
       print(
-        '[Lyrics] Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}',
+        '[Lyrics] Response body (first 500): ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}',
       );
       if (response.statusCode == 200) {
         final data = response.body;
-        final syncedMatch = RegExp(
-          r'"syncedLyrics"\s*:\s*"([^"]*)"',
-        ).firstMatch(data);
-        if (syncedMatch != null &&
-            syncedMatch.group(1) != null &&
-            syncedMatch.group(1)!.isNotEmpty) {
-          final lrcRaw = syncedMatch.group(1)!.replaceAll(r'\n', '\n');
+        Map<String, dynamic> json;
+        try {
+          json = jsonDecode(data);
+        } catch (e) {
+          setState(() {
+            _lyricsError = 'Error parsing lyrics response.';
+            _lyricsLoading = false;
+          });
+          print('[Lyrics] JSON decode error: $e');
+          return;
+        }
+        String? syncedLyrics = json['syncedLyrics'];
+        String? plainLyrics = json['plainLyrics'];
+        if (syncedLyrics != null && syncedLyrics.isNotEmpty) {
+          String lrcRaw = syncedLyrics.replaceAll(r'\n', '\n');
+          print('[Lyrics] Extracted syncedLyrics length: ${lrcRaw.length}');
+          print(
+            '[Lyrics] syncedLyrics (first 200): ${lrcRaw.substring(0, lrcRaw.length > 200 ? 200 : lrcRaw.length)}',
+          );
+          print(
+            '[Lyrics] syncedLyrics (last 200): ${lrcRaw.substring(lrcRaw.length > 200 ? lrcRaw.length - 200 : 0)}',
+          );
           print('[Lyrics] Synced lyrics found. Parsing LRC...');
           final parsedLyrics = _parseLrc(lrcRaw);
           setState(() {
@@ -167,27 +215,19 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
             }
           });
           print('[Lyrics] Parsed ${_syncedLyrics?.length ?? 0} LRC lines.');
+        } else if (plainLyrics != null && plainLyrics.isNotEmpty) {
+          String decodedLyrics = plainLyrics.replaceAll(r'\n', '\n');
+          setState(() {
+            _lyrics = decodedLyrics;
+            _lyricsLoading = false;
+          });
+          print('[Lyrics] Plain lyrics found.');
         } else {
-          print(
-            '[Lyrics] No synced lyrics found, checking for plain lyrics...',
-          );
-          final lyricsMatch = RegExp(
-            r'"plainLyrics"\s*:\s*"([^"]*)"',
-          ).firstMatch(data);
-          if (lyricsMatch != null) {
-            final lyrics = lyricsMatch.group(1);
-            setState(() {
-              _lyrics = lyrics?.replaceAll(r'\n', '\n') ?? 'Lyrics not found.';
-              _lyricsLoading = false;
-            });
-            print('[Lyrics] Plain lyrics found.');
-          } else {
-            setState(() {
-              _lyricsError = 'Lyrics not found.';
-              _lyricsLoading = false;
-            });
-            print('[Lyrics] No lyrics found in response.');
-          }
+          setState(() {
+            _lyricsError = 'Lyrics not found.';
+            _lyricsLoading = false;
+          });
+          print('[Lyrics] No lyrics found in response.');
         }
       } else if (response.statusCode == 404) {
         setState(() {
@@ -236,7 +276,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
 
   void _updateLrcIndex(Duration position) {
     if (_syncedLyrics == null || _syncedLyrics!.isEmpty) return;
-
     int newIndex = 0;
     for (int i = 0; i < _syncedLyrics!.length; i++) {
       if (position >= _syncedLyrics![i].timestamp) {
@@ -245,8 +284,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
         break;
       }
     }
-
-    // Only update and scroll if the index actually changed
     if (_currentLrcIndex != newIndex) {
       print(
         '[Lyrics] Updating current LRC index: $_currentLrcIndex -> $newIndex for position ${position.inMilliseconds}ms',
@@ -254,9 +291,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
       setState(() {
         _currentLrcIndex = newIndex;
       });
-
-      // Add a small delay to ensure the UI has updated before scrolling
-      Future.delayed(const Duration(milliseconds: 100), () {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _scrollToCurrentLyric(newIndex);
         }
@@ -265,75 +300,23 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
   }
 
   void _scrollToCurrentLyric(int index) {
-    if (_isAutoScrolling ||
-        !mounted ||
-        _syncedLyrics == null ||
-        _syncedLyrics!.isEmpty)
-      return;
-
+    if (_isAutoScrolling || !mounted) return;
     final key = _lyricsLineKeys[index];
     if (key?.currentContext != null) {
       _isAutoScrolling = true;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-
         try {
-          final RenderBox? renderBox =
-              key!.currentContext!.findRenderObject() as RenderBox?;
-          if (renderBox != null) {
-            final scrollPosition = _lyricsScrollController.position;
-            final viewportHeight = scrollPosition.viewportDimension;
-
-            // Get the current position of the lyric line relative to the scroll view
-            final RenderBox? scrollViewBox =
-                _lyricsKey.currentContext?.findRenderObject() as RenderBox?;
-            if (scrollViewBox != null) {
-              final lyricPosition = renderBox.localToGlobal(Offset.zero);
-              final scrollViewPosition = scrollViewBox.localToGlobal(
-                Offset.zero,
-              );
-              final relativePosition = lyricPosition.dy - scrollViewPosition.dy;
-
-              // Calculate center position for the viewport
-              final centerY = viewportHeight / 2;
-
-              // Only scroll if the current lyric is not already centered (with some tolerance)
-              final tolerance = 50.0; // pixels tolerance
-              if ((relativePosition - centerY).abs() > tolerance) {
-                // Calculate how much to scroll to center the current line
-                final scrollOffset =
-                    scrollPosition.pixels + (relativePosition - centerY);
-
-                _lyricsScrollController
-                    .animateTo(
-                      scrollOffset.clamp(
-                        scrollPosition.minScrollExtent,
-                        scrollPosition.maxScrollExtent,
-                      ),
-                      duration: const Duration(
-                        milliseconds: 600,
-                      ), // Smoother animation
-                      curve: Curves.easeInOutCubic, // Better easing curve
-                    )
-                    .then((_) {
-                      if (mounted) {
-                        _isAutoScrolling = false;
-                      }
-                    });
-              } else {
-                _isAutoScrolling = false;
-              }
-            } else {
-              _isAutoScrolling = false;
-            }
-          } else {
-            _isAutoScrolling = false;
-          }
+          await Scrollable.ensureVisible(
+            key!.currentContext!,
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeInOut,
+            alignment: 0.5, // Center the line
+          );
         } catch (e) {
-          print('[Lyrics] Error scrolling to lyric: $e');
-          _isAutoScrolling = false;
+          print('[Lyrics] Scrollable.ensureVisible error: $e');
         }
+        if (mounted) _isAutoScrolling = false;
       });
     }
   }
@@ -546,224 +529,237 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     bool customColorsEnabled,
     Color primaryColor,
   ) {
-    // Use widget.currentPosition directly instead of StreamBuilder
-    final position = widget.currentPosition;
-    int lrcIndex = 0;
+    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
 
-    if (_syncedLyrics != null && _syncedLyrics!.isNotEmpty) {
-      for (int i = 0; i < _syncedLyrics!.length; i++) {
-        if (position >= _syncedLyrics![i].timestamp) {
-          lrcIndex = i;
-        } else {
-          break;
-        }
-      }
+    // Tweak this value for lyric timing offset (in ms, negative means show earlier)
+    const int lyricsOffsetMs = 20;
 
-      // Update lyrics index if changed
-      if (_currentLrcIndex != lrcIndex) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(() {
-              _currentLrcIndex = lrcIndex;
-            });
-            _scrollToCurrentLyric(lrcIndex);
+    return StreamBuilder<Duration>(
+      stream: audioPlayer.positionStream,
+      builder: (context, snapshot) {
+        // Apply offset for better sync
+        final position =
+            (snapshot.data ?? Duration.zero) +
+            Duration(milliseconds: lyricsOffsetMs);
+
+        int lrcIndex = 0;
+        if (_syncedLyrics != null && _syncedLyrics!.isNotEmpty) {
+          // Robust index calculation (handles skips and seeks)
+          for (int i = 0; i < _syncedLyrics!.length; i++) {
+            if (position >= _syncedLyrics![i].timestamp) {
+              lrcIndex = i;
+            } else {
+              break;
+            }
           }
-        });
-      }
-    }
+          if (_currentLrcIndex != lrcIndex) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              setState(() {
+                _currentLrcIndex = lrcIndex;
+              });
+              _scrollToCurrentLyric(lrcIndex);
+            });
+          }
+        }
 
-    if (_lyricsLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(
-              color: customColorsEnabled ? primaryColor : Colors.white,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Loading lyrics...',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      );
-    } else if (_lyricsError != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.music_off,
-              color: Colors.white.withOpacity(0.5),
-              size: 48,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _lyricsError!,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 16,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      );
-    } else if (_syncedLyrics != null && _syncedLyrics!.isNotEmpty) {
-      return Expanded(
-        child: Scrollbar(
-          controller: _lyricsScrollController,
-          thumbVisibility: false,
-          child: ListView.builder(
-            key: _lyricsKey,
-            controller: _lyricsScrollController,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 100),
-            physics: const BouncingScrollPhysics(),
-            itemCount: _syncedLyrics!.length,
-            itemBuilder: (context, idx) {
-              final line = _syncedLyrics![idx];
-              final isCurrent = idx == lrcIndex;
-              final isPrevious = idx < lrcIndex;
-
-              return Container(
-                key: _lyricsLineKeys[idx],
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                child: AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 300),
+        if (_lyricsLoading) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  color: customColorsEnabled ? primaryColor : Colors.white,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Loading lyrics...',
                   style: TextStyle(
-                    color: isCurrent
-                        ? (customColorsEnabled ? primaryColor : Colors.white)
-                        : isPrevious
-                        ? Colors.white.withOpacity(0.4)
-                        : Colors.white.withOpacity(0.6),
-                    fontSize: isCurrent ? 22 : 18,
-                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
-                    height: 1.4,
-                  ),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isCurrent ? 8 : 0,
-                      vertical: isCurrent ? 8 : 4,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: isCurrent
-                          ? (customColorsEnabled
-                                ? primaryColor.withOpacity(0.1)
-                                : Colors.white.withOpacity(0.05))
-                          : Colors.transparent,
-                    ),
-                    child: Text(
-                      line.text,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        shadows: isCurrent
-                            ? [
-                                Shadow(
-                                  color:
-                                      (customColorsEnabled
-                                              ? primaryColor
-                                              : Colors.white)
-                                          .withOpacity(0.3),
-                                  blurRadius: 8,
-                                ),
-                              ]
-                            : null,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      );
-    } else if (_lyrics != null) {
-      return Expanded(
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.orange.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.orange, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'No synced lyrics available for this song',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                physics: const BouncingScrollPhysics(),
-                child: Text(
-                  _lyrics!,
-                  style: const TextStyle(
-                    color: Colors.white,
+                    color: Colors.white.withOpacity(0.7),
                     fontSize: 16,
-                    height: 1.6,
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else if (_lyricsError != null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.music_off,
+                  color: Colors.white.withOpacity(0.5),
+                  size: 48,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _lyricsError!,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 16,
                   ),
                   textAlign: TextAlign.center,
                 ),
+              ],
+            ),
+          );
+        } else if (_syncedLyrics != null && _syncedLyrics!.isNotEmpty) {
+          return Expanded(
+            child: Scrollbar(
+              controller: _lyricsScrollController,
+              thumbVisibility: false,
+              child: ListView.builder(
+                key: _lyricsKey,
+                controller: _lyricsScrollController,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 100,
+                ),
+                physics: const BouncingScrollPhysics(),
+                itemCount: _syncedLyrics!.length,
+                itemBuilder: (context, idx) {
+                  final line = _syncedLyrics![idx];
+                  final isCurrent = idx == _currentLrcIndex;
+                  return Container(
+                    key: _lyricsLineKeys[idx],
+                    margin: const EdgeInsets.symmetric(vertical: 12),
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 300),
+                      style: TextStyle(
+                        color: isCurrent
+                            ? (customColorsEnabled
+                                  ? primaryColor
+                                  : Colors.white)
+                            : Colors.white.withOpacity(0.6),
+                        fontSize: isCurrent ? 22 : 18,
+                        fontWeight: isCurrent
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                        height: 1.4,
+                      ),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isCurrent ? 8 : 0,
+                          vertical: isCurrent ? 8 : 4,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: isCurrent
+                              ? (customColorsEnabled
+                                    ? primaryColor.withOpacity(0.1)
+                                    : Colors.white.withOpacity(0.05))
+                              : Colors.transparent,
+                        ),
+                        child: Text(
+                          line.text,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            shadows: isCurrent
+                                ? [
+                                    Shadow(
+                                      color:
+                                          (customColorsEnabled
+                                                  ? primaryColor
+                                                  : Colors.white)
+                                              .withOpacity(0.3),
+                                      blurRadius: 8,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
-          ],
-        ),
-      );
-    } else {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.lyrics_outlined,
-              color: Colors.white.withOpacity(0.3),
-              size: 64,
+          );
+        } else if (_lyrics != null) {
+          return Expanded(
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.orange.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'No synced lyrics available for this song',
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    physics: const BouncingScrollPhysics(),
+                    child: Text(
+                      _lyrics!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        height: 1.6,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Lyrics will appear here',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-              ),
+          );
+        } else {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.lyrics_outlined,
+                  color: Colors.white.withOpacity(0.3),
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Lyrics will appear here',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Swipe to see album art',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.3),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Swipe to see album art',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.3),
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+          );
+        }
+      },
+    );
   }
 
   @override
