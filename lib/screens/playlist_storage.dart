@@ -7,6 +7,9 @@ import '../services/custom_theme_provider.dart';
 import '../widgets/animated_navbar.dart';
 import 'liked_songs_screen.dart';
 import 'my_playlist_screen.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import '../models/liked_song.dart';
+import '../models/playlist_song.dart';
 
 class LibraryScreen extends StatefulWidget {
   final Function(int)? onNavTap;
@@ -102,10 +105,12 @@ class _LibraryScreenState extends State<LibraryScreen>
     final customColorsEnabled = customTheme.customColorsEnabled;
     final primaryColor = customTheme.primaryColor;
     final secondaryColor = customTheme.secondaryColor;
+    final likedSongsCount = Hive.box<LikedSong>('likedSongs').length;
+    final playlistSongsCount = Hive.box<PlaylistSong>('playlistSongs').length;
     final libraryItems = [
       LibraryItemData(
         title: "Favorites",
-        subtitle: "247 songs",
+        subtitle: "$likedSongsCount songs",
         iconData: Icons.favorite,
         gradient: customColorsEnabled
             ? [primaryColor, primaryColor.withOpacity(0.7)]
@@ -120,7 +125,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       ),
       LibraryItemData(
         title: "My Playlists",
-        subtitle: "18 playlists",
+        subtitle: "$playlistSongsCount songs",
         iconData: Icons.queue_music,
         gradient: customColorsEnabled
             ? [primaryColor, primaryColor]
@@ -132,6 +137,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           );
         },
       ),
+      // ...existing code for other items...
       LibraryItemData(
         title: "Recently Played",
         subtitle: "89 tracks",
