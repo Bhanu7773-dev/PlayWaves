@@ -123,7 +123,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     _isInPlaylist = PlaylistService.isInPlaylist(songId);
     _fetchLyrics();
     _pageController.addListener(() {
-      if (_pageController.page?.round() == 1 && _syncedLyrics != null && _syncedLyrics!.isNotEmpty) {
+      if (_pageController.page?.round() == 1 &&
+          _syncedLyrics != null &&
+          _syncedLyrics!.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             _scrollToCurrentLyric(_currentLrcIndex);

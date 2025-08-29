@@ -11,6 +11,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/liked_song.dart';
 import '../models/playlist_song.dart';
 import 'downloaded_songs_screen.dart';
+import 'recently_played_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
   final Function(int)? onNavTap;
@@ -146,7 +147,14 @@ class _LibraryScreenState extends State<LibraryScreen>
         gradient: customColorsEnabled
             ? [primaryColor, primaryColor]
             : const [Color(0xFF9c27b0), Color(0xFFe91e63)],
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const RecentlyPlayedScreen(),
+            ),
+          );
+        },
       ),
       LibraryItemData(
         title: "Downloaded",
@@ -163,24 +171,6 @@ class _LibraryScreenState extends State<LibraryScreen>
             ),
           );
         },
-      ),
-      LibraryItemData(
-        title: "Albums",
-        subtitle: "12 albums",
-        iconData: Icons.album,
-        gradient: customColorsEnabled
-            ? [primaryColor.withOpacity(0.9), primaryColor.withOpacity(0.6)]
-            : const [Color(0xFF43e97b), Color(0xFF38f9d7)],
-        onTap: () {},
-      ),
-      LibraryItemData(
-        title: "Artists",
-        subtitle: "34 artists",
-        iconData: Icons.person,
-        gradient: customColorsEnabled
-            ? [primaryColor, primaryColor]
-            : const [Color(0xFFfa709a), Color(0xFFfee140)],
-        onTap: () {},
       ),
     ];
 

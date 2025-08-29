@@ -8,7 +8,6 @@ import '../services/jiosaavn_api_service.dart';
 import '../widgets/animated_navbar.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/music_loader.dart';
-import '../screens/music_player.dart';
 import '../screens/search_page.dart';
 import '../screens/playlist_storage.dart'; // Make sure this import is correct!
 import '../services/player_state_provider.dart';
@@ -21,6 +20,8 @@ import '../widgets/random_songs_section.dart';
 import '../widgets/album_section.dart';
 import '../services/pitch_black_theme_provider.dart'; // <-- Import pitch black provider
 import '../services/custom_theme_provider.dart';
+import '../screens/music_player.dart';
+
 
 // Helper function: pick N random (non-repeating) songs from a list, skipping recently shown
 Future<Set<String>> loadShownIdsFromStorage() async {
@@ -606,7 +607,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
           if (playerState.currentSong != null && !_isMusicPlayerPageOpen)
             Positioned(
-              bottom: 70,
+              bottom: 90, // Reduced for a lower position, but still above nav bar
               left: 16,
               right: 16,
               child: MiniPlayer(
