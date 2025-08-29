@@ -10,6 +10,7 @@ import 'my_playlist_screen.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/liked_song.dart';
 import '../models/playlist_song.dart';
+import 'downloaded_songs_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
   final Function(int)? onNavTap;
@@ -154,7 +155,14 @@ class _LibraryScreenState extends State<LibraryScreen>
         gradient: customColorsEnabled
             ? [primaryColor, primaryColor]
             : const [Color(0xFF4facfe), Color(0xFF00f2fe)],
-        onTap: () {},
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const DownloadedSongsScreen(),
+            ),
+          );
+        },
       ),
       LibraryItemData(
         title: "Albums",
