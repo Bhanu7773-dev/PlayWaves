@@ -56,6 +56,13 @@ class PlayerStateProvider extends ChangeNotifier {
 
   void setAudioQuality(String quality) {
     _audioQuality = quality;
+    
+    // Update current song URL if a song is playing and quality changed
+    if (_currentSong != null) {
+      print('🔄 Audio quality changed to: $quality, updating current song URL');
+      // This will trigger UI updates that use getCurrentPlayableUrl()
+    }
+    
     notifyListeners();
   }
 
@@ -72,5 +79,121 @@ class PlayerStateProvider extends ChangeNotifier {
     _currentSongIndex = 0;
     _currentContext = null; // reset context
     notifyListeners();
+  }
+
+  // Quality normalization method - converts display quality to API quality string
+  String _normalizeQuality(String quality) {
+    final q = quality.trim().toLowerCase();
+    if (q.contains('320')) return '320kbps';
+    if (q.contains('160')) return '160kbps';
+    if (q.contains('96')) return '96kbps';
+    if (q.contains('48')) return '48kbps';
+    if (q.contains('12')) return '12kbps';
+    
+    // Handle exact matches from UI
+    switch (q) {
+      case "low (12 kbps)":
+        return "12kbps";
+      case "low (48 kbps)":
+        return "48kbps";
+      case "low (96 kbps)":
+        return "96kbps";
+      case "high (160 kbps)":
+        return "160kbps";
+      case "super (320 kbps)":
+      case "high (320 kbps)":
+        return "320kbps";
+      default:
+        return '320kbps'; // Default fallback
+    }
+  }
+
+  // Transform URL quality suffix (e.g., song_12.mp4 → song_320.mp4)
+  String _transformUrlQuality(String url, String targetQuality) {
+    final qualityNumber = targetQuality.replaceAll('kbps', '');
+    // Transform common patterns
+    final patterns = [
+      RegExp(r'_(\d+)\.mp4$'),
+      RegExp(r'_(\d+)\.m4a$'),
+      RegExp(r'_(\d+)\.aac$'),
+    ];
+    
+    for (final pattern in patterns) {
+      if (pattern.hasMatch(url)) {
+        return url.replaceFirstMapped(pattern, (match) => '_$qualityNumber.${match.group(0)!.split('.').last}');
+      }
+    }
+    return url;
+  }
+
+  // Get playable URL for current song using user's audio quality preference
+  String? getCurrentPlayableUrl() {
+    return getPlayableUrlForSong(_currentSong);
+  }
+
+  // Get playable URL for any song using user's audio quality preference
+  String? getPlayableUrlForSong(Map<String, dynamic>? song) {
+    if (song == null) return null;
+
+    final preferredQuality = _normalizeQuality(_audioQuality ?? '320kbps');
+    print('🎵 Playing with quality preference: $preferredQuality');
+    
+    // First try to find URL from downloadUrl array with matching quality
+    final downloadUrl = song['downloadUrl'];
+    if (downloadUrl is List && downloadUrl.isNotEmpty) {
+      // Look for exact quality match first
+      for (var item in downloadUrl) {
+        if (item is Map) {
+          final quality = (item['quality'] ?? '').toString().toLowerCase();
+          if (quality == preferredQuality.toLowerCase() || 
+              quality.contains(preferredQuality.replaceAll('kbps', ''))) {
+            final url = item['url'] ?? item['link'];
+            if (url != null && url.toString().isNotEmpty) {
+              print('🎵 Found matching quality URL: $url');
+              return url.toString();
+            }
+          }
+        }
+      }
+      
+      // Fallback: try to transform the last URL to target quality
+      final lastItem = downloadUrl.last;
+      if (lastItem is Map && lastItem['url'] != null) {
+        final originalUrl = lastItem['url'].toString();
+        final transformedUrl = _transformUrlQuality(originalUrl, preferredQuality);
+        if (transformedUrl != originalUrl) {
+          print('🎵 Transformed URL quality: $originalUrl → $transformedUrl');
+          return transformedUrl;
+        }
+        print('⚠️ Using original URL: $originalUrl');
+        return originalUrl;
+      } else if (lastItem is String) {
+        final transformedUrl = _transformUrlQuality(lastItem, preferredQuality);
+        if (transformedUrl != lastItem) {
+          print('🎵 Transformed URL quality: $lastItem → $transformedUrl');
+          return transformedUrl;
+        }
+        print('⚠️ Using direct string URL: $lastItem');
+        return lastItem;
+      }
+    }
+    
+    // Fallback to other URL fields
+    final fallbackUrl = song['media_preview_url'] ?? 
+                       song['media_url'] ?? 
+                       song['preview_url'] ?? 
+                       song['stream_url'];
+    
+    if (fallbackUrl != null) {
+      final transformedUrl = _transformUrlQuality(fallbackUrl.toString(), preferredQuality);
+      if (transformedUrl != fallbackUrl.toString()) {
+        print('🎵 Transformed fallback URL: $fallbackUrl → $transformedUrl');
+        return transformedUrl;
+      }
+      print('⚠️ Using fallback URL: $fallbackUrl');
+      return fallbackUrl.toString();
+    }
+    
+    return null;
   }
 }

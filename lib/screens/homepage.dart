@@ -1528,21 +1528,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
         if (songData != null) {
           playerState.setSong(Map<String, dynamic>.from(songData));
-          if (songData['downloadUrl'] != null &&
-              songData['downloadUrl'] is List) {
-            final downloadUrls = songData['downloadUrl'] as List;
-            if (downloadUrls.isNotEmpty) {
-              final urlData = downloadUrls.last;
-              downloadUrl = urlData['url'] ?? urlData['link'];
-            }
-          }
-          if (downloadUrl == null) {
-            downloadUrl =
-                songData['media_preview_url'] ??
-                songData['media_url'] ??
-                songData['preview_url'] ??
-                songData['stream_url'];
-          }
+          
+          // Use PlayerStateProvider's quality-aware URL selection
+          downloadUrl = playerState.getPlayableUrlForSong(songData);
         }
 
         if (downloadUrl != null && downloadUrl.isNotEmpty) {
@@ -1642,21 +1630,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
             if (songData != null) {
               playerState.setSong(Map<String, dynamic>.from(songData));
-              if (songData['downloadUrl'] != null &&
-                  songData['downloadUrl'] is List) {
-                final downloadUrls = songData['downloadUrl'] as List;
-                if (downloadUrls.isNotEmpty) {
-                  final urlData = downloadUrls.last;
-                  downloadUrl = urlData['url'] ?? urlData['link'];
-                }
-              }
-              if (downloadUrl == null) {
-                downloadUrl =
-                    songData['media_preview_url'] ??
-                    songData['media_url'] ??
-                    songData['preview_url'] ??
-                    songData['stream_url'];
-              }
+              
+              // Use PlayerStateProvider's quality-aware URL selection
+              downloadUrl = playerState.getPlayableUrlForSong(songData);
             }
 
             if (downloadUrl != null && downloadUrl.isNotEmpty) {

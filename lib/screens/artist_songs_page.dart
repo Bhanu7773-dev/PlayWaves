@@ -159,22 +159,8 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
       // Build the playlist
       final playlist = ConcatenatingAudioSource(
         children: _songs.map((songData) {
-          String? downloadUrl;
-          if (songData['downloadUrl'] != null &&
-              songData['downloadUrl'] is List) {
-            final downloadUrls = songData['downloadUrl'] as List;
-            if (downloadUrls.isNotEmpty) {
-              final urlData = downloadUrls.last;
-              downloadUrl = urlData['url'] ?? urlData['link'];
-            }
-          }
-          if (downloadUrl == null) {
-            downloadUrl =
-                songData['media_preview_url'] ??
-                songData['media_url'] ??
-                songData['preview_url'] ??
-                songData['stream_url'];
-          }
+          // Use PlayerStateProvider's quality-aware URL selection
+          final downloadUrl = playerState.getPlayableUrlForSong(songData) ?? '';
           final title = songData['title'] ?? songData['name'] ?? 'Unknown Song';
           final album = songData['album']?['name'] ?? 'Unknown Album';
           final artist =
