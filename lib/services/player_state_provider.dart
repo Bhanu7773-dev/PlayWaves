@@ -56,6 +56,13 @@ class PlayerStateProvider extends ChangeNotifier {
 
   void setAudioQuality(String quality) {
     _audioQuality = quality;
+    
+    // Update current song URL if a song is playing and quality changed
+    if (_currentSong != null) {
+      print('🔄 Audio quality changed to: $quality, updating current song URL');
+      // This will trigger UI updates that use getCurrentPlayableUrl()
+    }
+    
     notifyListeners();
   }
 
@@ -82,7 +89,23 @@ class PlayerStateProvider extends ChangeNotifier {
     if (q.contains('96')) return '96kbps';
     if (q.contains('48')) return '48kbps';
     if (q.contains('12')) return '12kbps';
-    return '320kbps'; // Default fallback
+    
+    // Handle exact matches from UI
+    switch (q) {
+      case "low (12 kbps)":
+        return "12kbps";
+      case "low (48 kbps)":
+        return "48kbps";
+      case "low (96 kbps)":
+        return "96kbps";
+      case "high (160 kbps)":
+        return "160kbps";
+      case "super (320 kbps)":
+      case "high (320 kbps)":
+        return "320kbps";
+      default:
+        return '320kbps'; // Default fallback
+    }
   }
 
   // Transform URL quality suffix (e.g., song_12.mp4 → song_320.mp4)
