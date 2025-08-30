@@ -1,15 +1,16 @@
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
 import '../widgets/animated_navbar.dart';
-import 'liked_songs_screen.dart';
-import 'my_playlist_screen.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import '../models/liked_song.dart';
 import '../models/playlist_song.dart';
+import 'liked_songs_screen.dart';
+import 'my_playlist_screen.dart';
 import 'downloaded_songs_screen.dart';
 import 'recently_played_screen.dart';
 
@@ -37,6 +38,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   void initState() {
     super.initState();
+    Hive.openBox<PlaylistSong>('recentlyPlayed');
     try {
       _initializeAnimations();
       _startAnimations();

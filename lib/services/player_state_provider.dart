@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 class PlayerStateProvider extends ChangeNotifier {
   Map<String, dynamic>? _currentSong;
   List<Map<String, dynamic>> _currentPlaylist = [];
+  // Recently played songs (max 15)
+  final List<Map<String, dynamic>> _recentlyPlayed = [];
   int _currentSongIndex = 0;
   bool _isPlaying = false;
   bool _isSongLoading = false;
@@ -29,7 +31,70 @@ class PlayerStateProvider extends ChangeNotifier {
   String? get audioQuality => _audioQuality;
   String? get downloadQuality => _downloadQuality;
 
+  List<Map<String, dynamic>> get recentlyPlayed =>
+      List.unmodifiable(_recentlyPlayed);
+
   void setSong(Map<String, dynamic>? song) {
+    // Debug print: show all downloadUrl qualities for each song in recently played
+    if (_recentlyPlayed.isNotEmpty) {
+      for (var s in _recentlyPlayed) {
+        var urlField = s['downloadUrl'];
+        if (urlField is List) {
+          debugPrint(
+            'Song: ${s['name'] ?? s['title'] ?? s['id']} has ${urlField.length} download URLs:',
+          );
+          for (int i = 0; i < urlField.length; i++) {
+            var item = urlField[i];
+            if (item is Map && item.containsKey('quality')) {
+              debugPrint(
+                '  [${i}] quality: ${item['quality']}, url: ${item['url']}',
+              );
+            } else if (item is String) {
+              debugPrint('  [${i}] url: $item');
+            }
+          }
+        } else if (urlField is String) {
+          debugPrint(
+            'Song: ${s['name'] ?? s['title'] ?? s['id']} has single downloadUrl: $urlField',
+          );
+        }
+      }
+    }
+    // Add to recently played and debug print
+    if (song != null) {
+      // Store all available quality download URLs from API
+      dynamic urlField = song['downloadUrl'];
+      List<Map<String, dynamic>> allQualities = [];
+      if (urlField is List && urlField.isNotEmpty) {
+        for (var item in urlField) {
+          if (item is Map && item['quality'] != null && item['url'] != null) {
+            allQualities.add({'quality': item['quality'], 'url': item['url']});
+          }
+        }
+      } else if (urlField is String && urlField.isNotEmpty) {
+        allQualities.add({'quality': 'unknown', 'url': urlField});
+      }
+      song['allDownloadUrls'] = allQualities;
+      // Add to recently played (max 15)
+      if (song['id'] != null) {
+        _recentlyPlayed.removeWhere((s) => s['id'] == song['id']);
+        _recentlyPlayed.insert(0, song);
+        while (_recentlyPlayed.length > 15) {
+          _recentlyPlayed.removeLast();
+        }
+      }
+      Future.delayed(Duration(milliseconds: 100), () {
+        debugPrint('Recently played songs: ${_recentlyPlayed.length}');
+        for (var s in _recentlyPlayed) {
+          debugPrint('Song: ${s['name'] ?? s['title'] ?? s['id']} qualities:');
+          if (s['allDownloadUrls'] is List) {
+            for (var q in s['allDownloadUrls']) {
+              debugPrint('  quality: ${q['quality']}, url: ${q['url']}');
+            }
+          }
+        }
+      });
+    }
     _currentSong = song;
     notifyListeners();
   }
