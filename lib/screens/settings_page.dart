@@ -675,7 +675,10 @@ class _SettingsPageState extends State<SettingsPage>
     required ValueChanged<String> onChanged,
   }) {
     final isPitchBlack =
-        context.watch<PitchBlackThemeProvider>().isPitchBlack ||
+        Provider.of<PitchBlackThemeProvider>(
+          context,
+          listen: false,
+        ).isPitchBlack ||
         pitchBlackEnabled;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -745,7 +748,10 @@ class _SettingsPageState extends State<SettingsPage>
     ValueChanged<String> onChanged,
   ) {
     final isPitchBlack =
-        context.watch<PitchBlackThemeProvider>().isPitchBlack ||
+        Provider.of<PitchBlackThemeProvider>(
+          context,
+          listen: false,
+        ).isPitchBlack ||
         pitchBlackEnabled;
     showDialog(
       context: context,

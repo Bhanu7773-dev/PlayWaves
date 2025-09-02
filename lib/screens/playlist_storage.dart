@@ -3,14 +3,13 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
 import '../widgets/animated_navbar.dart';
 import '../models/liked_song.dart';
 import '../models/playlist_song.dart';
-import 'liked_songs_screen.dart' as liked;
-import 'my_playlist_screen.dart' hide LikedSongsScreen;
+import 'liked_songs_screen.dart';
+import 'my_playlist_screen.dart';
 import 'downloaded_songs_screen.dart';
 import 'recently_played_screen.dart';
 
@@ -35,16 +34,19 @@ class _LibraryScreenState extends State<LibraryScreen>
   late Animation<double> _floatAnimation;
   late Animation<double> _rippleAnimation;
 
+  late FocusNode _searchFocusNode;
+  final TextEditingController _searchControllerText = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     Hive.openBox<PlaylistSong>('recentlyPlayed');
-    try {
-      _initializeAnimations();
-      _startAnimations();
-    } catch (e) {
-      debugPrint('Animation initialization error: $e');
-    }
+    _searchFocusNode = FocusNode();
+    _searchFocusNode.addListener(() {
+      setState(() {}); // Rebuild when focus changes to show/hide close button
+    });
+    _initializeAnimations();
+    _startAnimations();
   }
 
   void _initializeAnimations() {
@@ -89,6 +91,8 @@ class _LibraryScreenState extends State<LibraryScreen>
     _masterController.dispose();
     _floatController.dispose();
     _rippleController.dispose();
+    _searchControllerText.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -111,6 +115,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     final secondaryColor = customTheme.secondaryColor;
     final likedSongsCount = Hive.box<LikedSong>('likedSongs').length;
     final playlistSongsCount = Hive.box<PlaylistSong>('playlistSongs').length;
+
     final libraryItems = [
       LibraryItemData(
         title: "Favorites",
@@ -118,14 +123,12 @@ class _LibraryScreenState extends State<LibraryScreen>
         iconData: Icons.favorite,
         gradient: customColorsEnabled
             ? [primaryColor, primaryColor.withOpacity(0.7)]
-            : const [Color(0xFFff7d78), Color(0xFFf54ea2)],
+            : const [Color(0xFF6366f1), Color(0xFF8b5cf6)],
         isActive: true,
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => const liked.LikedSongsScreen(),
-            ),
+            MaterialPageRoute(builder: (context) => const LikedSongsScreen()),
           );
         },
       ),
@@ -134,8 +137,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         subtitle: "$playlistSongsCount songs",
         iconData: Icons.queue_music,
         gradient: customColorsEnabled
-            ? [primaryColor, primaryColor]
-            : const [Color(0xFF667eea), Color(0xFF764ba2)],
+            ? [primaryColor, primaryColor.withOpacity(0.7)]
+            : const [Color(0xFF6366f1), Color(0xFF8b5cf6)],
         onTap: () {
           Navigator.push(
             context,
@@ -143,14 +146,13 @@ class _LibraryScreenState extends State<LibraryScreen>
           );
         },
       ),
-      // ...existing code for other items...
       LibraryItemData(
         title: "Recently Played",
         subtitle: "89 tracks",
         iconData: Icons.history,
         gradient: customColorsEnabled
-            ? [primaryColor, primaryColor]
-            : const [Color(0xFF9c27b0), Color(0xFFe91e63)],
+            ? [primaryColor, primaryColor.withOpacity(0.7)]
+            : const [Color(0xFF6366f1), Color(0xFF8b5cf6)],
         onTap: () {
           Navigator.push(
             context,
@@ -165,8 +167,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         subtitle: "32 songs",
         iconData: Icons.download_done,
         gradient: customColorsEnabled
-            ? [primaryColor, primaryColor]
-            : const [Color(0xFF4facfe), Color(0xFF00f2fe)],
+            ? [primaryColor, primaryColor.withOpacity(0.7)]
+            : const [Color(0xFF6366f1), Color(0xFF8b5cf6)],
         onTap: () {
           Navigator.push(
             context,
@@ -184,51 +186,55 @@ class _LibraryScreenState extends State<LibraryScreen>
           : customColorsEnabled
           ? secondaryColor
           : Colors.black,
-      body: Stack(
-        children: [
-          _buildStardustBackground(isPitchBlack: isPitchBlack),
-          SafeArea(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: CustomScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  slivers: [
-                    SliverToBoxAdapter(child: _buildHeader()),
-                    SliverToBoxAdapter(child: _buildSearchBar()),
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) =>
-                              _buildLibraryItem(libraryItems[index], index),
-                          childCount: libraryItems.length,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            _buildStardustBackground(isPitchBlack: isPitchBlack),
+            SafeArea(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: CustomScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    slivers: [
+                      SliverToBoxAdapter(child: _buildHeader()),
+                      SliverToBoxAdapter(child: _buildSearchBar()),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) =>
+                                _buildLibraryItem(libraryItems[index], index),
+                            childCount: libraryItems.length,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: AnimatedNavBar(
-              selectedIndex: widget.selectedNavIndex,
-              onNavTap: _onNavTap,
-              navIcons: const [
-                Icons.home,
-                Icons.search,
-                Icons.playlist_play,
-                Icons.person_outline,
-              ],
-              navLabels: const ['Home', 'Search', 'Playlist', 'Profile'],
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: AnimatedNavBar(
+                selectedIndex: widget.selectedNavIndex,
+                onNavTap: _onNavTap,
+                navIcons: const [
+                  Icons.home,
+                  Icons.search,
+                  Icons.playlist_play,
+                  Icons.person_outline,
+                ],
+                navLabels: const ['Home', 'Search', 'Playlist', 'Profile'],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -272,7 +278,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               ...List.generate(12, (index) {
                 final Color meteorColor = customColorsEnabled
                     ? primaryColor
-                    : const Color(0xFFff7d78);
+                    : const Color(0xFF6366f1);
 
                 return _buildFloatingMeteor(index, meteorColor, isPitchBlack);
               }),
@@ -379,34 +385,18 @@ class _LibraryScreenState extends State<LibraryScreen>
             ),
           ),
           const SizedBox(height: 4),
-          customColorsEnabled
-              ? Text(
-                  'Music Collection',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: primaryColor,
-                    letterSpacing: -0.5,
-                    height: 1.1,
-                  ),
-                )
-              : ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ).createShader(bounds),
-                  child: const Text(
-                    'Music Collection',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                      height: 1.1,
-                    ),
-                  ),
-                ),
+          Text(
+            'Music Collection',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: customColorsEnabled
+                  ? primaryColor
+                  : const Color(0xFF6366f1),
+              letterSpacing: -0.5,
+              height: 1.1,
+            ),
+          ),
         ],
       ),
     );
@@ -440,21 +430,18 @@ class _LibraryScreenState extends State<LibraryScreen>
             child: Row(
               children: [
                 const SizedBox(width: 20),
-                customColorsEnabled
-                    ? Icon(Icons.search_rounded, color: primaryColor, size: 24)
-                    : ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                        ).createShader(bounds),
-                        child: const Icon(
-                          Icons.search_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
+                Icon(
+                  Icons.search_rounded,
+                  color: customColorsEnabled
+                      ? primaryColor
+                      : const Color(0xFF6366f1),
+                  size: 24,
+                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: TextField(
+                    controller: _searchControllerText,
+                    focusNode: _searchFocusNode,
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                     decoration: InputDecoration(
                       hintText: "Search your music...",
@@ -464,8 +451,23 @@ class _LibraryScreenState extends State<LibraryScreen>
                       ),
                       border: InputBorder.none,
                     ),
+                    onEditingComplete: () {
+                      FocusScope.of(context).unfocus();
+                    },
                   ),
                 ),
+                if (_searchFocusNode.hasFocus)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      _searchControllerText.clear();
+                      _searchFocusNode.unfocus();
+                    },
+                  ),
               ],
             ),
           ),
@@ -555,7 +557,9 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: widget.item.onTap,
+      onTap: () {
+        widget.item.onTap();
+      },
       onTapDown: (_) => _hoverController.forward(),
       onTapUp: (_) => _hoverController.reverse(),
       onTapCancel: () => _hoverController.reverse(),

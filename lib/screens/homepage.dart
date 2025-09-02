@@ -22,7 +22,6 @@ import '../services/pitch_black_theme_provider.dart'; // <-- Import pitch black 
 import '../services/custom_theme_provider.dart';
 import '../screens/music_player.dart';
 
-
 // Helper function: pick N random (non-repeating) songs from a list, skipping recently shown
 Future<Set<String>> loadShownIdsFromStorage() async {
   // TODO: Implement persistent storage (SharedPreferences/Hive etc.)
@@ -607,7 +606,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           ),
           if (playerState.currentSong != null && !_isMusicPlayerPageOpen)
             Positioned(
-              bottom: 90, // Reduced for a lower position, but still above nav bar
+              bottom:
+                  90, // Reduced for a lower position, but still above nav bar
               left: 16,
               right: 16,
               child: MiniPlayer(

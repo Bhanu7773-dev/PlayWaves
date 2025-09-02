@@ -5,6 +5,7 @@ class PlayerStateProvider extends ChangeNotifier {
     _recentlyPlayed.clear();
     notifyListeners();
   }
+
   Map<String, dynamic>? _currentSong;
   List<Map<String, dynamic>> _currentPlaylist = [];
   // Recently played songs (max 15)

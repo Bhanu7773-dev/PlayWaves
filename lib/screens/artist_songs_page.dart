@@ -5,8 +5,8 @@ import '../services/jiosaavn_api_service.dart';
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
-import 'music_player.dart';
 import 'package:audio_service/audio_service.dart';
+import '../screens/music_player.dart';
 
 class ArtistSongsPage extends StatefulWidget {
   final String artistName;
