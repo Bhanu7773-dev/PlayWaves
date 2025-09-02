@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
@@ -16,7 +17,7 @@ class RecentlyPlayedScreen extends StatefulWidget {
 }
 
 class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   late AnimationController _waveController;
@@ -24,6 +25,12 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
   late Animation<double> _waveAnimation;
   late Animation<double> _pulseAnimation;
   bool _isDisposed = false;
+
+  late AudioPlayer _audioPlayer;
+  StreamSubscription<bool>? _playingSub;
+  StreamSubscription<int?>? _currentIndexSub;
+  StreamSubscription<ProcessingState>? _processingStateSub;
+  StreamSubscription<PlayerState>? _playerStateSub;
 
   @override
   void initState() {
@@ -52,6 +59,38 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     _fadeController.forward();
     _waveController.repeat(reverse: true);
     _pulseController.repeat(reverse: true);
+
+    // Listen to AudioPlayer state changes to update UI automatically
+    WidgetsBinding.instance.addObserver(this);
+    _audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
+    final playerState = Provider.of<PlayerStateProvider>(
+      context,
+      listen: false,
+    );
+    // Only use playerStateStream for play/pause updates
+    _currentIndexSub = _audioPlayer.currentIndexStream.listen((index) {
+      final recentlyPlayed = playerState.recentlyPlayed;
+      if (playerState.currentContext == "recentlyPlayed" &&
+          index != null &&
+          index >= 0 &&
+          index < recentlyPlayed.length) {
+        playerState.setSongIndex(index);
+        playerState.setSong(recentlyPlayed[index]);
+        if (mounted && !_isDisposed) setState(() {});
+      }
+    });
+    // Listen to processingState changes (stop, completed, etc.)
+    _processingStateSub = _audioPlayer.processingStateStream.listen((state) {
+      if (state == ProcessingState.completed || state == ProcessingState.idle) {
+        playerState.setPlaying(false);
+        if (mounted && !_isDisposed) setState(() {});
+      }
+    });
+    // Listen to playerState changes (play, pause, next, previous)
+    _playerStateSub = _audioPlayer.playerStateStream.listen((playerStateValue) {
+      playerState.setPlaying(playerStateValue.playing);
+      if (mounted && !_isDisposed) setState(() {});
+    });
   }
 
   @override
@@ -60,12 +99,32 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     _fadeController.dispose();
     _waveController.dispose();
     _pulseController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _playingSub?.cancel();
+    _currentIndexSub?.cancel();
+    _processingStateSub?.cancel();
+    _playerStateSub?.cancel();
     super.dispose();
+    void _syncPlayerState() {
+      final playerState = Provider.of<PlayerStateProvider>(
+        context,
+        listen: false,
+      );
+      playerState.setPlaying(_audioPlayer.playing);
+      if (mounted && !_isDisposed) setState(() {});
+    }
+
+    @override
+    void didChangeAppLifecycleState(AppLifecycleState state) {
+      super.didChangeAppLifecycleState(state);
+      if (state == AppLifecycleState.resumed) {
+        _syncPlayerState();
+      }
+    }
   }
 
   String _extractPlayableUrl(Map<String, dynamic> song) {
     var urlField = song['downloadUrl'];
-    // Always choose the highest quality (e.g., '320kbps') if available
     if (urlField is List && urlField.isNotEmpty) {
       for (var item in urlField) {
         if (item is Map &&
@@ -75,7 +134,6 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
           return item['url'];
         }
       }
-      // Fallback: first valid url in list
       for (var item in urlField) {
         if (item is Map && item['url'] is String && item['url'].isNotEmpty) {
           return item['url'];
@@ -129,9 +187,9 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
   }
 
   Future<void> _playRecentlyPlayedSong(
-    Map<String, dynamic> song,
-    int index,
-    List<Map<String, dynamic>> songList,
+  Map<String, dynamic> song,
+  int index,
+  List<Map<String, dynamic>> songs,
   ) async {
     final playerState = Provider.of<PlayerStateProvider>(
       context,
@@ -140,7 +198,31 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     try {
       playerState.setSongLoading(true);
-      final sources = songList
+      debugPrint('Tapped index: ' + index.toString());
+      debugPrint('Tapped song id: ' + (song['id']?.toString() ?? 'null'));
+      debugPrint('Playlist order:');
+      for (int i = 0; i < songs.length; i++) {
+        debugPrint('  [$i] id: ' + (songs[i]['id']?.toString() ?? 'null'));
+      }
+
+      // Use displayed songs list for playlist and index
+      final playlistCopy = songs.map((s) {
+        final songCopy = Map<String, dynamic>.from(s);
+        songCopy['downloadUrl'] = _extractPlayableUrl(songCopy);
+        return songCopy;
+      }).toList();
+
+      playerState.setPlaylist(playlistCopy);
+      playerState.setSongIndex(index);
+
+      // Copy full song, preserve all keys and add downloadUrl
+      final songCopy = Map<String, dynamic>.from(song);
+      songCopy['downloadUrl'] = _extractPlayableUrl(songCopy);
+      playerState.setSong(songCopy);
+
+      playerState.setCurrentContext("recentlyPlayed");
+
+      final sources = playlistCopy
           .map(
             (s) => AudioSource.uri(
               Uri.parse(_extractPlayableUrl(s)),
@@ -156,35 +238,13 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
             ),
           )
           .where((source) {
-            final uri = (source as UriAudioSource).uri;
+            final uri = source.uri;
             return uri.toString().isNotEmpty;
           })
           .toList();
-      playerState.setPlaylist(
-        songList
-            .map(
-              (s) => {
-                'id': s['id'],
-                'name': s['name'] ?? s['title'] ?? '',
-                'primaryArtists':
-                    s['primaryArtists'] ?? s['artist'] ?? s['subtitle'] ?? '',
-                'image': s['image'],
-                'downloadUrl': _extractPlayableUrl(s),
-              },
-            )
-            .toList(),
-      );
-      playerState.setSongIndex(index);
-      playerState.setSong({
-        'id': song['id'],
-        'name': song['name'] ?? song['title'] ?? '',
-        'primaryArtists':
-            song['primaryArtists'] ?? song['artist'] ?? song['subtitle'] ?? '',
-        'image': song['image'],
-        'downloadUrl': _extractPlayableUrl(song),
-      });
-      playerState.setCurrentContext("recentlyPlayed");
+
       if (sources.isNotEmpty) {
+        await audioPlayer.stop();
         await audioPlayer.setAudioSource(
           ConcatenatingAudioSource(children: sources),
           initialIndex: index,
@@ -255,7 +315,6 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
           ),
           child: Stack(
             children: [
-              // Animated circles
               ...List.generate(5, (index) {
                 return _buildFloatingCircle(
                   index,
@@ -265,7 +324,6 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                   isPitchBlack,
                 );
               }),
-              // Musical notes
               ...List.generate(8, (index) {
                 return _buildFloatingNote(
                   index,
@@ -506,23 +564,29 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
             AnimatedBuilder(
               animation: _pulseAnimation,
               builder: (context, child) {
-                return Transform.scale(
-                  scale: 1.0 + _pulseAnimation.value * 0.12,
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: customColorsEnabled
-                          ? primaryColor.withOpacity(0.15)
-                          : const Color(0xFFff7d78).withOpacity(0.15),
-                    ),
-                    child: Icon(
-                      Icons.play_arrow_rounded,
-                      color: customColorsEnabled
-                          ? primaryColor
-                          : const Color(0xFFff7d78),
-                      size: 22,
+                return GestureDetector(
+                  onTap: () {
+                    final playerState = Provider.of<PlayerStateProvider>(context, listen: false);
+                    playerState.clearRecentlyPlayed();
+                  },
+                  child: Transform.scale(
+                    scale: 1.0 + _pulseAnimation.value * 0.12,
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: customColorsEnabled
+                            ? primaryColor.withOpacity(0.15)
+                            : const Color(0xFFff7d78).withOpacity(0.15),
+                      ),
+                      child: Icon(
+                        Icons.delete_outline,
+                        color: customColorsEnabled
+                            ? primaryColor
+                            : const Color(0xFFff7d78),
+                        size: 22,
+                      ),
                     ),
                   ),
                 );
@@ -609,10 +673,10 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
         physics: const BouncingScrollPhysics(),
         itemCount: songs.length,
         itemBuilder: (context, index) {
-          final song = songs[index];
-          final isCurrentSong =
-              playerState.currentSong?['id'] == song['id'] &&
-              playerState.currentContext == "recentlyPlayed";
+      final song = songs[index];
+      final isCurrentSong =
+        playerState.currentSongIndex == index &&
+        playerState.currentContext == "recentlyPlayed";
           return TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: 1),
             duration: Duration(milliseconds: 250 + (index * 40)),
@@ -691,7 +755,19 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                // Album Art
+                // Index number for playlist
+                Container(
+                  width: 32,
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      color: isCurrentSong ? primaryColor : Colors.white70,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
                 Container(
                   width: 52,
                   height: 52,
@@ -735,7 +811,6 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                   ),
                 ),
                 const SizedBox(width: 14),
-                // Song Info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -781,7 +856,6 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                   ),
                 ),
                 const SizedBox(width: 10),
-                // Play Button
                 _buildPlayButton(
                   song,
                   index,
@@ -868,12 +942,26 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 )
-              : Icon(
-                  shouldShowPause
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 20,
+              : StreamBuilder<bool>(
+                  stream: _audioPlayer.playingStream,
+                  builder: (context, snapshot) {
+                    final isPlaying = snapshot.data ?? false;
+                    final playerState = Provider.of<PlayerStateProvider>(
+                      context,
+                      listen: false,
+                    );
+                    final showPause =
+                        isCurrentSong &&
+                        isPlaying &&
+                        playerState.currentContext == "recentlyPlayed";
+                    return Icon(
+                      showPause
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    );
+                  },
                 ),
         ),
       ),
@@ -887,46 +975,52 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     final customColorsEnabled = customTheme.customColorsEnabled;
     final primaryColor = customTheme.primaryColor;
     final secondaryColor = customTheme.secondaryColor;
-    final recentlyPlayed = context.watch<PlayerStateProvider>().recentlyPlayed;
+    return Consumer<PlayerStateProvider>(
+      builder: (context, playerState, child) {
+        final recentlyPlayed = playerState.recentlyPlayed;
 
-    return Scaffold(
-      backgroundColor: isPitchBlack ? Colors.black : const Color(0xFF0a0a0a),
-      body: Stack(
-        children: [
-          _buildAnimatedBackground(
-            isPitchBlack: isPitchBlack,
-            customColorsEnabled: customColorsEnabled,
-            primaryColor: primaryColor,
-            secondaryColor: secondaryColor,
-          ),
-          Column(
+        return Scaffold(
+          backgroundColor: isPitchBlack
+              ? Colors.black
+              : const Color(0xFF0a0a0a),
+          body: Stack(
             children: [
-              _buildHeader(
+              _buildAnimatedBackground(
+                isPitchBlack: isPitchBlack,
                 customColorsEnabled: customColorsEnabled,
                 primaryColor: primaryColor,
+                secondaryColor: secondaryColor,
               ),
-              _buildStatsSection(
-                customColorsEnabled: customColorsEnabled,
-                primaryColor: primaryColor,
-                songCount: recentlyPlayed.length,
-              ),
-              const SizedBox(height: 24),
-              Expanded(
-                child: recentlyPlayed.isEmpty
-                    ? _buildEmptyState(
-                        customColorsEnabled: customColorsEnabled,
-                        primaryColor: primaryColor,
-                      )
-                    : _buildSongsList(
-                        customColorsEnabled: customColorsEnabled,
-                        primaryColor: primaryColor,
-                        songs: recentlyPlayed,
-                      ),
+              Column(
+                children: [
+                  _buildHeader(
+                    customColorsEnabled: customColorsEnabled,
+                    primaryColor: primaryColor,
+                  ),
+                  _buildStatsSection(
+                    customColorsEnabled: customColorsEnabled,
+                    primaryColor: primaryColor,
+                    songCount: recentlyPlayed.length,
+                  ),
+                  const SizedBox(height: 24),
+                  Expanded(
+                    child: recentlyPlayed.isEmpty
+                        ? _buildEmptyState(
+                            customColorsEnabled: customColorsEnabled,
+                            primaryColor: primaryColor,
+                          )
+                        : _buildSongsList(
+                            customColorsEnabled: customColorsEnabled,
+                            primaryColor: primaryColor,
+                            songs: recentlyPlayed,
+                          ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

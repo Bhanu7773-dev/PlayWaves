@@ -9,8 +9,8 @@ import '../services/custom_theme_provider.dart';
 import '../widgets/animated_navbar.dart';
 import '../models/liked_song.dart';
 import '../models/playlist_song.dart';
-import 'liked_songs_screen.dart';
-import 'my_playlist_screen.dart';
+import 'liked_songs_screen.dart' as liked;
+import 'my_playlist_screen.dart' hide LikedSongsScreen;
 import 'downloaded_songs_screen.dart';
 import 'recently_played_screen.dart';
 
@@ -123,7 +123,9 @@ class _LibraryScreenState extends State<LibraryScreen>
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const LikedSongsScreen()),
+            MaterialPageRoute(
+              builder: (context) => const liked.LikedSongsScreen(),
+            ),
           );
         },
       ),

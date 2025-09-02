@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:audio_service/audio_service.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:just_audio/just_audio.dart';
-import '../models/playlist_song.dart';
+import 'package:just_audio_background/just_audio_background.dart';
+import '../models/liked_song.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
 import '../services/player_state_provider.dart';
@@ -22,7 +22,6 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   late AnimationController _meteorController;
-
   StreamSubscription<bool>? _playingSub;
   StreamSubscription<int?>? _currentIndexSub;
   late AudioPlayer audioPlayer;
@@ -44,11 +43,9 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
       vsync: this,
     )..repeat();
     _fadeController.forward();
-
     WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
       audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
       playerState = Provider.of<PlayerStateProvider>(context, listen: false);
 
@@ -58,14 +55,19 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
       });
 
       _currentIndexSub = audioPlayer.currentIndexStream.listen((index) {
-        final playlist = playerState.currentPlaylist;
-        if (playerState.currentContext == "playlist" &&
-            playlist.isNotEmpty &&
+        final likedSongs = Hive.box<LikedSong>('likedSongs').values.toList();
+        if (playerState.currentContext == "liked" &&
             index != null &&
             index >= 0 &&
-            index < playlist.length) {
+            index < likedSongs.length) {
           playerState.setSongIndex(index);
-          playerState.setSong(playlist[index]);
+          playerState.setSong({
+            'id': likedSongs[index].id,
+            'name': likedSongs[index].title,
+            'primaryArtists': likedSongs[index].artist,
+            'image': likedSongs[index].imageUrl,
+            'downloadUrl': likedSongs[index].downloadUrl,
+          });
           if (mounted && !_isDisposed) setState(() {});
         }
       });
@@ -84,8 +86,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
   }
 
   void _syncPlayerState() {
-    final actuallyPlaying = audioPlayer.playing;
-    playerState.setPlaying(actuallyPlaying);
+    playerState.setPlaying(audioPlayer.playing);
     if (mounted && !_isDisposed) setState(() {});
   }
 
@@ -95,6 +96,506 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     if (state == AppLifecycleState.resumed) {
       _syncPlayerState();
     }
+  }
+
+  Future<void> _playLikedSong(
+    LikedSong song,
+    int index,
+    List<LikedSong> likedSongs,
+  ) async {
+    try {
+      playerState.setSongLoading(true);
+
+      // Build liked songs playlist
+      final sources = likedSongs
+          .map(
+            (s) => AudioSource.uri(
+              Uri.parse(s.downloadUrl ?? ''),
+              tag: MediaItem(
+                id: s.id,
+                album: '',
+                title: s.title,
+                artist: s.artist,
+                artUri: s.imageUrl.isNotEmpty ? Uri.parse(s.imageUrl) : null,
+              ),
+            ),
+          )
+          .toList();
+
+      final playlistSource = ConcatenatingAudioSource(children: sources);
+
+      playerState.setPlaylist(
+        likedSongs
+            .map(
+              (s) => {
+                'id': s.id,
+                'name': s.title,
+                'primaryArtists': s.artist,
+                'image': s.imageUrl,
+                'downloadUrl': s.downloadUrl,
+              },
+            )
+            .toList(),
+      );
+      playerState.setSongIndex(index);
+      playerState.setSong({
+        'id': song.id,
+        'name': song.title,
+        'primaryArtists': song.artist,
+        'image': song.imageUrl,
+        'downloadUrl': song.downloadUrl,
+      });
+
+      // Mark context as liked
+      playerState.setCurrentContext("liked");
+
+      await audioPlayer.setAudioSource(playlistSource, initialIndex: index);
+      await audioPlayer.play();
+      playerState.setPlaying(true);
+      playerState.setSongLoading(false);
+    } catch (e) {
+      playerState.setSongLoading(false);
+      if (mounted && !_isDisposed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error playing song: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+    }
+    if (mounted && !_isDisposed) setState(() {});
+  }
+
+  void _openMusicPlayer(
+    LikedSong song,
+    int index,
+    List<LikedSong> likedSongs,
+  ) async {
+    final isCurrentSong =
+        playerState.currentSong != null &&
+        playerState.currentSong!['id'] == song.id &&
+        playerState.currentContext == "liked";
+
+    if (!isCurrentSong) {
+      await _playLikedSong(song, index, likedSongs);
+    }
+
+    await Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (context) => StreamBuilder<bool>(
+              stream: audioPlayer.playingStream,
+              builder: (context, playingSnapshot) {
+                return StreamBuilder<Duration>(
+                  stream: audioPlayer.positionStream,
+                  builder: (context, positionSnapshot) {
+                    return StreamBuilder<Duration?>(
+                      stream: audioPlayer.durationStream,
+                      builder: (context, durationSnapshot) {
+                        return MusicPlayerPage(
+                          songTitle: song.title,
+                          artistName: song.artist,
+                          albumArtUrl: song.imageUrl,
+                          songId: song.id,
+                          isPlaying: playingSnapshot.data ?? false,
+                          isLoading: playerState.isSongLoading,
+                          currentPosition:
+                              positionSnapshot.data ?? Duration.zero,
+                          totalDuration: durationSnapshot.data ?? Duration.zero,
+                          onPlayPause: () {
+                            if (audioPlayer.playing) {
+                              audioPlayer.pause();
+                            } else {
+                              audioPlayer.play();
+                            }
+                          },
+                          onNext: () async {
+                            final currentIndex = likedSongs.indexWhere(
+                              (s) => s.id == song.id,
+                            );
+                            if (currentIndex != -1 &&
+                                currentIndex < likedSongs.length - 1) {
+                              await _playLikedSong(
+                                likedSongs[currentIndex + 1],
+                                currentIndex + 1,
+                                likedSongs,
+                              );
+                            }
+                          },
+                          onPrevious: () async {
+                            final currentIndex = likedSongs.indexWhere(
+                              (s) => s.id == song.id,
+                            );
+                            if (currentIndex > 0) {
+                              await _playLikedSong(
+                                likedSongs[currentIndex - 1],
+                                currentIndex - 1,
+                                likedSongs,
+                              );
+                            }
+                          },
+                          onJumpToSong: (jumpIndex) async {
+                            if (jumpIndex >= 0 &&
+                                jumpIndex < likedSongs.length) {
+                              await _playLikedSong(
+                                likedSongs[jumpIndex],
+                                jumpIndex,
+                                likedSongs,
+                              );
+                            }
+                          },
+                          onSeek: (value) {
+                            final position =
+                                (durationSnapshot.data ?? Duration.zero) *
+                                value;
+                            audioPlayer.seek(position);
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        )
+        .then((_) {
+          if (mounted && !_isDisposed) setState(() {});
+        });
+  }
+
+  Widget _buildSongCard(
+    LikedSong song,
+    int index,
+    List<LikedSong> likedSongs,
+    bool isCurrentSong,
+    bool isPlaying,
+    bool isLoading,
+    bool customColorsEnabled,
+    Color primaryColor,
+    Color secondaryColor,
+    VoidCallback onDelete,
+  ) {
+    final shouldShowPause =
+        isCurrentSong && isPlaying && playerState.currentContext == "liked";
+    final showLoader =
+        isCurrentSong && isLoading && playerState.currentContext == "liked";
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      height: 90,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withOpacity(0.08),
+            Colors.white.withOpacity(0.03),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => _openMusicPlayer(song, index, likedSongs),
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: customColorsEnabled
+                                ? [
+                                    primaryColor.withOpacity(0.3),
+                                    primaryColor.withOpacity(0.1),
+                                  ]
+                                : [
+                                    Color(0xFFff7d78).withOpacity(0.3),
+                                    Color(0xFF9c27b0).withOpacity(0.3),
+                                  ],
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: song.imageUrl.isNotEmpty
+                              ? Image.network(
+                                  song.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Icon(
+                                      Icons.music_note,
+                                      color: customColorsEnabled
+                                          ? primaryColor
+                                          : Color(0xFFff7d78),
+                                      size: 24,
+                                    );
+                                  },
+                                )
+                              : Icon(
+                                  Icons.music_note,
+                                  color: customColorsEnabled
+                                      ? primaryColor
+                                      : Color(0xFFff7d78),
+                                  size: 24,
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              song.title,
+                              style: TextStyle(
+                                color: customColorsEnabled
+                                    ? primaryColor
+                                    : Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.person_outline_rounded,
+                                  color: Colors.white.withOpacity(0.7),
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    song.artist,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.7),
+                                      fontSize: 14,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: customColorsEnabled
+                          ? [primaryColor, primaryColor.withOpacity(0.8)]
+                          : [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: customColorsEnabled
+                            ? primaryColor.withOpacity(0.4)
+                            : Color(0xFFff7d78).withOpacity(0.4),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: showLoader
+                        ? SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : Icon(
+                            shouldShowPause ? Icons.pause : Icons.play_arrow,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                    onPressed: showLoader
+                        ? null
+                        : () async {
+                            if (isCurrentSong && shouldShowPause) {
+                              await audioPlayer.pause();
+                              playerState.setPlaying(false);
+                            } else if (isCurrentSong && !shouldShowPause) {
+                              await audioPlayer.play();
+                              playerState.setPlaying(true);
+                            } else {
+                              await _playLikedSong(song, index, likedSongs);
+                            }
+                            if (mounted && !_isDisposed) setState(() {});
+                          },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                      onPressed: onDelete,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({
+    required bool customColorsEnabled,
+    required Color primaryColor,
+  }) {
+    return Center(
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: customColorsEnabled
+                      ? [
+                          primaryColor.withOpacity(0.3),
+                          primaryColor.withOpacity(0.1),
+                        ]
+                      : [
+                          Color(0xFFff7d78).withOpacity(0.3),
+                          Color(0xFF9c27b0).withOpacity(0.3),
+                        ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.favorite_border,
+                size: 60,
+                color: customColorsEnabled ? primaryColor : Color(0xFFff7d78),
+              ),
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'No Liked Songs Yet',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Start exploring music and like\nyour favorite tracks!',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 16,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: customColorsEnabled
+                      ? [primaryColor, primaryColor.withOpacity(0.8)]
+                      : [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                ),
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: customColorsEnabled
+                        ? primaryColor.withOpacity(0.4)
+                        : Color(0xFFff7d78).withOpacity(0.4),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(25),
+                  onTap: () => Navigator.pop(context),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.explore, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text(
+                          'Explore Music',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildAnimatedBackground({
@@ -236,7 +737,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                             ? [primaryColor, primaryColor.withOpacity(0.7)]
                             : [Color(0xFFff7d78), Color(0xFF9c27b0)],
                       ),
-                      borderRadius: const BorderRadius.all(Radius.circular(2)),
+                      borderRadius: BorderRadius.all(Radius.circular(2)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -263,7 +764,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
-                                Icons.queue_music,
+                                Icons.favorite,
                                 color: customColorsEnabled
                                     ? primaryColor
                                     : Color(0xFFff7d78),
@@ -272,7 +773,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                             ),
                             const SizedBox(width: 12),
                             const Text(
-                              'My Playlist',
+                              'Liked Songs',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 28,
@@ -283,7 +784,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Songs you added to your playlist',
+                          'Your favorite tracks',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.7),
                             fontSize: 16,
@@ -301,545 +802,11 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     );
   }
 
-  Future<void> _playPlaylistSong(
-    PlaylistSong song,
-    int index,
-    List<PlaylistSong> playlistSongs,
-  ) async {
-    final playerState = Provider.of<PlayerStateProvider>(
-      context,
-      listen: false,
-    );
-    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
-
-    try {
-      playerState.setSongLoading(true);
-      if (song.downloadUrl != null && song.downloadUrl!.isNotEmpty) {
-        await audioPlayer.pause();
-        await audioPlayer.stop();
-        final sources = playlistSongs
-            .map(
-              (s) => AudioSource.uri(
-                Uri.parse(s.downloadUrl ?? ''),
-                tag: MediaItem(
-                  id: s.id,
-                  album: '',
-                  title: s.title,
-                  artist: s.artist,
-                  artUri: s.imageUrl.isNotEmpty
-                      ? Uri.parse(s.imageUrl)
-                      : (s.downloadUrl != null
-                            ? Uri.parse(s.downloadUrl!)
-                            : null),
-                ),
-              ),
-            )
-            .toList();
-        final playlistSource = ConcatenatingAudioSource(children: sources);
-        List<Map<String, dynamic>> playlist = playlistSongs
-            .map(
-              (s) => {
-                'id': s.id,
-                'name': s.title,
-                'primaryArtists': s.artist,
-                'image': s.imageUrl,
-                'downloadUrl': s.downloadUrl,
-              },
-            )
-            .toList();
-        playerState.setPlaylist(playlist);
-        playerState.setSongIndex(index);
-        playerState.setSong(playlist[index]);
-        playerState.setCurrentContext("playlist");
-        await audioPlayer.setAudioSource(playlistSource, initialIndex: index);
-        await audioPlayer.play();
-        playerState.setPlaying(true);
-      } else {
-        if (mounted && !_isDisposed) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No audio URL available for this song.'),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted && !_isDisposed) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error playing song: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
-    }
-    playerState.setSongLoading(false);
-    if (mounted && !_isDisposed) setState(() {});
-  }
-
-  void _openMusicPlayer(
-    PlaylistSong song,
-    int index,
-    List<PlaylistSong> playlistSongs,
-  ) async {
-    final playerState = Provider.of<PlayerStateProvider>(
-      context,
-      listen: false,
-    );
-    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
-
-    final isCurrentSong =
-        playerState.currentSong != null &&
-        playerState.currentSong!['id'] == song.id &&
-        playerState.currentContext == "playlist";
-
-    if (!isCurrentSong) {
-      playerState.setSongLoading(true); // Show loader immediately on tap!
-      await _playPlaylistSong(song, index, playlistSongs);
-    }
-
-    Navigator.of(context)
-        .push(
-          MaterialPageRoute(
-            builder: (context) => StreamBuilder<bool>(
-              stream: audioPlayer.playingStream,
-              builder: (context, playingSnapshot) {
-                return StreamBuilder<Duration>(
-                  stream: audioPlayer.positionStream,
-                  builder: (context, positionSnapshot) {
-                    return StreamBuilder<Duration?>(
-                      stream: audioPlayer.durationStream,
-                      builder: (context, durationSnapshot) {
-                        return MusicPlayerPage(
-                          songTitle: song.title,
-                          artistName: song.artist,
-                          albumArtUrl: song.imageUrl,
-                          songId: song.id,
-                          isPlaying: playingSnapshot.data ?? false,
-                          isLoading: playerState.isSongLoading,
-                          currentPosition:
-                              positionSnapshot.data ?? Duration.zero,
-                          totalDuration: durationSnapshot.data ?? Duration.zero,
-                          onPlayPause: () {
-                            if (audioPlayer.playing) {
-                              audioPlayer.pause();
-                            } else {
-                              audioPlayer.play();
-                            }
-                          },
-                          onNext: () async {
-                            final currentIndex = playlistSongs.indexWhere(
-                              (s) => s.id == song.id,
-                            );
-                            if (currentIndex != -1 &&
-                                currentIndex < playlistSongs.length - 1) {
-                              await _playPlaylistSong(
-                                playlistSongs[currentIndex + 1],
-                                currentIndex + 1,
-                                playlistSongs,
-                              );
-                            }
-                          },
-                          onPrevious: () async {
-                            final currentIndex = playlistSongs.indexWhere(
-                              (s) => s.id == song.id,
-                            );
-                            if (currentIndex > 0) {
-                              await _playPlaylistSong(
-                                playlistSongs[currentIndex - 1],
-                                currentIndex - 1,
-                                playlistSongs,
-                              );
-                            }
-                          },
-                          onJumpToSong: (jumpIndex) async {
-                            if (jumpIndex >= 0 &&
-                                jumpIndex < playlistSongs.length) {
-                              await _playPlaylistSong(
-                                playlistSongs[jumpIndex],
-                                jumpIndex,
-                                playlistSongs,
-                              );
-                            }
-                          },
-                          onSeek: (value) {
-                            final position =
-                                (durationSnapshot.data ?? Duration.zero) *
-                                value;
-                            audioPlayer.seek(position);
-                          },
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        )
-        .then((_) {
-          if (mounted && !_isDisposed) setState(() {});
-        });
-  }
-
-  Widget _buildSongCard(
-    PlaylistSong song,
-    int index,
-    List<PlaylistSong> playlistSongs,
-    bool isCurrentSong,
-    bool isPlaying,
-    bool isLoading,
-    bool customColorsEnabled,
-    Color primaryColor,
-    Color secondaryColor,
-    VoidCallback onDelete,
-  ) {
-    final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
-
-    final shouldShowPause =
-        isCurrentSong && isPlaying && playerState.currentContext == "playlist";
-    final showLoader =
-        isCurrentSong && isLoading && playerState.currentContext == "playlist";
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      height: 90,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withOpacity(0.08),
-            Colors.white.withOpacity(0.03),
-          ],
-        ),
-        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: Row(
-          children: [
-            Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => _openMusicPlayer(song, index, playlistSongs),
-                child: Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Hero(
-                        tag: 'album_art_${song.id}_${index}',
-                        child: Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            gradient: LinearGradient(
-                              colors: customColorsEnabled
-                                  ? [
-                                      primaryColor.withOpacity(0.3),
-                                      primaryColor.withOpacity(0.1),
-                                    ]
-                                  : [
-                                      Color(0xFFff7d78).withOpacity(0.3),
-                                      Color(0xFF9c27b0).withOpacity(0.3),
-                                    ],
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: song.imageUrl.isNotEmpty
-                                ? Image.network(
-                                    song.imageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Icon(
-                                        Icons.music_note,
-                                        color: customColorsEnabled
-                                            ? primaryColor
-                                            : Color(0xFFff7d78),
-                                        size: 24,
-                                      );
-                                    },
-                                  )
-                                : Icon(
-                                    Icons.music_note,
-                                    color: customColorsEnabled
-                                        ? primaryColor
-                                        : Color(0xFFff7d78),
-                                    size: 24,
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.only(top: 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              song.title,
-                              style: TextStyle(
-                                color: customColorsEnabled
-                                    ? primaryColor
-                                    : Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.person_outline_rounded,
-                                  color: Colors.white.withOpacity(0.7),
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    song.artist.isNotEmpty
-                                        ? song.artist
-                                        : 'Unknown Artist',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontSize: 14,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: customColorsEnabled
-                          ? [primaryColor, primaryColor.withOpacity(0.8)]
-                          : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: customColorsEnabled
-                            ? primaryColor.withOpacity(0.4)
-                            : Color(0xFFff7d78).withOpacity(0.4),
-                        blurRadius: 8,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: IconButton(
-                    icon: showLoader
-                        ? SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Icon(
-                            shouldShowPause ? Icons.pause : Icons.play_arrow,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                    onPressed: showLoader
-                        ? null
-                        : () async {
-                            if (isCurrentSong && shouldShowPause) {
-                              await audioPlayer.pause();
-                              playerState.setPlaying(false);
-                            } else if (isCurrentSong && !shouldShowPause) {
-                              await audioPlayer.play();
-                              playerState.setPlaying(true);
-                            } else {
-                              playerState.setSongLoading(
-                                true,
-                              ); // Show loader right away!
-                              await _playPlaylistSong(
-                                song,
-                                index,
-                                playlistSongs,
-                              );
-                            }
-                            if (mounted && !_isDisposed) setState(() {});
-                          },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.red.withOpacity(0.3)),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        color: Colors.red,
-                        size: 20,
-                      ),
-                      onPressed: onDelete,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState({
-    required bool customColorsEnabled,
-    required Color primaryColor,
-  }) {
-    return Center(
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: customColorsEnabled
-                      ? [
-                          primaryColor.withOpacity(0.3),
-                          primaryColor.withOpacity(0.1),
-                        ]
-                      : [
-                          Color(0xFFff7d78).withOpacity(0.3),
-                          Color(0xFF9c27b0).withOpacity(0.3),
-                        ],
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.queue_music_outlined,
-                size: 60,
-                color: customColorsEnabled ? primaryColor : Color(0xFFff7d78),
-              ),
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'No Songs In Playlist',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Add songs to your playlist and enjoy\nyour favorite tracks!',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 16,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: customColorsEnabled
-                      ? [primaryColor, primaryColor.withOpacity(0.8)]
-                      : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                ),
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: customColorsEnabled
-                        ? primaryColor.withOpacity(0.4)
-                        : Color(0xFFff7d78).withOpacity(0.4),
-                    blurRadius: 12,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(25),
-                  onTap: () => Navigator.pop(context),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.explore, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text(
-                          'Explore Music',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<PlayerStateProvider>(
       builder: (context, playerState, _) {
-        if (!Hive.isBoxOpen('playlistSongs')) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('My Playlist')),
-            body: const Center(child: CircularProgressIndicator()),
-          );
-        }
-        final playlistBox = Hive.box<PlaylistSong>('playlistSongs');
+        final likedSongsBox = Hive.box<LikedSong>('likedSongs');
         final isPitchBlack = context
             .watch<PitchBlackThemeProvider>()
             .isPitchBlack;
@@ -863,8 +830,8 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                 secondaryColor: secondaryColor,
               ),
               ValueListenableBuilder(
-                valueListenable: playlistBox.listenable(),
-                builder: (context, Box<PlaylistSong> box, _) {
+                valueListenable: likedSongsBox.listenable(),
+                builder: (context, Box<LikedSong> box, _) {
                   final songs = box.values.toList();
 
                   return Column(
@@ -894,8 +861,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                                     final isCurrentSong =
                                         playerState.currentSong?['id'] ==
                                             song.id &&
-                                        playerState.currentContext ==
-                                            "playlist";
+                                        playerState.currentContext == "liked";
 
                                     return _buildSongCard(
                                       song,
@@ -908,7 +874,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                                       customColorsEnabled,
                                       primaryColor,
                                       secondaryColor,
-                                      () => playlistBox.delete(song.id),
+                                      () => likedSongsBox.delete(song.id),
                                     );
                                   },
                                 ),

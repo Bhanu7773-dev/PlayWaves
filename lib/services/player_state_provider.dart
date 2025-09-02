@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 class PlayerStateProvider extends ChangeNotifier {
+  void clearRecentlyPlayed() {
+    _recentlyPlayed.clear();
+    notifyListeners();
+  }
   Map<String, dynamic>? _currentSong;
   List<Map<String, dynamic>> _currentPlaylist = [];
   // Recently played songs (max 15)
@@ -77,11 +81,15 @@ class PlayerStateProvider extends ChangeNotifier {
       song['allDownloadUrls'] = allQualities;
       // Add to recently played (max 15)
       if (song['id'] != null) {
-        _recentlyPlayed.removeWhere((s) => s['id'] == song['id']);
-        _recentlyPlayed.insert(0, song);
-        while (_recentlyPlayed.length > 15) {
-          _recentlyPlayed.removeLast();
+        // Only add to top if not already in the list (i.e., played from outside)
+        final idx = _recentlyPlayed.indexWhere((s) => s['id'] == song['id']);
+        if (idx == -1) {
+          _recentlyPlayed.insert(0, song);
+          while (_recentlyPlayed.length > 15) {
+            _recentlyPlayed.removeLast();
+          }
         }
+        // If played from the list, do not reorder
       }
       Future.delayed(Duration(milliseconds: 100), () {
         debugPrint('Recently played songs: ${_recentlyPlayed.length}');
