@@ -362,7 +362,10 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
 
     if (downloadUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("No download URL found for $quality")),
+        SnackBar(
+          content: Text("No download URL found for $quality"),
+          duration: const Duration(milliseconds: 100),
+        ),
       );
       return;
     }
@@ -393,9 +396,12 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     }
 
     if (!hasPermission) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Storage permission denied")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Storage permission denied"),
+          duration: const Duration(milliseconds: 100),
+        ),
+      );
       return;
     }
 
@@ -414,7 +420,10 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     }
     if (dir == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Could not access save directory")),
+        SnackBar(
+          content: Text("Could not access save directory"),
+          duration: const Duration(milliseconds: 100),
+        ),
       );
       setState(() {
         _isDownloading = false;
@@ -429,13 +438,19 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
 
     try {
       await Dio().download(downloadUrl, filePath);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Downloaded to $filePath")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Downloaded to $filePath"),
+          duration: const Duration(milliseconds: 100),
+        ),
+      );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Download failed: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Download failed: $e"),
+          duration: const Duration(milliseconds: 100),
+        ),
+      );
     } finally {
       setState(() {
         _isDownloading = false;
@@ -868,9 +883,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                     shaderCallback: (bounds) =>
                                         const LinearGradient(
                                           colors: [
-                                            Color(0xFFff7d78),
-                                            Color(0xFF9c27b0),
+                                            Color(0xFF6366f1),
+                                            Color(0xFF8b5cf6),
                                           ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
                                         ).createShader(bounds),
                                     child: const Text(
                                       'Now Playing',
@@ -1074,10 +1091,10 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                                             return const LinearGradient(
                                                               colors: [
                                                                 Color(
-                                                                  0xFFff7d78,
+                                                                  0xFF6366f1,
                                                                 ),
                                                                 Color(
-                                                                  0xFF9c27b0,
+                                                                  0xFF8b5cf6,
                                                                 ),
                                                               ],
                                                               begin: Alignment
@@ -1168,6 +1185,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                           ),
                                         ),
                                         margin: const EdgeInsets.all(16),
+                                        duration: const Duration(
+                                          milliseconds: 100,
+                                        ),
                                       ),
                                     );
                                   }
@@ -1293,12 +1313,18 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                 overlayShape: const RoundSliderOverlayShape(
                                   overlayRadius: 16,
                                 ),
-                                activeTrackColor: primaryColor,
+                                activeTrackColor: customColorsEnabled
+                                    ? primaryColor
+                                    : const Color(0xFF6366f1),
                                 inactiveTrackColor: Colors.white.withOpacity(
                                   0.2,
                                 ),
                                 thumbColor: Colors.white,
-                                overlayColor: primaryColor.withOpacity(0.2),
+                                overlayColor:
+                                    (customColorsEnabled
+                                            ? primaryColor
+                                            : const Color(0xFF8b5cf6))
+                                        .withOpacity(0.2),
                               ),
                               child: Slider(
                                 value: displayProgress.clamp(0.0, 1.0),
@@ -1380,8 +1406,8 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                 gradient: !customColorsEnabled
                                     ? const LinearGradient(
                                         colors: [
-                                          Color(0xFFff7d78),
-                                          Color(0xFF9c27b0),
+                                          Color(0xFF6366f1),
+                                          Color(0xFF8b5cf6),
                                         ],
                                         begin: Alignment.topLeft,
                                         end: Alignment.bottomRight,

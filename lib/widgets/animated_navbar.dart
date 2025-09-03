@@ -105,24 +105,32 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
                       curve: Curves.easeOut,
                       transform: Matrix4.identity()
                         ..scale(isSelected ? 1.2 : 1.0),
-                      child: ShaderMask(
-                        shaderCallback: (bounds) => isSelected
-                            ? LinearGradient(
-                                colors: customColorsEnabled
-                                    ? [primaryColor, primaryColor]
-                                    : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ).createShader(bounds)
-                            : const LinearGradient(
-                                colors: [Colors.white60, Colors.white60],
-                              ).createShader(bounds),
-                        child: Icon(
-                          icons[index],
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
+                      child: customColorsEnabled && isSelected
+                          ? Icon(icons[index], color: primaryColor, size: 24)
+                          : ShaderMask(
+                              shaderCallback: (Rect bounds) {
+                                return isSelected
+                                    ? const LinearGradient(
+                                        colors: [
+                                          Color(0xFF6366f1),
+                                          Color(0xFF8b5cf6),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ).createShader(bounds)
+                                    : const LinearGradient(
+                                        colors: [
+                                          Colors.white60,
+                                          Colors.white60,
+                                        ],
+                                      ).createShader(bounds);
+                              },
+                              child: Icon(
+                                icons[index],
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 4),
                     AnimatedDefaultTextStyle(

@@ -8,6 +8,8 @@ import '../services/custom_theme_provider.dart';
 import 'package:audio_service/audio_service.dart';
 import '../screens/music_player.dart';
 
+import 'dart:ui';
+
 class ArtistSongsPage extends StatefulWidget {
   final String artistName;
   final JioSaavnApiService apiService;
@@ -397,30 +399,30 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: customColorsEnabled
-                          ? [
-                              primaryColor.withOpacity(0.3),
-                              primaryColor.withOpacity(0.1),
-                            ]
-                          : [
-                              const Color(0xFFff7d78).withOpacity(0.3),
-                              const Color(0xFF9c27b0).withOpacity(0.3),
-                            ],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${index + 1}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.18),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -493,14 +495,16 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                     gradient: LinearGradient(
                       colors: customColorsEnabled
                           ? [primaryColor, primaryColor.withOpacity(0.8)]
-                          : [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                          : [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
                         color: customColorsEnabled
                             ? primaryColor.withOpacity(0.4)
-                            : const Color(0xFFff7d78).withOpacity(0.4),
+                            : const Color(0xFF6366f1).withOpacity(0.4),
                         blurRadius: 8,
                         spreadRadius: 2,
                       ),
@@ -641,7 +645,7 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                       gradient: LinearGradient(
                         colors: customColorsEnabled
                             ? [primaryColor, primaryColor.withOpacity(0.8)]
-                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                            : [Color(0xFF6366f1), Color(0xFF8b5cf6)],
                       ),
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -666,7 +670,9 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                       gradient: LinearGradient(
                         colors: customColorsEnabled
                             ? [primaryColor, primaryColor.withOpacity(0.7)]
-                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                            : [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.all(Radius.circular(2)),
                     ),

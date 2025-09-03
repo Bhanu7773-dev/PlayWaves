@@ -129,9 +129,8 @@ class _RippleFlowEffectState extends State<RippleFlowEffect>
   @override
   Widget build(BuildContext context) {
     final customTheme = Provider.of<CustomThemeProvider>(context);
-    final rippleColor = customTheme.customColorsEnabled
-        ? customTheme.primaryColor
-        : widget.color;
+    final customColorsEnabled = customTheme.customColorsEnabled;
+    final primaryColor = customTheme.primaryColor;
     return AnimatedBuilder(
       animation: Listenable.merge([
         _animation1,
@@ -148,7 +147,14 @@ class _RippleFlowEffectState extends State<RippleFlowEffect>
             animation3: _animation3.value,
             animation4: _animation4.value,
             animation5: _animation5.value,
-            color: rippleColor,
+            color: customColorsEnabled ? primaryColor : null,
+            gradient: customColorsEnabled
+                ? null
+                : const LinearGradient(
+                    colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
           ),
           size: Size.infinite,
         );
@@ -163,7 +169,8 @@ class RipplePainter extends CustomPainter {
   final double animation3;
   final double animation4;
   final double animation5;
-  final Color color;
+  final Color? color;
+  final LinearGradient? gradient;
 
   RipplePainter({
     required this.animation1,
@@ -171,7 +178,8 @@ class RipplePainter extends CustomPainter {
     required this.animation3,
     required this.animation4,
     required this.animation5,
-    required this.color,
+    this.color,
+    this.gradient,
   });
 
   @override
@@ -182,46 +190,27 @@ class RipplePainter extends CustomPainter {
     ); // Position even further left, just below album art
     final maxRadius = size.width * 0.9;
 
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
-
-    // Draw multiple ripples with different opacity and size
-    _drawRipple(
-      canvas,
-      center,
-      maxRadius * animation1,
-      color.withOpacity((1 - animation1) * 0.3),
-      paint,
-    );
-    _drawRipple(
-      canvas,
-      center,
-      maxRadius * animation2,
-      color.withOpacity((1 - animation2) * 0.22),
-      paint,
-    );
-    _drawRipple(
-      canvas,
-      center,
-      maxRadius * animation3,
-      color.withOpacity((1 - animation3) * 0.16),
-      paint,
-    );
-    _drawRipple(
-      canvas,
-      center,
-      maxRadius * animation4,
-      color.withOpacity((1 - animation4) * 0.10),
-      paint,
-    );
-    _drawRipple(
-      canvas,
-      center,
-      maxRadius * animation5,
-      color.withOpacity((1 - animation5) * 0.06),
-      paint,
-    );
+    for (final anim in [
+      animation1,
+      animation2,
+      animation3,
+      animation4,
+      animation5,
+    ]) {
+      final paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0;
+      if (color != null) {
+        paint.color = color!.withOpacity((1 - anim) * 0.3);
+      } else if (gradient != null) {
+        final rect = Rect.fromCircle(center: center, radius: maxRadius * anim);
+        paint.shader = gradient!.createShader(rect);
+        paint.color = Colors.white.withOpacity((1 - anim) * 0.3);
+      }
+      if (anim > 0) {
+        canvas.drawCircle(center, maxRadius * anim, paint);
+      }
+    }
   }
 
   void _drawRipple(
@@ -467,13 +456,33 @@ class MiniPlayer extends StatelessWidget {
                             final isPlaying = snapshot.data ?? false;
                             return IconButton(
                               onPressed: onPlayPause,
-                              icon: Icon(
-                                isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: useCustom
-                                    ? primaryColor
-                                    : const Color(0xFFff7d78),
-                                size: 28,
-                              ),
+                              icon: useCustom
+                                  ? Icon(
+                                      isPlaying
+                                          ? Icons.pause
+                                          : Icons.play_arrow,
+                                      color: primaryColor,
+                                      size: 28,
+                                    )
+                                  : ShaderMask(
+                                      shaderCallback: (Rect bounds) {
+                                        return const LinearGradient(
+                                          colors: [
+                                            Color(0xFF6366f1),
+                                            Color(0xFF8b5cf6),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ).createShader(bounds);
+                                      },
+                                      child: Icon(
+                                        isPlaying
+                                            ? Icons.pause
+                                            : Icons.play_arrow,
+                                        color: Colors.white,
+                                        size: 28,
+                                      ),
+                                    ),
                               padding: const EdgeInsets.all(4),
                             );
                           },

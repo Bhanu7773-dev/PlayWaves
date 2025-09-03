@@ -38,11 +38,18 @@ class AlbumsSection extends StatelessWidget {
                     width: 4,
                     height: 24,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: customColorsEnabled
-                            ? [primaryColor, primaryColor.withOpacity(0.7)]
-                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                      ),
+                      gradient: customColorsEnabled
+                          ? LinearGradient(
+                              colors: [
+                                primaryColor,
+                                primaryColor.withOpacity(0.7),
+                              ],
+                            )
+                          : LinearGradient(
+                              colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -215,17 +222,21 @@ class AlbumsSection extends StatelessWidget {
             right: 8,
             child: Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: customColorsEnabled
-                      ? [primaryColor, primaryColor.withOpacity(0.8)]
-                      : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                ),
+                gradient: customColorsEnabled
+                    ? LinearGradient(
+                        colors: [primaryColor, primaryColor.withOpacity(0.8)],
+                      )
+                    : LinearGradient(
+                        colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
                     color: customColorsEnabled
                         ? primaryColor.withOpacity(0.3)
-                        : const Color(0xFFff7d78).withOpacity(0.3),
+                        : const Color(0xFF6366f1).withOpacity(0.3),
                     blurRadius: 8,
                     spreadRadius: 2,
                   ),

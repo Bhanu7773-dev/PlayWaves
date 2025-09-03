@@ -34,14 +34,18 @@ class MasonrySongSection extends StatelessWidget {
                     width: 4,
                     height: 24,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: customColorsEnabled
-                            ? [
+                      gradient: customColorsEnabled
+                          ? LinearGradient(
+                              colors: [
                                 primaryColor,
-                                primaryColor.withValues(alpha: 0.7),
-                              ]
-                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                      ),
+                                primaryColor.withOpacity(0.7),
+                              ],
+                            )
+                          : LinearGradient(
+                              colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 12),

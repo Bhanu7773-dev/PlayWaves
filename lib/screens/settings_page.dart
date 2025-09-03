@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
@@ -34,18 +35,14 @@ class _SettingsPageState extends State<SettingsPage>
   Color pickedPrimaryColor = const Color(0xFFff7d78);
   Color pickedSecondaryColor = const Color(0xFF16213e);
 
-  final List<Color> defaultGradient = [Color(0xFFff7d78), Color(0xFF9c27b0)];
-  final Color defaultPrimaryColor = Color(0xFFff7d78);
+  final List<Color> defaultGradient = [Color(0xFF6366f1), Color(0xFF8b5cf6)];
+  final Color defaultPrimaryColor = Color(0xFF6366f1);
   final Color defaultSecondaryColor = Color(0xFF16213e);
 
   Color get primaryColor =>
       customColorsEnabled ? pickedPrimaryColor : defaultPrimaryColor;
   Color get secondaryColor =>
       customColorsEnabled ? pickedSecondaryColor : defaultSecondaryColor;
-
-  List<Color> get iconGradient => customColorsEnabled
-      ? [pickedPrimaryColor, pickedPrimaryColor]
-      : defaultGradient;
 
   final List<String> audioQualities = [
     'Low (96 kbps)',
@@ -115,60 +112,51 @@ class _SettingsPageState extends State<SettingsPage>
 
   Future<void> _launchURL(String url) async {
     final Uri uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      _showSnackBar("Could not open $url", Colors.red);
-    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
-  }
-
-  // Mutually exclusive, but all can be off (default theme)
+  // FIX: Provider is always updated when toggles change
   void _handleThemeToggle(String key, bool value) {
     setState(() {
-      if (key == 'system') {
-        useSystemTheme = value;
-        if (value) {
-          useDynamicColors = false;
-          customColorsEnabled = false;
-          pitchBlackEnabled = false;
-          context.read<PitchBlackThemeProvider>().setPitchBlack(false);
-        }
-      } else if (key == 'dynamic') {
+      if (key == 'dynamic') {
         useDynamicColors = value;
         if (value) {
-          useSystemTheme = false;
           customColorsEnabled = false;
           pitchBlackEnabled = false;
           context.read<PitchBlackThemeProvider>().setPitchBlack(false);
+          Provider.of<CustomThemeProvider>(
+            context,
+            listen: false,
+          ).setCustomColorsEnabled(false);
         }
       } else if (key == 'custom') {
         customColorsEnabled = value;
         if (value) {
-          useSystemTheme = false;
           useDynamicColors = false;
           pitchBlackEnabled = false;
           context.read<PitchBlackThemeProvider>().setPitchBlack(false);
+          Provider.of<CustomThemeProvider>(
+            context,
+            listen: false,
+          ).setCustomColorsEnabled(true);
+        } else {
+          Provider.of<CustomThemeProvider>(
+            context,
+            listen: false,
+          ).setCustomColorsEnabled(false);
         }
       } else if (key == 'pitchBlack') {
         pitchBlackEnabled = value;
         context.read<PitchBlackThemeProvider>().setPitchBlack(value);
         if (value) {
-          useSystemTheme = false;
           useDynamicColors = false;
           customColorsEnabled = false;
+          Provider.of<CustomThemeProvider>(
+            context,
+            listen: false,
+          ).setCustomColorsEnabled(false);
         }
       }
-      // If all are false, show default gradient theme
     });
     _saveSettings();
   }
@@ -267,56 +255,55 @@ class _SettingsPageState extends State<SettingsPage>
 
   Widget _buildHeader(bool isPitchBlack) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
       child: Row(
         children: [
-          Container(
-            width: 4,
-            height: 28,
-            decoration: BoxDecoration(
-              gradient:
-                  (!customColorsEnabled &&
-                      !useSystemTheme &&
-                      !useDynamicColors &&
-                      !pitchBlackEnabled)
-                  ? LinearGradient(
-                      colors: defaultGradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: customColorsEnabled ? primaryColor : null,
-              borderRadius: const BorderRadius.all(Radius.circular(2)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Customize your experience',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  'Settings',
+                  style: TextStyle(
+                    color: customColorsEnabled
+                        ? primaryColor
+                        : Color(0xFF6366f1),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 35,
+                    letterSpacing: 0.5,
+                    shadows: [
+                      Shadow(
+                        color: Color(0xFF8b5cf6).withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 16),
-          const Text(
-            'Settings',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const Spacer(),
           Container(
             decoration: BoxDecoration(
-              gradient:
-                  (!customColorsEnabled &&
-                      !useSystemTheme &&
-                      !useDynamicColors &&
-                      !pitchBlackEnabled)
-                  ? LinearGradient(
-                      colors: defaultGradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+              gradient: !customColorsEnabled
+                  ? const LinearGradient(
+                      colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                     )
                   : null,
               color: customColorsEnabled ? primaryColor : null,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: primaryColor.withOpacity(0.3),
+                  color:
+                      (customColorsEnabled ? primaryColor : Color(0xFF6366f1))
+                          .withOpacity(0.3),
                   blurRadius: 8,
                   spreadRadius: 2,
                 ),
@@ -364,30 +351,69 @@ class _SettingsPageState extends State<SettingsPage>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    gradient:
-                        (!customColorsEnabled &&
-                            !useSystemTheme &&
-                            !useDynamicColors &&
-                            !pitchBlackEnabled)
-                        ? LinearGradient(
-                            colors: defaultGradient,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : null,
-                    color: customColorsEnabled ? primaryColor : null,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    Icons.bar_chart,
-                    color: Colors.white,
-                    size: 24,
-                  ),
+                  child: customColorsEnabled
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.25),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.bar_chart,
+                                color: primaryColor,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.25),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: ShaderMask(
+                                shaderCallback: (Rect bounds) {
+                                  return const LinearGradient(
+                                    colors: [
+                                      Color(0xFF6366f1),
+                                      Color(0xFF8b5cf6),
+                                    ],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ).createShader(bounds);
+                                },
+                                child: Icon(
+                                  Icons.bar_chart,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                 ),
-                const SizedBox(width: 16),
-                const Text(
+                Text(
                   "Your Music Journey",
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 20,
@@ -409,6 +435,7 @@ class _SettingsPageState extends State<SettingsPage>
             ),
             const SizedBox(height: 16),
             Container(
+              width: 330,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.1),
@@ -420,13 +447,25 @@ class _SettingsPageState extends State<SettingsPage>
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.star,
-                        color: customColorsEnabled
-                            ? primaryColor
-                            : defaultPrimaryColor,
-                        size: 16,
-                      ),
+                      customColorsEnabled
+                          ? Icon(Icons.star, color: primaryColor, size: 16)
+                          : ShaderMask(
+                              shaderCallback: (Rect bounds) {
+                                return const LinearGradient(
+                                  colors: [
+                                    Color(0xFF6366f1),
+                                    Color(0xFF8b5cf6),
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ).createShader(bounds);
+                              },
+                              child: const Icon(
+                                Icons.star,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
                       const SizedBox(width: 8),
                       const Text(
                         "Top Artist: ",
@@ -445,13 +484,25 @@ class _SettingsPageState extends State<SettingsPage>
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(
-                        Icons.favorite,
-                        color: customColorsEnabled
-                            ? secondaryColor
-                            : Color(0xFF9c27b0),
-                        size: 16,
-                      ),
+                      customColorsEnabled
+                          ? Icon(Icons.favorite, color: primaryColor, size: 16)
+                          : ShaderMask(
+                              shaderCallback: (Rect bounds) {
+                                return const LinearGradient(
+                                  colors: [
+                                    Color(0xFF6366f1),
+                                    Color(0xFF8b5cf6),
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ).createShader(bounds);
+                              },
+                              child: const Icon(
+                                Icons.favorite,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
                       const SizedBox(width: 8),
                       const Text(
                         "Top Song: ",
@@ -491,11 +542,18 @@ class _SettingsPageState extends State<SettingsPage>
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              color: customColorsEnabled ? primaryColor : defaultPrimaryColor,
-              size: 20,
-            ),
+            customColorsEnabled
+                ? Icon(icon, color: primaryColor, size: 20)
+                : ShaderMask(
+                    shaderCallback: (Rect bounds) {
+                      return const LinearGradient(
+                        colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ).createShader(bounds);
+                    },
+                    child: Icon(icon, color: Colors.white, size: 20),
+                  ),
             const SizedBox(height: 8),
             Text(
               value,
@@ -522,107 +580,325 @@ class _SettingsPageState extends State<SettingsPage>
       icon: Icons.palette,
       isPitchBlack: isPitchBlack,
       children: [
-        _buildSwitchTile(
-          title: "Use System Theme",
-          subtitle: "Automatically adapts to system light/dark mode",
-          value: useSystemTheme,
-          onChanged: (val) {
-            _handleThemeToggle('system', val);
-            if (val) _showSnackBar("System theme enabled", defaultPrimaryColor);
-          },
-        ),
-        _buildSwitchTile(
+        _buildIOSToggle(
           title: "Dynamic Colors",
           subtitle: "Matches system accent color (Android 12+)",
           value: useDynamicColors,
+          thumbIcon: Icons.auto_awesome,
           onChanged: (val) {
-            _handleThemeToggle('dynamic', val);
-            if (val)
-              _showSnackBar("Dynamic colors enabled", defaultPrimaryColor);
+            if (useDynamicColors ||
+                (!pitchBlackEnabled && !customColorsEnabled)) {
+              _handleThemeToggle('dynamic', val);
+              // SnackBar removed
+            }
           },
+          isActive: useDynamicColors,
+          otherActive: pitchBlackEnabled || customColorsEnabled,
         ),
-        _buildSwitchTile(
+        _buildIOSToggle(
           title: "Pitch Black",
           subtitle: "Ultra dark mode for AMOLED screens",
           value: isPitchBlack,
+          thumbIcon: Icons.brightness_2,
           onChanged: (val) {
-            _handleThemeToggle('pitchBlack', val);
-            if (val) _showSnackBar("Pitch Black enabled", Colors.black);
+            if (pitchBlackEnabled ||
+                (!useDynamicColors && !customColorsEnabled)) {
+              _handleThemeToggle('pitchBlack', val);
+              // SnackBar removed
+            }
           },
+          isActive: pitchBlackEnabled,
+          otherActive: useDynamicColors || customColorsEnabled,
         ),
         _buildCustomColorsTile(context),
       ],
     );
   }
 
-  Widget _buildCustomColorsTile(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+  Widget _buildIOSToggle({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required IconData thumbIcon,
+    required ValueChanged<bool> onChanged,
+    required bool isActive,
+    required bool otherActive,
+  }) {
+    final isDisabled = !isActive && otherActive;
+    return Opacity(
+      opacity: isDisabled ? 0.5 : 1.0,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              GestureDetector(
+                onTap: isDisabled ? null : () => onChanged(!value),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  width: 60,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: value
+                        ? (!customColorsEnabled
+                              ? const LinearGradient(
+                                  colors: [
+                                    Color(0xFF6366f1),
+                                    Color(0xFF8b5cf6),
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                )
+                              : LinearGradient(
+                                  colors: [
+                                    primaryColor,
+                                    primaryColor.withOpacity(0.8),
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ))
+                        : null,
+                    color: value ? null : Colors.grey.withOpacity(0.3),
+                    boxShadow: value
+                        ? [
+                            BoxShadow(
+                              color:
+                                  (customColorsEnabled
+                                          ? primaryColor
+                                          : const Color(0xFF6366f1))
+                                      .withOpacity(0.4),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      AnimatedAlign(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        alignment: value
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.all(3),
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              value ? thumbIcon : Icons.close,
+                              key: ValueKey(value),
+                              color: value
+                                  ? (customColorsEnabled
+                                        ? primaryColor
+                                        : const Color(0xFF6366f1))
+                                  : Colors.grey[600],
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: ListTile(
-        leading: Icon(
-          Icons.palette,
-          color: customColorsEnabled ? pickedPrimaryColor : Colors.white54,
+    );
+  }
+
+  Widget _buildCustomColorsTile(BuildContext context) {
+    final isDisabled = useDynamicColors || pitchBlackEnabled;
+    return Opacity(
+      opacity: isDisabled ? 0.5 : 1.0,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
-        title: Text(
-          "Custom Colors",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.palette,
+                color: customColorsEnabled
+                    ? pickedPrimaryColor
+                    : Colors.white54,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Custom Colors",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Personalize your app colors",
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              GestureDetector(
+                onTap: isDisabled
+                    ? null
+                    : () {
+                        final newValue = !customColorsEnabled;
+                        _handleThemeToggle('custom', newValue);
+                        Provider.of<CustomThemeProvider>(
+                          context,
+                          listen: false,
+                        ).setCustomColorsEnabled(newValue);
+                      },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  width: 60,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: customColorsEnabled
+                        ? LinearGradient(
+                            colors: [
+                              pickedPrimaryColor,
+                              pickedPrimaryColor.withOpacity(0.8),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          )
+                        : null,
+                    color: customColorsEnabled
+                        ? null
+                        : Colors.grey.withOpacity(0.3),
+                    boxShadow: customColorsEnabled
+                        ? [
+                            BoxShadow(
+                              color: pickedPrimaryColor.withOpacity(0.4),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      AnimatedAlign(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                        alignment: customColorsEnabled
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.all(3),
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              customColorsEnabled
+                                  ? Icons.color_lens
+                                  : Icons.close,
+                              key: ValueKey(customColorsEnabled),
+                              color: customColorsEnabled
+                                  ? pickedPrimaryColor
+                                  : Colors.grey[600],
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        subtitle: Text(
-          "Personalize your app colors",
-          style: TextStyle(color: Colors.white70),
-        ),
-        trailing: Switch(
-          value: customColorsEnabled,
-          onChanged: (val) {
-            _handleThemeToggle('custom', val);
-            Provider.of<CustomThemeProvider>(
-              context,
-              listen: false,
-            ).setCustomColorsEnabled(val);
-            if (val) {
-              _showSnackBar("Custom colors enabled", pickedPrimaryColor);
-            } else {
-              _showSnackBar("Custom colors disabled", defaultPrimaryColor);
-            }
-          },
-          activeColor: pickedPrimaryColor,
-        ),
-        onTap: () {
-          showDialog(
-            context: context,
-            builder: (ctx) => ColorThemeDialog(
-              primaryColor: pickedPrimaryColor,
-              secondaryColor: pickedSecondaryColor,
-              onPrimaryColorChanged: (c) {
-                setState(() {
-                  pickedPrimaryColor = c;
-                });
-                print('[SettingsPage] Picked primaryColor: ' + c.toString());
-                Provider.of<CustomThemeProvider>(
-                  context,
-                  listen: false,
-                ).setPrimaryColor(c);
-                _saveSettings();
-              },
-              onSecondaryColorChanged: (c) {
-                setState(() {
-                  pickedSecondaryColor = c;
-                });
-                print('[SettingsPage] Picked secondaryColor: ' + c.toString());
-                Provider.of<CustomThemeProvider>(
-                  context,
-                  listen: false,
-                ).setSecondaryColor(c);
-                _saveSettings();
-              },
-            ),
-          );
-        },
       ),
     );
   }
@@ -643,7 +919,6 @@ class _SettingsPageState extends State<SettingsPage>
               options: audioQualities,
               onChanged: (value) {
                 playerState.setAudioQuality(value);
-                _showSnackBar("Audio quality updated to $value", primaryColor);
               },
             ),
             _buildQualitySelector(
@@ -654,10 +929,6 @@ class _SettingsPageState extends State<SettingsPage>
               options: downloadQualities,
               onChanged: (value) {
                 playerState.setDownloadQuality(value);
-                _showSnackBar(
-                  "Download quality updated to $value",
-                  primaryColor,
-                );
               },
             ),
           ],
@@ -674,69 +945,70 @@ class _SettingsPageState extends State<SettingsPage>
     required List<String> options,
     required ValueChanged<String> onChanged,
   }) {
-    final isPitchBlack =
-        Provider.of<PitchBlackThemeProvider>(
-          context,
-          listen: false,
-        ).isPitchBlack ||
-        pitchBlackEnabled;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-      ),
-      child: ListTile(
-        leading: Container(
+    // Removed unused variable isPitchBlack
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           decoration: BoxDecoration(
-            gradient:
-                (!customColorsEnabled &&
-                    !useSystemTheme &&
-                    !useDynamicColors &&
-                    !pitchBlackEnabled)
-                ? LinearGradient(
-                    colors: defaultGradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            color: customColorsEnabled ? primaryColor : null,
-            shape: BoxShape.circle,
-          ),
-          padding: const EdgeInsets.all(8),
-          child: Icon(icon, color: Colors.white),
-        ),
-        title: Text(title, style: const TextStyle(color: Colors.white)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(subtitle, style: const TextStyle(color: Colors.white70)),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: customColorsEnabled ? primaryColor : defaultPrimaryColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                currentValue,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.25),
+              width: 1.2,
             ),
-          ],
+          ),
+          child: ListTile(
+            leading: Icon(
+              icon,
+              color: (title == "Language" || title == "Notifications")
+                  ? Colors.grey[400]
+                  : Colors.white,
+            ),
+            title: Text(title, style: const TextStyle(color: Colors.white)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(subtitle, style: const TextStyle(color: Colors.white70)),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: !customColorsEnabled
+                        ? const LinearGradient(
+                            colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: customColorsEnabled ? primaryColor : null,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    currentValue,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            trailing: const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white54,
+              size: 16,
+            ),
+            onTap: () =>
+                _showQualityDialog(title, currentValue, options, onChanged),
+          ),
         ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          color: Colors.white54,
-          size: 16,
-        ),
-        onTap: () =>
-            _showQualityDialog(title, currentValue, options, onChanged),
       ),
     );
   }
@@ -747,120 +1019,141 @@ class _SettingsPageState extends State<SettingsPage>
     List<String> options,
     ValueChanged<String> onChanged,
   ) {
-    final isPitchBlack =
-        Provider.of<PitchBlackThemeProvider>(
-          context,
-          listen: false,
-        ).isPitchBlack ||
-        pitchBlackEnabled;
+    // Removed unused variable isPitchBlack
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: secondaryColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Colors.white.withOpacity(0.2)),
-          ),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient:
-                      (!customColorsEnabled &&
-                          !useSystemTheme &&
-                          !useDynamicColors &&
-                          !pitchBlackEnabled)
-                      ? LinearGradient(
-                          colors: defaultGradient,
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: customColorsEnabled ? primaryColor : null,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  title.contains('Audio') ? Icons.high_quality : Icons.download,
-                  color: Colors.white,
-                  size: 20,
-                ),
+        String selectedValue = currentValue;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.white.withOpacity(0.2)),
               ),
-              const SizedBox(width: 12),
-              Text(
-                'Select $title',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: options.map((option) {
-              final isSelected = option == currentValue;
-              return Container(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? (customColorsEnabled
-                            ? primaryColor.withOpacity(0.2)
-                            : defaultPrimaryColor.withOpacity(0.2))
-                      : Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? (customColorsEnabled
-                              ? primaryColor
-                              : defaultPrimaryColor)
-                        : Colors.white.withOpacity(0.1),
-                  ),
-                ),
-                child: ListTile(
-                  title: Text(
-                    option,
-                    style: TextStyle(
-                      color: isSelected
-                          ? (customColorsEnabled
-                                ? primaryColor
-                                : defaultPrimaryColor)
-                          : Colors.white,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: customColorsEnabled
+                                      ? primaryColor
+                                      : Colors.white.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  title.contains('Audio')
+                                      ? Icons.high_quality
+                                      : Icons.download,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Select $title',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: options.map((option) {
+                              final isSelected = option == selectedValue;
+                              return Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.white.withOpacity(0.12)
+                                      : Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? (customColorsEnabled
+                                              ? primaryColor
+                                              : const Color(0xFF8b5cf6))
+                                        : Colors.white.withOpacity(0.1),
+                                  ),
+                                ),
+                                child: ListTile(
+                                  title: Text(
+                                    option,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? (customColorsEnabled
+                                                ? primaryColor
+                                                : const Color(0xFF8b5cf6))
+                                          : Colors.white,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                  leading: isSelected
+                                      ? Icon(
+                                          Icons.check_circle,
+                                          color: customColorsEnabled
+                                              ? primaryColor
+                                              : const Color(0xFF8b5cf6),
+                                        )
+                                      : const Icon(
+                                          Icons.radio_button_unchecked,
+                                          color: Colors.white54,
+                                        ),
+                                  onTap: () {
+                                    setState(() {
+                                      selectedValue = option;
+                                    });
+                                    onChanged(option);
+                                  },
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            top: 8.0,
+                            bottom: 16.0,
+                          ),
+                          child: TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  leading: isSelected
-                      ? Icon(
-                          Icons.check_circle,
-                          color: customColorsEnabled
-                              ? primaryColor
-                              : defaultPrimaryColor,
-                        )
-                      : const Icon(
-                          Icons.radio_button_unchecked,
-                          color: Colors.white54,
-                        ),
-                  onTap: () {
-                    onChanged(option);
-                    Navigator.of(context).pop();
-                  },
                 ),
-              );
-            }).toList(),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.white54),
               ),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -868,27 +1161,30 @@ class _SettingsPageState extends State<SettingsPage>
 
   Widget _buildSystemSection(bool isPitchBlack) {
     return _buildSection(
-      title: "System & Storage",
+      title: "System & Preferences",
       icon: Icons.settings,
       isPitchBlack: isPitchBlack,
       children: [
-        _buildSwitchTile(
+        _buildIOSToggle(
           title: "Offline Mode",
           subtitle: "Only show/play downloaded and local songs",
           value: offlineMode,
+          thumbIcon: Icons.cloud_off,
           onChanged: (val) {
             setState(() {
               offlineMode = val;
             });
             _saveSettings();
           },
+          isActive: offlineMode,
+          otherActive: false,
         ),
         _buildSettingsTile(
           icon: Icons.language,
           title: "Language",
           subtitle: "English",
           onTap: () {
-            _showSnackBar("Language settings coming soon", primaryColor);
+            // SnackBar removed
           },
         ),
         _buildSettingsTile(
@@ -896,7 +1192,7 @@ class _SettingsPageState extends State<SettingsPage>
           title: "Notifications",
           subtitle: "Manage notification settings",
           onTap: () {
-            _showSnackBar("Notification settings coming soon", primaryColor);
+            // SnackBar removed
           },
         ),
       ],
@@ -923,24 +1219,37 @@ class _SettingsPageState extends State<SettingsPage>
             padding: const EdgeInsets.all(20),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient:
-                        (!customColorsEnabled &&
-                            !useSystemTheme &&
-                            !useDynamicColors &&
-                            !pitchBlackEnabled)
-                        ? LinearGradient(
-                            colors: defaultGradient,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          )
-                        : null,
-                    color: customColorsEnabled ? primaryColor : null,
-                    borderRadius: BorderRadius.circular(8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.25),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: customColorsEnabled
+                          ? Icon(icon, color: primaryColor, size: 20)
+                          : ShaderMask(
+                              shaderCallback: (Rect bounds) {
+                                return const LinearGradient(
+                                  colors: [
+                                    Color(0xFF6366f1),
+                                    Color(0xFF8b5cf6),
+                                  ],
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                ).createShader(bounds);
+                              },
+                              child: Icon(icon, color: Colors.white, size: 20),
+                            ),
+                    ),
                   ),
-                  child: Icon(icon, color: Colors.white, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -960,43 +1269,13 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildSwitchTile({
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-      ),
-      child: SwitchListTile.adaptive(
-        title: Text(title, style: const TextStyle(color: Colors.white)),
-        subtitle: Text(subtitle, style: const TextStyle(color: Colors.white70)),
-        value: value,
-        onChanged: onChanged,
-        activeColor: customColorsEnabled ? primaryColor : defaultPrimaryColor,
-        activeTrackColor:
-            (customColorsEnabled ? primaryColor : defaultPrimaryColor)
-                .withOpacity(0.3),
-        inactiveThumbColor: Colors.white24,
-        inactiveTrackColor: Colors.white12,
-      ),
-    );
-  }
-
   Widget _buildSettingsTile({
     required IconData icon,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    final isPitchBlack =
-        context.watch<PitchBlackThemeProvider>().isPitchBlack ||
-        pitchBlackEnabled;
+    // Removed unused variable isPitchBlack
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -1005,25 +1284,23 @@ class _SettingsPageState extends State<SettingsPage>
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
       child: ListTile(
-        leading: Container(
-          decoration: BoxDecoration(
-            gradient:
-                (!customColorsEnabled &&
-                    !useSystemTheme &&
-                    !useDynamicColors &&
-                    !pitchBlackEnabled)
-                ? LinearGradient(
-                    colors: defaultGradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            color: customColorsEnabled ? primaryColor : null,
-            shape: BoxShape.circle,
-          ),
-          padding: const EdgeInsets.all(8),
-          child: Icon(icon, color: Colors.white),
-        ),
+        leading: (title == "Language" || title == "Notifications")
+            ? Icon(icon, color: Colors.grey[400])
+            : Container(
+                decoration: BoxDecoration(
+                  gradient: !customColorsEnabled
+                      ? const LinearGradient(
+                          colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  color: customColorsEnabled ? primaryColor : null,
+                  shape: BoxShape.circle,
+                ),
+                padding: const EdgeInsets.all(8),
+                child: Icon(icon, color: Colors.white),
+              ),
         title: Text(title, style: const TextStyle(color: Colors.white)),
         subtitle: Text(subtitle, style: const TextStyle(color: Colors.white70)),
         trailing: const Icon(
@@ -1059,13 +1336,9 @@ class _SettingsPageState extends State<SettingsPage>
             height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient:
-                  (!customColorsEnabled &&
-                      !useSystemTheme &&
-                      !useDynamicColors &&
-                      !pitchBlackEnabled)
-                  ? LinearGradient(
-                      colors: defaultGradient,
+              gradient: !customColorsEnabled
+                  ? const LinearGradient(
+                      colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )
@@ -1097,13 +1370,9 @@ class _SettingsPageState extends State<SettingsPage>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              gradient:
-                  (!customColorsEnabled &&
-                      !useSystemTheme &&
-                      !useDynamicColors &&
-                      !pitchBlackEnabled)
-                  ? LinearGradient(
-                      colors: defaultGradient,
+              gradient: !customColorsEnabled
+                  ? const LinearGradient(
+                      colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     )

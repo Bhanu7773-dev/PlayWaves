@@ -217,22 +217,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
               ),
             ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: AnimatedNavBar(
-                selectedIndex: widget.selectedNavIndex,
-                onNavTap: _onNavTap,
-                navIcons: const [
-                  Icons.home,
-                  Icons.search,
-                  Icons.playlist_play,
-                  Icons.person_outline,
-                ],
-                navLabels: const ['Home', 'Search', 'Playlist', 'Profile'],
-              ),
-            ),
+            // Navigation bar removed as requested
           ],
         ),
       ),

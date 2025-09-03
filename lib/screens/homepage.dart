@@ -829,9 +829,19 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               Text(
                 'PlayWaves',
                 style: TextStyle(
-                  color: customColorsEnabled ? primaryColor : Colors.white,
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
+                  foreground: Paint()
+                    ..shader = (customColorsEnabled
+                        ? null
+                        : const LinearGradient(
+                            colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ).createShader(Rect.fromLTWH(0, 0, 200, 40)))
+                    ..color = (customColorsEnabled
+                        ? primaryColor
+                        : Colors.white),
                 ),
               ),
             ],
@@ -1011,7 +1021,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     }
     return RefreshIndicator(
       onRefresh: _loadData,
-      color: customColorsEnabled ? primaryColor : const Color(0xFFff7d78),
+      color: customColorsEnabled
+          ? primaryColor
+          : const Color(0xFF6366f1), // Use purple theme for indicator
       backgroundColor: Colors.black,
       displacement: 40.0,
       strokeWidth: 3.0,
@@ -1223,11 +1235,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
                 Container(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: customColorsEnabled
-                          ? [primaryColor, primaryColor.withOpacity(0.8)]
-                          : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                    ),
+                    gradient: customColorsEnabled
+                        ? LinearGradient(
+                            colors: [
+                              primaryColor,
+                              primaryColor.withOpacity(0.8),
+                            ],
+                          )
+                        : LinearGradient(
+                            colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                     shape: BoxShape.circle,
                   ),
                   child: Consumer<PlayerStateProvider>(

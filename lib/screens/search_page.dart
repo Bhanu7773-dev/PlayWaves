@@ -443,30 +443,12 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                   hintStyle: TextStyle(color: Colors.grey[400], fontSize: 16),
                   prefixIcon: Container(
                     padding: const EdgeInsets.all(12),
-                    child: Consumer<CustomThemeProvider>(
-                      builder: (context, customTheme, child) {
-                        final customColorsEnabled =
-                            customTheme.customColorsEnabled;
-                        final primaryColor = customTheme.primaryColor;
-                        if (customColorsEnabled) {
-                          return Icon(
-                            Icons.music_note_rounded,
-                            color: primaryColor,
-                            size: 24,
-                          );
-                        } else {
-                          return ShaderMask(
-                            shaderCallback: (bounds) => const LinearGradient(
-                              colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                            ).createShader(bounds),
-                            child: const Icon(
-                              Icons.music_note_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          );
-                        }
-                      },
+                    child: Icon(
+                      Icons.music_note_rounded,
+                      color: customColorsEnabled
+                          ? primaryColor
+                          : Color(0xFF6366f1),
+                      size: 24,
                     ),
                   ),
                   border: InputBorder.none,
@@ -520,24 +502,28 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
           Container(
             width: 4,
             height: 28,
-            decoration: BoxDecoration(
-              gradient: !customColorsEnabled
-                  ? const LinearGradient(
-                      colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                    )
-                  : null,
-              color: customColorsEnabled ? primaryColor : null,
-              borderRadius: const BorderRadius.all(Radius.circular(2)),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+              ),
+              borderRadius: BorderRadius.all(Radius.circular(2)),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: customColorsEnabled ? primaryColor : Color(0xFF6366f1),
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
+                shadows: [
+                  Shadow(
+                    color: Color(0xFF8b5cf6).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
               ),
             ),
           ),
@@ -546,7 +532,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
             decoration: BoxDecoration(
               gradient: !customColorsEnabled
                   ? const LinearGradient(
-                      colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                      colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
                     )
                   : null,
               color: customColorsEnabled ? primaryColor : null,
@@ -643,21 +629,21 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                 Stack(
                   children: [
                     Container(
-                      width: 60,
-                      height: 60,
+                      width: 56,
+                      height: 56,
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
                         gradient: !customColorsEnabled
                             ? LinearGradient(
                                 colors: [
-                                  const Color(0xFFff7d78).withOpacity(0.3),
-                                  const Color(0xFF9c27b0).withOpacity(0.3),
+                                  const Color(0xFF6366f1).withOpacity(0.3),
+                                  const Color(0xFF8b5cf6).withOpacity(0.3),
                                 ],
                               )
                             : null,
                         color: customColorsEnabled
                             ? primaryColor.withOpacity(0.3)
                             : null,
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
@@ -730,8 +716,8 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                           gradient: !customColorsEnabled
                               ? const LinearGradient(
                                   colors: [
-                                    Color(0xFFff7d78),
-                                    Color(0xFF9c27b0),
+                                    Color(0xFF6366f1),
+                                    Color(0xFF8b5cf6),
                                   ],
                                 )
                               : null,
@@ -740,7 +726,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                           boxShadow: [
                             BoxShadow(
                               color: !customColorsEnabled
-                                  ? const Color(0xFFff7d78).withOpacity(0.5)
+                                  ? const Color(0xFF6366f1).withOpacity(0.5)
                                   : primaryColor.withOpacity(0.5),
                               blurRadius: 6,
                               spreadRadius: 1,
@@ -807,7 +793,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                   decoration: BoxDecoration(
                     gradient: !customColorsEnabled
                         ? const LinearGradient(
-                            colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                            colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
                           )
                         : null,
                     color: customColorsEnabled ? primaryColor : null,
@@ -815,7 +801,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                     boxShadow: [
                       BoxShadow(
                         color: !customColorsEnabled
-                            ? const Color(0xFFff7d78).withOpacity(0.4)
+                            ? const Color(0xFF6366f1).withOpacity(0.4)
                             : primaryColor.withOpacity(0.4),
                         blurRadius: 12,
                         spreadRadius: 2,
@@ -1028,60 +1014,43 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
               children: [
                 // Header
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(
+                    20,
+                    20,
+                    20,
+                    4,
+                  ), // reduced bottom padding
                   decoration: const BoxDecoration(color: Colors.transparent),
                   child: Row(
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                          ),
-                        ),
-                        width: 42,
-                        height: 42,
-                        child: Icon(Icons.search, color: Colors.white),
-                      ),
-                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            (!customColorsEnabled && !isPitchBlack)
-                                ? ShaderMask(
-                                    shaderCallback: (bounds) =>
-                                        const LinearGradient(
-                                          colors: [
-                                            Color(0xFFff7d78),
-                                            Color(0xFF9c27b0),
-                                          ],
-                                        ).createShader(bounds),
-                                    child: const Text(
-                                      'Discover Music',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 24,
-                                      ),
-                                    ),
-                                  )
-                                : Text(
-                                    'Discover Music',
-                                    style: TextStyle(
-                                      color: customColorsEnabled
-                                          ? primaryColor
-                                          : Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 24,
-                                    ),
-                                  ),
                             Text(
                               'Find your perfect soundtrack',
                               style: TextStyle(
                                 color: Colors.grey[400],
                                 fontSize: 14,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Discover Music',
+                              style: TextStyle(
+                                color: customColorsEnabled
+                                    ? primaryColor
+                                    : Color(0xFF6366f1),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 35,
+                                letterSpacing: 0.5,
+                                shadows: [
+                                  Shadow(
+                                    color: Color(0xFF8b5cf6).withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -1216,20 +1185,22 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                     width: 4,
                                     height: 24,
                                     decoration: BoxDecoration(
-                                      color: customColorsEnabled
-                                          ? primaryColor
-                                          : null,
                                       gradient: !customColorsEnabled
                                           ? const LinearGradient(
                                               colors: [
-                                                Color(0xFFff7d78),
-                                                Color(0xFF9c27b0),
+                                                Color(0xFF6366f1),
+                                                Color(0xFF8b5cf6),
                                               ],
                                               begin: Alignment.topCenter,
                                               end: Alignment.bottomCenter,
                                             )
                                           : null,
-                                      borderRadius: BorderRadius.circular(2),
+                                      color: customColorsEnabled
+                                          ? primaryColor
+                                          : null,
+                                      borderRadius: const BorderRadius.all(
+                                        Radius.circular(2),
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -1266,22 +1237,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
           ),
 
           // ...existing code...
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: AnimatedNavBar(
-              selectedIndex: widget.selectedNavIndex,
-              onNavTap: _onNavTap,
-              navIcons: const [
-                Icons.home,
-                Icons.search,
-                Icons.playlist_play,
-                Icons.person_outline,
-              ],
-              navLabels: const ['Home', 'Search', 'Playlist', 'Profile'],
-            ),
-          ),
+          // Navigation bar removed as requested
         ],
       ),
     );

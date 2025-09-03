@@ -52,14 +52,18 @@ class ArtistSection extends StatelessWidget {
                     width: 4,
                     height: 24,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: customColorsEnabled
-                            ? [
+                      gradient: customColorsEnabled
+                          ? LinearGradient(
+                              colors: [
                                 primaryColor,
-                                primaryColor.withValues(alpha: 0.7),
-                              ]
-                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                      ),
+                                primaryColor.withOpacity(0.7),
+                              ],
+                            )
+                          : LinearGradient(
+                              colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -172,9 +176,14 @@ class ArtistSection extends StatelessWidget {
           Text(
             artist['name'] ?? 'Unknown Artist',
             style: TextStyle(
-              color: customColorsEnabled
-                  ? primaryColor.withValues(alpha: 0.9)
-                  : Colors.white,
+              foreground: customColorsEnabled
+                  ? (Paint()..color = Colors.white)
+                  : (Paint()
+                      ..shader = const LinearGradient(
+                        colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ).createShader(Rect.fromLTWH(0, 0, 100, 20))),
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),

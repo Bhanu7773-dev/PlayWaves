@@ -86,11 +86,18 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                     width: 4,
                     height: 24,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: customColorsEnabled
-                            ? [primaryColor, primaryColor.withOpacity(0.7)]
-                            : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                      ),
+                      gradient: customColorsEnabled
+                          ? LinearGradient(
+                              colors: [
+                                primaryColor,
+                                primaryColor.withOpacity(0.7),
+                              ],
+                            )
+                          : LinearGradient(
+                              colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -255,7 +262,7 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                       artist,
                       style: TextStyle(
                         color: customColorsEnabled
-                            ? primaryColor.withOpacity(0.6)
+                            ? Colors.white
                             : Colors.white70,
                         fontSize: 14,
                       ),
@@ -282,10 +289,8 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                         playerState.isSongLoading && isCurrentSong;
 
                     return CircleAvatar(
-                      radius: 24,
-                      backgroundColor: customColorsEnabled
-                          ? primaryColor
-                          : const Color(0xFFff7d78),
+                      radius: 34,
+                      backgroundColor: Colors.transparent,
                       child: IconButton(
                         icon: isLoading
                             ? SizedBox(
@@ -298,9 +303,31 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                                   ),
                                 ),
                               )
-                            : Icon(
-                                isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: Colors.white,
+                            : Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: customColorsEnabled
+                                      ? LinearGradient(
+                                          colors: [
+                                            primaryColor,
+                                            primaryColor.withOpacity(0.8),
+                                          ],
+                                        )
+                                      : LinearGradient(
+                                          colors: [
+                                            Color(0xFF6366f1),
+                                            Color(0xFF8b5cf6),
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                ),
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  isPlaying ? Icons.pause : Icons.play_arrow,
+                                  color: Colors.white,
+                                  size: 40,
+                                ),
                               ),
                         onPressed: isLoading
                             ? null
