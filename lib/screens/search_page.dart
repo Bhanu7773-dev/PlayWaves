@@ -25,6 +25,7 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
+  late FocusNode _searchFocusNode;
   final JioSaavnApiService _apiService = JioSaavnApiService();
 
   List<Map<String, dynamic>> _searchResults = [];
@@ -41,6 +42,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
 
   @override
   void initState() {
+    _searchFocusNode = FocusNode();
     super.initState();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
@@ -429,64 +431,76 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
           ),
           border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
         ),
-        child: TextField(
-          controller: _searchController,
-          style: const TextStyle(color: Colors.white, fontSize: 16),
-          decoration: InputDecoration(
-            hintText: 'Discover your next favorite song...',
-            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 16),
-            prefixIcon: Container(
-              padding: const EdgeInsets.all(12),
-              child: Consumer<CustomThemeProvider>(
-                builder: (context, customTheme, child) {
-                  final customColorsEnabled = customTheme.customColorsEnabled;
-                  final primaryColor = customTheme.primaryColor;
-                  if (customColorsEnabled) {
-                    return Icon(
-                      Icons.music_note_rounded,
-                      color: primaryColor,
-                      size: 24,
-                    );
-                  } else {
-                    return ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                      ).createShader(bounds),
-                      child: const Icon(
-                        Icons.music_note_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    );
-                  }
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: 'Discover your next favorite song...',
+                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 16),
+                  prefixIcon: Container(
+                    padding: const EdgeInsets.all(12),
+                    child: Consumer<CustomThemeProvider>(
+                      builder: (context, customTheme, child) {
+                        final customColorsEnabled =
+                            customTheme.customColorsEnabled;
+                        final primaryColor = customTheme.primaryColor;
+                        if (customColorsEnabled) {
+                          return Icon(
+                            Icons.music_note_rounded,
+                            color: primaryColor,
+                            size: 24,
+                          );
+                        } else {
+                          return ShaderMask(
+                            shaderCallback: (bounds) => const LinearGradient(
+                              colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                            ).createShader(bounds),
+                            child: const Icon(
+                              Icons.music_note_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 18,
+                  ),
+                ),
+                onTap: () {},
+                onEditingComplete: () {
+                  FocusScope.of(context).unfocus();
                 },
               ),
             ),
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.clear_rounded,
-                        color: Colors.white70,
-                        size: 16,
-                      ),
-                    ),
-                    onPressed: () {
-                      _searchController.clear();
-                    },
-                  )
-                : null,
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 24,
-              vertical: 18,
-            ),
-          ),
+            if (_searchFocusNode.hasFocus)
+              IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.clear_rounded,
+                    color: Colors.white70,
+                    size: 16,
+                  ),
+                ),
+                onPressed: () {
+                  _searchController.clear();
+                  _searchFocusNode.unfocus();
+                },
+              ),
+          ],
         ),
       ),
     );
@@ -1275,8 +1289,8 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _searchController.removeListener(() {});
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _animationController.dispose();
     _meteorController.dispose();
     _searchController2.dispose();
