@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
-import '../widgets/color_theme.dialogue.dart';
+import 'preset_store.dart';
 import '../services/custom_theme_provider.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -39,10 +39,19 @@ class _SettingsPageState extends State<SettingsPage>
   final Color defaultPrimaryColor = Color(0xFF6366f1);
   final Color defaultSecondaryColor = Color(0xFF16213e);
 
-  Color get primaryColor =>
-      customColorsEnabled ? pickedPrimaryColor : defaultPrimaryColor;
-  Color get secondaryColor =>
-      customColorsEnabled ? pickedSecondaryColor : defaultSecondaryColor;
+  Color get primaryColor {
+    if (customColorsEnabled) {
+      return Provider.of<CustomThemeProvider>(context).primaryColor;
+    }
+    return defaultPrimaryColor;
+  }
+
+  Color get secondaryColor {
+    if (customColorsEnabled) {
+      return Provider.of<CustomThemeProvider>(context).secondaryColor;
+    }
+    return defaultSecondaryColor;
+  }
 
   final List<String> audioQualities = [
     'Low (96 kbps)',
@@ -120,6 +129,13 @@ class _SettingsPageState extends State<SettingsPage>
     setState(() {
       if (key == 'dynamic') {
         useDynamicColors = value;
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setBool('useDynamicColors', value);
+        });
+        Provider.of<CustomThemeProvider>(
+          context,
+          listen: false,
+        ).setUseDynamicColors(value);
         if (value) {
           customColorsEnabled = false;
           pitchBlackEnabled = false;
@@ -159,6 +175,295 @@ class _SettingsPageState extends State<SettingsPage>
       }
     });
     _saveSettings();
+  }
+
+  Future<Color?> showInlineColorPickerDialog(
+    BuildContext context,
+    Color initialColor,
+    String label,
+  ) async {
+    Color selectedColor = initialColor;
+    final List<Color> materialPresets = [
+      Colors.red,
+      Colors.pink,
+      Colors.purple,
+      Colors.deepPurple,
+      Colors.indigo,
+      Colors.blue,
+      Colors.lightBlue,
+      Colors.cyan,
+      Colors.teal,
+      Colors.green,
+      Colors.lightGreen,
+      Colors.lime,
+      Colors.yellow,
+      Colors.amber,
+      Colors.orange,
+      Colors.deepOrange,
+      Colors.brown,
+      Colors.grey,
+      Colors.blueGrey,
+      Colors.black,
+    ];
+    TextEditingController hexController = TextEditingController(
+      text:
+          '#${selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}',
+    );
+    bool showCustomPicker = false;
+    Color customColor = selectedColor;
+    return showDialog<Color>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: Colors.white.withOpacity(0.1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                'Pick $label Color',
+                style: const TextStyle(color: Colors.white),
+              ),
+              content: SingleChildScrollView(
+                child: AnimatedSize(
+                  duration: Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: materialPresets
+                            .map(
+                              (color) => GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    selectedColor = color;
+                                    customColor = color;
+                                    hexController.text =
+                                        '#${selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+                                  });
+                                },
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: selectedColor == color
+                                          ? Colors.white
+                                          : Colors.transparent,
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Custom', style: TextStyle(color: Colors.white70)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: hexController,
+                              style: const TextStyle(color: Colors.white),
+                              decoration: InputDecoration(
+                                hintText: '#RRGGBB',
+                                hintStyle: TextStyle(color: Colors.white54),
+                                border: OutlineInputBorder(),
+                                filled: true,
+                                fillColor: Colors.white.withOpacity(0.05),
+                              ),
+                              onChanged: (value) {
+                                if (value.startsWith('#') &&
+                                    value.length == 7) {
+                                  try {
+                                    final color = Color(
+                                      int.parse(
+                                        'FF${value.substring(1)}',
+                                        radix: 16,
+                                      ),
+                                    );
+                                    setState(() {
+                                      selectedColor = color;
+                                      customColor = color;
+                                    });
+                                  } catch (_) {}
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                showCustomPicker = !showCustomPicker;
+                              });
+                            },
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: customColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.colorize,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (showCustomPicker) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          'Custom Color',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(color: Colors.white),
+                        ),
+                        SizedBox(height: 8),
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: customColor,
+                            border: Border.all(color: Colors.grey.shade400),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text(
+                              'R',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: Colors.red),
+                            ),
+                            Expanded(
+                              child: Slider(
+                                value: customColor.red.toDouble(),
+                                min: 0,
+                                max: 255,
+                                activeColor: Colors.red,
+                                onChanged: (value) {
+                                  setState(() {
+                                    customColor = customColor.withRed(
+                                      value.toInt(),
+                                    );
+                                    selectedColor = customColor;
+                                    hexController.text =
+                                        '#${customColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+                                  });
+                                },
+                              ),
+                            ),
+                            Text(
+                              customColor.red.toString(),
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Text(
+                              'G',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: Colors.green),
+                            ),
+                            Expanded(
+                              child: Slider(
+                                value: customColor.green.toDouble(),
+                                min: 0,
+                                max: 255,
+                                activeColor: Colors.green,
+                                onChanged: (value) {
+                                  setState(() {
+                                    customColor = customColor.withGreen(
+                                      value.toInt(),
+                                    );
+                                    selectedColor = customColor;
+                                    hexController.text =
+                                        '#${customColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+                                  });
+                                },
+                              ),
+                            ),
+                            Text(
+                              customColor.green.toString(),
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Text(
+                              'B',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: Colors.blue),
+                            ),
+                            Expanded(
+                              child: Slider(
+                                value: customColor.blue.toDouble(),
+                                min: 0,
+                                max: 255,
+                                activeColor: Colors.blue,
+                                onChanged: (value) {
+                                  setState(() {
+                                    customColor = customColor.withBlue(
+                                      value.toInt(),
+                                    );
+                                    selectedColor = customColor;
+                                    hexController.text =
+                                        '#${customColor.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+                                  });
+                                },
+                              ),
+                            ),
+                            Text(
+                              customColor.blue.toString(),
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(selectedColor),
+                  child: const Text(
+                    'Select',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -764,142 +1069,306 @@ class _SettingsPageState extends State<SettingsPage>
 
   Widget _buildCustomColorsTile(BuildContext context) {
     final isDisabled = useDynamicColors || pitchBlackEnabled;
-    return Opacity(
-      opacity: isDisabled ? 0.5 : 1.0,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Icon(
-                Icons.palette,
-                color: customColorsEnabled
-                    ? pickedPrimaryColor
-                    : Colors.white54,
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Custom Colors",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+    return Column(
+      children: [
+        Opacity(
+          opacity: isDisabled ? 0.5 : 1.0,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Provider.of<CustomThemeProvider>(context).customIcon,
+                    color: customColorsEnabled
+                        ? Provider.of<CustomThemeProvider>(context).primaryColor
+                        : Colors.white54,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Custom Colors",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "Personalize your app colors",
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  GestureDetector(
+                    onTap: isDisabled
+                        ? null
+                        : () {
+                            final newValue = !customColorsEnabled;
+                            _handleThemeToggle('custom', newValue);
+                            Provider.of<CustomThemeProvider>(
+                              context,
+                              listen: false,
+                            ).setCustomColorsEnabled(newValue);
+                          },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      width: 60,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: customColorsEnabled
+                            ? LinearGradient(
+                                colors: [
+                                  Provider.of<CustomThemeProvider>(
+                                    context,
+                                  ).primaryColor,
+                                  Provider.of<CustomThemeProvider>(
+                                    context,
+                                  ).primaryColor.withOpacity(0.8),
+                                ],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              )
+                            : null,
+                        color: customColorsEnabled
+                            ? null
+                            : Colors.grey.withOpacity(0.3),
+                        boxShadow: customColorsEnabled
+                            ? [
+                                BoxShadow(
+                                  color: Provider.of<CustomThemeProvider>(
+                                    context,
+                                  ).primaryColor.withOpacity(0.4),
+                                  blurRadius: 12,
+                                  spreadRadius: 2,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          AnimatedAlign(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                            alignment: customColorsEnabled
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              margin: const EdgeInsets.all(3),
+                              width: 26,
+                              height: 26,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(15),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                child: Icon(
+                                  customColorsEnabled
+                                      ? Icons.color_lens
+                                      : Icons.close,
+                                  key: ValueKey(customColorsEnabled),
+                                  color: customColorsEnabled
+                                      ? Provider.of<CustomThemeProvider>(
+                                          context,
+                                        ).primaryColor
+                                      : Colors.grey[600],
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Personalize your app colors",
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              GestureDetector(
-                onTap: isDisabled
-                    ? null
-                    : () {
-                        final newValue = !customColorsEnabled;
-                        _handleThemeToggle('custom', newValue);
-                        Provider.of<CustomThemeProvider>(
-                          context,
-                          listen: false,
-                        ).setCustomColorsEnabled(newValue);
-                      },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                  width: 60,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: customColorsEnabled
-                        ? LinearGradient(
-                            colors: [
-                              pickedPrimaryColor,
-                              pickedPrimaryColor.withOpacity(0.8),
-                            ],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          )
-                        : null,
-                    color: customColorsEnabled
-                        ? null
-                        : Colors.grey.withOpacity(0.3),
-                    boxShadow: customColorsEnabled
-                        ? [
-                            BoxShadow(
-                              color: pickedPrimaryColor.withOpacity(0.4),
-                              blurRadius: 12,
-                              spreadRadius: 2,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (customColorsEnabled && !isDisabled)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      AnimatedAlign(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        alignment: customColorsEnabled
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
+                      Text(
+                        "Primary Color",
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () async {
+                          Color? selected = await showInlineColorPickerDialog(
+                            context,
+                            Provider.of<CustomThemeProvider>(
+                              context,
+                              listen: false,
+                            ).primaryColor,
+                            "Primary",
+                          );
+                          if (selected != null) {
+                            setState(() {
+                              pickedPrimaryColor = selected;
+                            });
+                            Provider.of<CustomThemeProvider>(
+                              context,
+                              listen: false,
+                            ).setPrimaryColor(selected);
+                          }
+                        },
                         child: Container(
-                          margin: const EdgeInsets.all(3),
-                          width: 26,
-                          height: 26,
+                          height: 36,
+                          width: double.infinity,
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              customColorsEnabled
-                                  ? Icons.color_lens
-                                  : Icons.close,
-                              key: ValueKey(customColorsEnabled),
-                              color: customColorsEnabled
-                                  ? pickedPrimaryColor
-                                  : Colors.grey[600],
-                              size: 16,
-                            ),
+                            color: Provider.of<CustomThemeProvider>(
+                              context,
+                            ).primaryColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white24),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Secondary Color",
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () async {
+                          Color? selected = await showInlineColorPickerDialog(
+                            context,
+                            Provider.of<CustomThemeProvider>(
+                              context,
+                              listen: false,
+                            ).secondaryColor,
+                            "Secondary",
+                          );
+                          if (selected != null) {
+                            setState(() {
+                              pickedSecondaryColor = selected;
+                            });
+                            Provider.of<CustomThemeProvider>(
+                              context,
+                              listen: false,
+                            ).setSecondaryColor(selected);
+                          }
+                        },
+                        child: Container(
+                          height: 36,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Provider.of<CustomThemeProvider>(
+                              context,
+                            ).secondaryColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        if (customColorsEnabled && !isDisabled)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ColorPresetPage(),
+                  ),
+                );
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.storefront, color: Colors.white70),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Preset Store",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Browse and apply curated color palettes",
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -1367,93 +1836,40 @@ class _SettingsPageState extends State<SettingsPage>
             ),
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              gradient: !customColorsEnabled
-                  ? const LinearGradient(
-                      colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: customColorsEnabled ? primaryColor : null,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              "🌑 I am DARK 🌑",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "BCA Student & Aspiring Developer",
+          Text(
+            "Bhanu Pratap",
             style: TextStyle(
-              fontStyle: FontStyle.italic,
-              color: Colors.white70,
-              fontSize: 14,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
-            ),
-            child: const Column(
-              children: [
-                Text(
-                  "Hope you're enjoying my PlayWaves Music App!",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 8),
-                Text(
-                  "Special thanks to our amazing collaborators:\nineffable & darkx dev",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white60,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
+          const SizedBox(height: 4),
+          Text(
+            "Flutter Developer",
+            style: TextStyle(fontSize: 14, color: Colors.white70),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            "\"Code, Create, Conquer!\"",
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.amberAccent,
-              fontStyle: FontStyle.italic,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildSocialButton(
                 FontAwesomeIcons.github,
                 Colors.white,
                 "GitHub",
-                () => _launchURL("https://github.com/Bhanu7773-dev"),
+                () => _launchURL("https://github.com/yourprofile"),
               ),
+              const SizedBox(width: 16),
+              _buildSocialButton(
+                FontAwesomeIcons.linkedin,
+                Colors.blueAccent,
+                "LinkedIn",
+                () => _launchURL("https://linkedin.com/in/yourprofile"),
+              ),
+              const SizedBox(width: 16),
               _buildSocialButton(
                 FontAwesomeIcons.telegram,
-                const Color(0xFF29A7DF),
+                Colors.blue,
                 "Telegram",
                 () => _launchURL("https://t.me/darkdevil7773"),
               ),

@@ -55,6 +55,8 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   just_audio_background: ^0.0.1-beta.17
+  flutter_riverpod: ^2.6.1
+  flex_color_scheme: ^8.2.0
 
 
 dev_dependencies:                     

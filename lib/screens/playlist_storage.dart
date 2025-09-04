@@ -12,6 +12,7 @@ import 'liked_songs_screen.dart';
 import 'my_playlist_screen.dart';
 import 'downloaded_songs_screen.dart';
 import 'recently_played_screen.dart';
+import '../logic/playlist_storage_logic.dart';
 
 class LibraryScreen extends StatefulWidget {
   final Function(int)? onNavTap;
@@ -28,82 +29,44 @@ class _LibraryScreenState extends State<LibraryScreen>
     with TickerProviderStateMixin {
   late AnimationController _masterController;
   late AnimationController _floatController;
-  late AnimationController _rippleController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _floatAnimation;
-  late Animation<double> _rippleAnimation;
-
   late FocusNode _searchFocusNode;
   final TextEditingController _searchControllerText = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    Hive.openBox<PlaylistSong>('recentlyPlayed');
+    PlaylistStorageLogic.openRecentlyPlayedBox();
     _searchFocusNode = FocusNode();
     _searchFocusNode.addListener(() {
       setState(() {}); // Rebuild when focus changes to show/hide close button
     });
-    _initializeAnimations();
-    _startAnimations();
-  }
-
-  void _initializeAnimations() {
-    _masterController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
+    _masterController = PlaylistStorageLogic.createMasterController(this);
+    _floatController = PlaylistStorageLogic.createFloatController(this);
+    _fadeAnimation = PlaylistStorageLogic.createFadeAnimation(
+      _masterController,
     );
-    _floatController = AnimationController(
-      duration: const Duration(seconds: 8),
-      vsync: this,
+    _slideAnimation = PlaylistStorageLogic.createSlideAnimation(
+      _masterController,
     );
-    _rippleController = AnimationController(
-      duration: const Duration(seconds: 5),
-      vsync: this,
+    _floatAnimation = PlaylistStorageLogic.createFloatAnimation(
+      _floatController,
     );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _masterController, curve: Curves.easeOut),
-    );
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
-          CurvedAnimation(parent: _masterController, curve: Curves.easeOut),
-        );
-    _floatAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _floatController, curve: Curves.easeInOut),
-    );
-    _rippleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _rippleController, curve: Curves.easeOut),
-    );
-  }
-
-  void _startAnimations() {
     _masterController.forward();
     _floatController.repeat(reverse: true);
-    _rippleController.repeat();
   }
 
   @override
   void dispose() {
     _masterController.stop();
     _floatController.stop();
-    _rippleController.stop();
     _masterController.dispose();
     _floatController.dispose();
-    _rippleController.dispose();
     _searchControllerText.dispose();
     _searchFocusNode.dispose();
     super.dispose();
-  }
-
-  void _onNavTap(int index) {
-    if (index == 0) {
-      Navigator.pop(context);
-    } else {
-      if (widget.onNavTap != null) {
-        widget.onNavTap!(index);
-      }
-    }
   }
 
   @override
@@ -111,19 +74,37 @@ class _LibraryScreenState extends State<LibraryScreen>
     final isPitchBlack = context.watch<PitchBlackThemeProvider>().isPitchBlack;
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
-    final primaryColor = customTheme.primaryColor;
-    final secondaryColor = customTheme.secondaryColor;
-    final likedSongsCount = Hive.box<LikedSong>('likedSongs').length;
-    final playlistSongsCount = Hive.box<PlaylistSong>('playlistSongs').length;
+    final useDynamicColors = customTheme.useDynamicColors;
+    final scheme = Theme.of(context).colorScheme;
+
+    // For all color logic
+    final primaryColor = useDynamicColors ? scheme.primary : scheme.primary;
+    final secondaryColor = useDynamicColors
+        ? scheme.secondary
+        : customTheme.secondaryColor;
+    final backgroundColor = isPitchBlack
+        ? Colors.black
+        : useDynamicColors
+        ? scheme.background
+        : customColorsEnabled
+        ? secondaryColor
+        : const Color(0xFF16213e);
+
+    final accentGradient = useDynamicColors
+        ? [scheme.primary, scheme.secondary]
+        : customColorsEnabled
+        ? [primaryColor, secondaryColor]
+        : const [Color(0xFF6366f1), Color(0xFF8b5cf6)];
+
+    final likedSongsCount = PlaylistStorageLogic.getLikedSongsCount();
+    final playlistSongsCount = PlaylistStorageLogic.getPlaylistSongsCount();
 
     final libraryItems = [
       LibraryItemData(
         title: "Favorites",
         subtitle: "$likedSongsCount songs",
         iconData: Icons.favorite,
-        gradient: customColorsEnabled
-            ? [primaryColor, primaryColor.withOpacity(0.7)]
-            : const [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+        gradient: accentGradient,
         isActive: true,
         onTap: () {
           Navigator.push(
@@ -136,9 +117,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         title: "My Playlists",
         subtitle: "$playlistSongsCount songs",
         iconData: Icons.queue_music,
-        gradient: customColorsEnabled
-            ? [primaryColor, primaryColor.withOpacity(0.7)]
-            : const [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+        gradient: accentGradient,
         onTap: () {
           Navigator.push(
             context,
@@ -150,9 +129,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         title: "Recently Played",
         subtitle: "89 tracks",
         iconData: Icons.history,
-        gradient: customColorsEnabled
-            ? [primaryColor, primaryColor.withOpacity(0.7)]
-            : const [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+        gradient: accentGradient,
         onTap: () {
           Navigator.push(
             context,
@@ -166,9 +143,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         title: "Downloaded",
         subtitle: "32 songs",
         iconData: Icons.download_done,
-        gradient: customColorsEnabled
-            ? [primaryColor, primaryColor.withOpacity(0.7)]
-            : const [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+        gradient: accentGradient,
         onTap: () {
           Navigator.push(
             context,
@@ -181,17 +156,21 @@ class _LibraryScreenState extends State<LibraryScreen>
     ];
 
     return Scaffold(
-      backgroundColor: isPitchBlack
-          ? Colors.black
-          : customColorsEnabled
-          ? secondaryColor
-          : Colors.black,
+      backgroundColor: backgroundColor,
       body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusScope.of(context).unfocus(),
         child: Stack(
           children: [
-            _buildStardustBackground(isPitchBlack: isPitchBlack),
+            _buildStardustBackground(
+              isPitchBlack: isPitchBlack,
+              scheme: scheme,
+              accentGradient: accentGradient,
+              useDynamicColors: useDynamicColors,
+              customColorsEnabled: customColorsEnabled,
+              primaryColor: primaryColor,
+              secondaryColor: secondaryColor,
+            ),
             SafeArea(
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -200,14 +179,31 @@ class _LibraryScreenState extends State<LibraryScreen>
                   child: CustomScrollView(
                     physics: const BouncingScrollPhysics(),
                     slivers: [
-                      SliverToBoxAdapter(child: _buildHeader()),
-                      SliverToBoxAdapter(child: _buildSearchBar()),
+                      SliverToBoxAdapter(
+                        child: _buildHeader(
+                          scheme,
+                          useDynamicColors,
+                          customColorsEnabled,
+                          primaryColor,
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: _buildSearchBar(
+                          scheme,
+                          useDynamicColors,
+                          customColorsEnabled,
+                          primaryColor,
+                        ),
+                      ),
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
-                            (context, index) =>
-                                _buildLibraryItem(libraryItems[index], index),
+                            (context, index) => _buildLibraryItem(
+                              libraryItems[index],
+                              index,
+                              scheme,
+                            ),
                             childCount: libraryItems.length,
                           ),
                         ),
@@ -224,12 +220,15 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  Widget _buildStardustBackground({required bool isPitchBlack}) {
-    final customTheme = context.watch<CustomThemeProvider>();
-    final customColorsEnabled = customTheme.customColorsEnabled;
-    final primaryColor = customTheme.primaryColor;
-    final secondaryColor = customTheme.secondaryColor;
-
+  Widget _buildStardustBackground({
+    required bool isPitchBlack,
+    required ColorScheme scheme,
+    required List<Color> accentGradient,
+    required bool useDynamicColors,
+    required bool customColorsEnabled,
+    required Color primaryColor,
+    required Color secondaryColor,
+  }) {
     return AnimatedBuilder(
       animation: _floatAnimation,
       builder: (context, child) {
@@ -237,6 +236,12 @@ class _LibraryScreenState extends State<LibraryScreen>
           decoration: BoxDecoration(
             gradient: isPitchBlack
                 ? null
+                : useDynamicColors
+                ? RadialGradient(
+                    center: Alignment.topLeft,
+                    radius: 1.5,
+                    colors: [scheme.background, scheme.surface, Colors.black],
+                  )
                 : customColorsEnabled
                 ? RadialGradient(
                     center: Alignment.topLeft,
@@ -261,10 +266,11 @@ class _LibraryScreenState extends State<LibraryScreen>
           child: Stack(
             children: [
               ...List.generate(12, (index) {
-                final Color meteorColor = customColorsEnabled
+                final Color meteorColor = useDynamicColors
+                    ? scheme.tertiary
+                    : customColorsEnabled
                     ? primaryColor
-                    : const Color(0xFF6366f1);
-
+                    : accentGradient.first;
                 return _buildFloatingMeteor(index, meteorColor, isPitchBlack);
               }),
               ...List.generate(20, (index) {
@@ -351,11 +357,12 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  Widget _buildHeader() {
-    final customTheme = context.watch<CustomThemeProvider>();
-    final customColorsEnabled = customTheme.customColorsEnabled;
-    final primaryColor = customTheme.primaryColor;
-
+  Widget _buildHeader(
+    ColorScheme scheme,
+    bool useDynamicColors,
+    bool customColorsEnabled,
+    Color primaryColor,
+  ) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Column(
@@ -364,7 +371,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           Text(
             'Your Library',
             style: TextStyle(
-              color: Colors.grey[400],
+              color: useDynamicColors ? scheme.onBackground : Colors.grey[400],
               fontSize: 16,
               fontWeight: FontWeight.w400,
             ),
@@ -375,9 +382,11 @@ class _LibraryScreenState extends State<LibraryScreen>
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.w900,
-              color: customColorsEnabled
-                  ? primaryColor
-                  : const Color(0xFF6366f1),
+              color: useDynamicColors
+                  ? scheme.primary
+                  : (customColorsEnabled
+                        ? primaryColor
+                        : const Color(0xFF6366f1)),
               letterSpacing: -0.5,
               height: 1.1,
             ),
@@ -387,26 +396,41 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  Widget _buildSearchBar() {
-    final customTheme = context.watch<CustomThemeProvider>();
-    final customColorsEnabled = customTheme.customColorsEnabled;
-    final primaryColor = customTheme.primaryColor;
-
+  Widget _buildSearchBar(
+    ColorScheme scheme,
+    bool useDynamicColors,
+    bool customColorsEnabled,
+    Color primaryColor,
+  ) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
       child: Container(
         height: 56,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
-          gradient: LinearGradient(
-            colors: [
-              Colors.white.withOpacity(0.1),
-              Colors.white.withOpacity(0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          gradient: useDynamicColors
+              ? LinearGradient(
+                  colors: [
+                    scheme.surface.withOpacity(0.1),
+                    scheme.surface.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : LinearGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.1),
+                    Colors.white.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          border: Border.all(
+            color: useDynamicColors
+                ? scheme.onSurface.withOpacity(0.15)
+                : Colors.white.withOpacity(0.15),
+            width: 1,
           ),
-          border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
@@ -417,9 +441,11 @@ class _LibraryScreenState extends State<LibraryScreen>
                 const SizedBox(width: 20),
                 Icon(
                   Icons.search_rounded,
-                  color: customColorsEnabled
-                      ? primaryColor
-                      : const Color(0xFF6366f1),
+                  color: useDynamicColors
+                      ? scheme.tertiary
+                      : (customColorsEnabled
+                            ? primaryColor
+                            : const Color(0xFF6366f1)),
                   size: 24,
                 ),
                 const SizedBox(width: 16),
@@ -427,14 +453,24 @@ class _LibraryScreenState extends State<LibraryScreen>
                   child: TextField(
                     controller: _searchControllerText,
                     focusNode: _searchFocusNode,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    style: TextStyle(
+                      color: useDynamicColors ? scheme.onSurface : Colors.white,
+                      fontSize: 16,
+                    ),
+                    cursorColor: useDynamicColors
+                        ? scheme.primary
+                        : Color(0xFF6366f1),
                     decoration: InputDecoration(
                       hintText: "Search your music...",
                       hintStyle: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
+                        color: useDynamicColors
+                            ? scheme.onSurface.withOpacity(0.5)
+                            : Colors.white.withOpacity(0.5),
                         fontSize: 16,
                       ),
                       border: InputBorder.none,
+                      fillColor: Colors.transparent,
+                      filled: true,
                     ),
                     onEditingComplete: () {
                       FocusScope.of(context).unfocus();
@@ -443,9 +479,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
                 if (_searchFocusNode.hasFocus)
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.close,
-                      color: Colors.white,
+                      color: useDynamicColors ? scheme.onSurface : Colors.white,
                       size: 20,
                     ),
                     onPressed: () {
@@ -461,7 +497,11 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  Widget _buildLibraryItem(LibraryItemData item, int index) {
+  Widget _buildLibraryItem(
+    LibraryItemData item,
+    int index,
+    ColorScheme scheme,
+  ) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: Duration(milliseconds: 800 + (index * 100)),
@@ -471,7 +511,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           offset: Offset(0, (1 - value) * 20),
           child: Opacity(
             opacity: value,
-            child: MinimalLibraryCard(item: item, index: index),
+            child: MinimalLibraryCard(item: item, index: index, scheme: scheme),
           ),
         );
       },
@@ -500,9 +540,14 @@ class LibraryItemData {
 class MinimalLibraryCard extends StatefulWidget {
   final LibraryItemData item;
   final int index;
+  final ColorScheme scheme;
 
-  const MinimalLibraryCard({required this.item, required this.index, Key? key})
-    : super(key: key);
+  const MinimalLibraryCard({
+    required this.item,
+    required this.index,
+    required this.scheme,
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<MinimalLibraryCard> createState() => _MinimalLibraryCardState();
@@ -541,6 +586,14 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = widget.scheme;
+    final customTheme = Provider.of<CustomThemeProvider>(
+      context,
+      listen: false,
+    );
+    final useDynamicColors = customTheme.useDynamicColors;
+    // Fallback for blue-purple gradient
+    final bluePurpleGradient = const [Color(0xFF6366f1), Color(0xFF8b5cf6)];
     return GestureDetector(
       onTap: () {
         widget.item.onTap();
@@ -558,22 +611,16 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withOpacity(
-                      0.08 + _glowAnimation.value * 0.04,
-                    ),
-                    Colors.white.withOpacity(
-                      0.04 + _glowAnimation.value * 0.02,
-                    ),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: useDynamicColors
+                    ? scheme.surface
+                    : Colors.white.withOpacity(0.12),
                 border: Border.all(
                   color: widget.item.isActive
-                      ? widget.item.gradient.first.withOpacity(0.3)
-                      : Colors.white.withOpacity(
+                      ? (useDynamicColors
+                                ? scheme.primary
+                                : const Color(0xFF6366f1))
+                            .withOpacity(0.3)
+                      : scheme.outline.withOpacity(
                           0.12 + _glowAnimation.value * 0.08,
                         ),
                   width: widget.item.isActive ? 1.5 : 1,
@@ -581,7 +628,11 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
                 boxShadow: [
                   if (widget.item.isActive)
                     BoxShadow(
-                      color: widget.item.gradient.first.withOpacity(0.2),
+                      color:
+                          (useDynamicColors
+                                  ? scheme.primary
+                                  : const Color(0xFF6366f1))
+                              .withOpacity(0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -596,88 +647,203 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: LinearGradient(
-                            colors: widget.item.gradient,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: widget.item.gradient.first.withOpacity(
-                                0.3,
-                              ),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          widget.item.iconData,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                child: useDynamicColors
+                    ? BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                        child: Row(
                           children: [
-                            Text(
-                              widget.item.title,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: widget.item.isActive
-                                    ? FontWeight.w700
-                                    : FontWeight.w600,
-                                letterSpacing: -0.2,
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                color: useDynamicColors ? scheme.primary : null,
+                                gradient: useDynamicColors
+                                    ? null
+                                    : LinearGradient(
+                                        colors: bluePurpleGradient,
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        (useDynamicColors
+                                                ? scheme.primary
+                                                : bluePurpleGradient.first)
+                                            .withOpacity(0.3),
+                                    blurRadius: 15,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                widget.item.iconData,
+                                color: useDynamicColors
+                                    ? scheme.onPrimary
+                                    : Colors.white,
+                                size: 28,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              widget.item.subtitle,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.item.title,
+                                    style: TextStyle(
+                                      color: scheme.onSurface,
+                                      fontSize: 18,
+                                      fontWeight: widget.item.isActive
+                                          ? FontWeight.w700
+                                          : FontWeight.w600,
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.item.subtitle,
+                                    style: TextStyle(
+                                      color: scheme.onSurface.withOpacity(0.6),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                            if (widget.item.isActive)
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: useDynamicColors
+                                      ? scheme.primary
+                                      : null,
+                                  gradient: useDynamicColors
+                                      ? null
+                                      : LinearGradient(
+                                          colors: bluePurpleGradient,
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                ),
+                                child: Icon(
+                                  Icons.play_arrow,
+                                  color: useDynamicColors
+                                      ? scheme.onPrimary
+                                      : Colors.white,
+                                  size: 20,
+                                ),
+                              )
+                            else
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: scheme.onSurface.withOpacity(0.4),
+                                size: 16,
+                              ),
+                          ],
+                        ),
+                      )
+                    : BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                color: useDynamicColors ? scheme.primary : null,
+                                gradient: useDynamicColors
+                                    ? null
+                                    : LinearGradient(
+                                        colors: bluePurpleGradient,
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        (useDynamicColors
+                                                ? scheme.primary
+                                                : bluePurpleGradient.first)
+                                            .withOpacity(0.3),
+                                    blurRadius: 15,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                widget.item.iconData,
+                                color: useDynamicColors
+                                    ? scheme.onPrimary
+                                    : Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.item.title,
+                                    style: TextStyle(
+                                      color: scheme.onSurface,
+                                      fontSize: 18,
+                                      fontWeight: widget.item.isActive
+                                          ? FontWeight.w700
+                                          : FontWeight.w600,
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.item.subtitle,
+                                    style: TextStyle(
+                                      color: scheme.onSurface.withOpacity(0.6),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (widget.item.isActive)
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: useDynamicColors
+                                      ? scheme.primary
+                                      : null,
+                                  gradient: useDynamicColors
+                                      ? null
+                                      : LinearGradient(
+                                          colors: bluePurpleGradient,
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                ),
+                                child: Icon(
+                                  Icons.play_arrow,
+                                  color: useDynamicColors
+                                      ? scheme.onPrimary
+                                      : Colors.white,
+                                  size: 20,
+                                ),
+                              )
+                            else
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: scheme.onSurface.withOpacity(0.4),
+                                size: 16,
+                              ),
                           ],
                         ),
                       ),
-                      if (widget.item.isActive)
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: widget.item.gradient,
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.play_arrow,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        )
-                      else
-                        Icon(
-                          Icons.arrow_forward_ios,
-                          color: Colors.white.withOpacity(0.4),
-                          size: 16,
-                        ),
-                    ],
-                  ),
-                ),
               ),
             ),
           );
