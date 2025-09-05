@@ -4,6 +4,9 @@ import 'dart:math' as math;
 import 'package:provider/provider.dart' as provider;
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
+import '../widgets/animated_navbar.dart';
+import '../models/liked_song.dart';
+import '../models/playlist_song.dart';
 import 'liked_songs_screen.dart';
 import 'my_playlist_screen.dart';
 import 'downloaded_songs_screen.dart';
@@ -11,7 +14,38 @@ import 'recently_played_screen.dart';
 import '../logic/playlist_storage_logic.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/theme_provider.dart';
-import 'package:flex_color_scheme/flex_color_scheme.dart';
+import 'package:flex_color_scheme/flex_color_scheme.dart';ter/material.dart';
+import 'dart:ui';
+import 'dart:math' as math;
+import 'package:provider/provider.dart' as provider;
+import '../services/pitch_black_theme_provider.dart';
+import '../services/custom_theme_provider.dart';
+import '../widgets/animated_navbar.dart';
+import '../models/liked_song.dart';
+import '../models/playlist_song.dart';
+import 'liked_songs_screen.dart';
+import 'my_playlist_screen.dart';
+import 'downloaded_songs_screen.dart';
+import 'recently_played_screen.dart';
+import '../logic/playlist_storage_logic.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/theme_provider.dart';
+import 'package:flex_color_scheme/flex_color_scheme.dart';flutter/material.dart';
+import 'dart:ui';
+import 'dart:math' as math;
+import 'package:provider/provider.dart' as provider;
+import '../services/pitch_black_theme_provider.dart';
+import '../services/custom_theme_provider.dart';
+import '../widgets/animated_navbar.dart';
+import '../models/liked_song.dart';
+import '../models/playlist_song.dart';
+import 'liked_songs_screen.dart';
+import 'my_playlist_screen.dart';
+import 'downloaded_songs_screen.dart';
+import 'recently_played_screen.dart';
+import '../logic/playlist_storage_logic.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/theme_provider.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
   final Function(int)? onNavTap;
@@ -96,9 +130,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     final themeScheme = currentThemeData.colorScheme;
 
     // For all color logic
-    final primaryColor = useDynamicColors
-        ? themeScheme.primary
-        : customTheme.primaryColor;
+    final primaryColor = useDynamicColors ? themeScheme.primary : customTheme.primaryColor;
     final secondaryColor = useDynamicColors
         ? themeScheme.secondary
         : customTheme.secondaryColor;

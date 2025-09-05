@@ -32,6 +32,7 @@ class _SettingsPageState extends State<SettingsPage>
   bool customColorsEnabled = false;
   bool pitchBlackEnabled = false;
   bool offlineMode = false;
+  bool materialPresetEnabled = false; // Added for Material Preset toggle
   Color pickedPrimaryColor = const Color(0xFFff7d78);
   Color pickedSecondaryColor = const Color(0xFF16213e);
 
@@ -101,6 +102,8 @@ class _SettingsPageState extends State<SettingsPage>
       customColorsEnabled = prefs.getBool('customColorsEnabled') ?? false;
       pitchBlackEnabled = prefs.getBool('pitchBlackEnabled') ?? false;
       offlineMode = prefs.getBool('offlineMode') ?? false;
+      materialPresetEnabled =
+          prefs.getBool('materialPresetEnabled') ?? false; // Added
       pickedPrimaryColor = Color(prefs.getInt('primaryColor') ?? 0xFFff7d78);
       pickedSecondaryColor = Color(
         prefs.getInt('secondaryColor') ?? 0xFF16213e,
@@ -115,6 +118,7 @@ class _SettingsPageState extends State<SettingsPage>
     prefs.setBool('customColorsEnabled', customColorsEnabled);
     prefs.setBool('pitchBlackEnabled', pitchBlackEnabled);
     prefs.setBool('offlineMode', offlineMode);
+    prefs.setBool('materialPresetEnabled', materialPresetEnabled); // Added
     prefs.setInt('primaryColor', pickedPrimaryColor.value);
     prefs.setInt('secondaryColor', pickedSecondaryColor.value);
   }
@@ -171,6 +175,22 @@ class _SettingsPageState extends State<SettingsPage>
             context,
             listen: false,
           ).setCustomColorsEnabled(false);
+        }
+      } else if (key == 'materialPreset') {
+        materialPresetEnabled = value;
+        if (value) {
+          useDynamicColors = false;
+          customColorsEnabled = false;
+          pitchBlackEnabled = false;
+          context.read<PitchBlackThemeProvider>().setPitchBlack(false);
+          Provider.of<CustomThemeProvider>(
+            context,
+            listen: false,
+          ).setCustomColorsEnabled(false);
+          Provider.of<CustomThemeProvider>(
+            context,
+            listen: false,
+          ).setUseDynamicColors(false);
         }
       }
     });
@@ -886,20 +906,78 @@ class _SettingsPageState extends State<SettingsPage>
       isPitchBlack: isPitchBlack,
       children: [
         _buildIOSToggle(
-          title: "Dynamic Colors",
-          subtitle: "Matches system accent color (Android 12+)",
+          title: "Material Preset",
+          subtitle: "Use Material 3 color presets for your app's theme.",
           value: useDynamicColors,
-          thumbIcon: Icons.auto_awesome,
+          thumbIcon: Icons.palette,
           onChanged: (val) {
             if (useDynamicColors ||
-                (!pitchBlackEnabled && !customColorsEnabled)) {
+                (!pitchBlackEnabled &&
+                    !customColorsEnabled &&
+                    !materialPresetEnabled)) {
               _handleThemeToggle('dynamic', val);
               // SnackBar removed
             }
           },
           isActive: useDynamicColors,
-          otherActive: pitchBlackEnabled || customColorsEnabled,
+          otherActive:
+              pitchBlackEnabled || customColorsEnabled || materialPresetEnabled,
         ),
+        if (useDynamicColors)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ColorPresetPage(),
+                  ),
+                );
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.storefront, color: Colors.white70),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Preset Store",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Browse and apply curated color palettes",
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         _buildIOSToggle(
           title: "Pitch Black",
           subtitle: "Ultra dark mode for AMOLED screens",
@@ -907,13 +985,16 @@ class _SettingsPageState extends State<SettingsPage>
           thumbIcon: Icons.brightness_2,
           onChanged: (val) {
             if (pitchBlackEnabled ||
-                (!useDynamicColors && !customColorsEnabled)) {
+                (!useDynamicColors &&
+                    !customColorsEnabled &&
+                    !materialPresetEnabled)) {
               _handleThemeToggle('pitchBlack', val);
               // SnackBar removed
             }
           },
           isActive: pitchBlackEnabled,
-          otherActive: useDynamicColors || customColorsEnabled,
+          otherActive:
+              useDynamicColors || customColorsEnabled || materialPresetEnabled,
         ),
         _buildCustomColorsTile(context),
       ],
@@ -1068,7 +1149,8 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildCustomColorsTile(BuildContext context) {
-    final isDisabled = useDynamicColors || pitchBlackEnabled;
+    final isDisabled =
+        useDynamicColors || pitchBlackEnabled || materialPresetEnabled;
     return Column(
       children: [
         Opacity(
@@ -1216,6 +1298,62 @@ class _SettingsPageState extends State<SettingsPage>
             ),
           ),
         ),
+
+        if (materialPresetEnabled)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ColorPresetPage(),
+                  ),
+                );
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.storefront, color: Colors.white70),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Preset Store",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Browse and apply curated color palettes",
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (customColorsEnabled && !isDisabled)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1311,61 +1449,6 @@ class _SettingsPageState extends State<SettingsPage>
                   ),
                 ),
               ],
-            ),
-          ),
-        if (customColorsEnabled && !isDisabled)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: GestureDetector(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const ColorPresetPage(),
-                  ),
-                );
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.storefront, color: Colors.white70),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Preset Store",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "Browse and apply curated color palettes",
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ),
           ),
       ],

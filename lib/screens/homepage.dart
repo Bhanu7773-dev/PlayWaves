@@ -9,12 +9,10 @@ import '../widgets/animated_navbar.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/music_loader.dart';
 import '../screens/search_page.dart';
-import '../screens/playlist_storage.dart'; // Make sure this import is correct!
+import '../screens/playlist_storage.dart';
 import '../services/player_state_provider.dart';
 import '../screens/settings_page.dart';
-import 'package:swipe_cards/swipe_cards.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import '../widgets/artist_section.dart'; // <-- Import the new artist page widget
+import '../widgets/artist_section.dart';
 import '../widgets/masonry_song_section.dart';
 import '../widgets/random_songs_section.dart';
 import '../widgets/album_section.dart';

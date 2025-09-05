@@ -109,6 +109,7 @@ class MyApp extends ConsumerWidget {
         }
 
         return MaterialApp(
+          debugShowCheckedModeBanner: false,
           theme: FlexThemeData.light(
             swapColors: theme.swapColors,
             blendLevel: theme.blendLevel,
