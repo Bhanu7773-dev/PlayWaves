@@ -349,9 +349,10 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     final customColorsEnabled = customTheme.customColorsEnabled;
     final primaryColor = customTheme.primaryColor;
     final secondaryColor = customTheme.secondaryColor;
+    final useDynamicColors = customTheme.useDynamicColors;
     return Container(
       decoration: BoxDecoration(
-        gradient: (isPitchBlack || customColorsEnabled)
+        gradient: (isPitchBlack || customColorsEnabled || useDynamicColors)
             ? null
             : const RadialGradient(
                 center: Alignment.topLeft,
@@ -360,7 +361,11 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
               ),
         color: isPitchBlack
             ? Colors.black
-            : (customColorsEnabled ? secondaryColor : null),
+            : (customColorsEnabled
+                  ? secondaryColor
+                  : (useDynamicColors
+                        ? Theme.of(context).colorScheme.background
+                        : null)),
       ),
       child: Stack(
         children: List.generate(
@@ -416,6 +421,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
       listen: false,
     );
     final customColorsEnabled = customTheme.customColorsEnabled;
+    final useDynamicColors = customTheme.useDynamicColors;
     final primaryColor = customTheme.primaryColor;
     return ScaleTransition(
       scale: _searchAnimation,
@@ -438,6 +444,11 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                 controller: _searchController,
                 focusNode: _searchFocusNode,
                 style: const TextStyle(color: Colors.white, fontSize: 16),
+                cursorColor: customColorsEnabled
+                    ? primaryColor
+                    : (customTheme.useDynamicColors
+                          ? Theme.of(context).colorScheme.primary
+                          : Color(0xFF6366f1)),
                 decoration: InputDecoration(
                   hintText: 'Discover your next favorite song...',
                   hintStyle: TextStyle(color: Colors.grey[400], fontSize: 16),
@@ -447,7 +458,9 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                       Icons.music_note_rounded,
                       color: customColorsEnabled
                           ? primaryColor
-                          : Color(0xFF6366f1),
+                          : (customTheme.useDynamicColors
+                                ? Theme.of(context).colorScheme.primary
+                                : Color(0xFF6366f1)),
                       size: 24,
                     ),
                   ),
@@ -494,6 +507,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
       listen: false,
     );
     final customColorsEnabled = customTheme.customColorsEnabled;
+    final useDynamicColors = customTheme.useDynamicColors;
     final primaryColor = customTheme.primaryColor;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -502,11 +516,13 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
           Container(
             width: 4,
             height: 28,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
-              ),
-              borderRadius: BorderRadius.all(Radius.circular(2)),
+            decoration: BoxDecoration(
+              color: customColorsEnabled
+                  ? primaryColor
+                  : (useDynamicColors
+                        ? Theme.of(context).colorScheme.primary
+                        : Color(0xFF6366f1)),
+              borderRadius: const BorderRadius.all(Radius.circular(2)),
             ),
           ),
           const SizedBox(width: 12),
@@ -562,6 +578,7 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
       listen: false,
     );
     final customColorsEnabled = customTheme.customColorsEnabled;
+    final useDynamicColors = customTheme.useDynamicColors;
     final primaryColor = customTheme.primaryColor;
 
     final playerState = Provider.of<PlayerStateProvider>(context);
@@ -713,7 +730,12 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          gradient: !customColorsEnabled
+                          color: customColorsEnabled
+                              ? primaryColor
+                              : (useDynamicColors
+                                    ? Theme.of(context).colorScheme.primary
+                                    : null),
+                          gradient: (!customColorsEnabled && !useDynamicColors)
                               ? const LinearGradient(
                                   colors: [
                                     Color(0xFF6366f1),
@@ -721,13 +743,15 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                   ],
                                 )
                               : null,
-                          color: customColorsEnabled ? primaryColor : null,
                           borderRadius: BorderRadius.circular(10),
                           boxShadow: [
                             BoxShadow(
-                              color: !customColorsEnabled
+                              color: !customColorsEnabled && !useDynamicColors
                                   ? const Color(0xFF6366f1).withOpacity(0.5)
-                                  : primaryColor.withOpacity(0.5),
+                                  : (customColorsEnabled
+                                        ? primaryColor.withOpacity(0.5)
+                                        : Theme.of(context).colorScheme.primary
+                                              .withOpacity(0.5)),
                               blurRadius: 6,
                               spreadRadius: 1,
                             ),
@@ -791,18 +815,28 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                 // Play Button
                 Container(
                   decoration: BoxDecoration(
-                    gradient: !customColorsEnabled
+                    color: customColorsEnabled
+                        ? primaryColor
+                        : (useDynamicColors
+                              ? Theme.of(context).colorScheme.primary
+                              : null),
+                    gradient: (!customColorsEnabled && !useDynamicColors)
                         ? const LinearGradient(
                             colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
                           )
                         : null,
-                    color: customColorsEnabled ? primaryColor : null,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: !customColorsEnabled
+                        color: !customColorsEnabled && !useDynamicColors
                             ? const Color(0xFF6366f1).withOpacity(0.4)
-                            : primaryColor.withOpacity(0.4),
+                            : (customColorsEnabled
+                                  ? primaryColor.withOpacity(0.4)
+                                  : Theme.of(
+                                      context,
+                                    ).colorScheme.primary.withOpacity(0.4)),
                         blurRadius: 12,
                         spreadRadius: 2,
                       ),
@@ -1000,8 +1034,17 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
     final isPitchBlack = context.watch<PitchBlackThemeProvider>().isPitchBlack;
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
-    final primaryColor = customTheme.primaryColor;
-    final secondaryColor = customTheme.secondaryColor;
+    final useDynamicColors = customTheme.useDynamicColors;
+    final primaryColor = customColorsEnabled
+        ? customTheme.primaryColor
+        : (useDynamicColors
+              ? Theme.of(context).colorScheme.primary
+              : Color(0xFF6366f1));
+    final secondaryColor = customColorsEnabled
+        ? customTheme.secondaryColor
+        : (useDynamicColors
+              ? Theme.of(context).colorScheme.secondary
+              : Color(0xFF8b5cf6));
 
     return Scaffold(
       backgroundColor: isPitchBlack ? Colors.black : secondaryColor,
@@ -1038,15 +1081,13 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                             Text(
                               'Discover Music',
                               style: TextStyle(
-                                color: customColorsEnabled
-                                    ? primaryColor
-                                    : Color(0xFF6366f1),
+                                color: primaryColor,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 35,
                                 letterSpacing: 0.5,
                                 shadows: [
                                   Shadow(
-                                    color: Color(0xFF8b5cf6).withOpacity(0.3),
+                                    color: secondaryColor.withOpacity(0.3),
                                     blurRadius: 8,
                                     offset: Offset(0, 2),
                                   ),
@@ -1068,11 +1109,15 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const SizedBox(
+                        SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                            color: Color(0xFFff7d78),
+                            color: customColorsEnabled
+                                ? primaryColor
+                                : (useDynamicColors
+                                      ? Theme.of(context).colorScheme.primary
+                                      : const Color(0xFF6366f1)),
                             strokeWidth: 2,
                           ),
                         ),
@@ -1185,7 +1230,16 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                     width: 4,
                                     height: 24,
                                     decoration: BoxDecoration(
-                                      gradient: !customColorsEnabled
+                                      color: customColorsEnabled
+                                          ? primaryColor
+                                          : (useDynamicColors
+                                                ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary
+                                                : null),
+                                      gradient:
+                                          (!customColorsEnabled &&
+                                              !useDynamicColors)
                                           ? const LinearGradient(
                                               colors: [
                                                 Color(0xFF6366f1),
@@ -1194,9 +1248,6 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                                               begin: Alignment.topCenter,
                                               end: Alignment.bottomCenter,
                                             )
-                                          : null,
-                                      color: customColorsEnabled
-                                          ? primaryColor
                                           : null,
                                       borderRadius: const BorderRadius.all(
                                         Radius.circular(2),

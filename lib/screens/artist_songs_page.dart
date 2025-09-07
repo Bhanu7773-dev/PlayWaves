@@ -356,6 +356,10 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     required Color primaryColor,
     required Color secondaryColor,
   }) {
+    final customTheme = Provider.of<CustomThemeProvider>(
+      context,
+      listen: false,
+    );
     final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     final imageUrl = _getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
@@ -492,19 +496,44 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                 const SizedBox(width: 16),
                 Container(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: customColorsEnabled
-                          ? [primaryColor, primaryColor.withOpacity(0.8)]
-                          : [Color(0xFF6366f1), Color(0xFF8b5cf6)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    gradient: customTheme.useDynamicColors
+                        ? LinearGradient(
+                            colors: [
+                              Theme.of(context).colorScheme.primary,
+                              Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.8),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : (customColorsEnabled
+                              ? LinearGradient(
+                                  colors: [
+                                    primaryColor,
+                                    primaryColor.withOpacity(0.8),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : LinearGradient(
+                                  colors: [
+                                    Color(0xFF6366f1),
+                                    Color(0xFF8b5cf6),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: customColorsEnabled
-                            ? primaryColor.withOpacity(0.4)
-                            : const Color(0xFF6366f1).withOpacity(0.4),
+                        color: customTheme.useDynamicColors
+                            ? Theme.of(
+                                context,
+                              ).colorScheme.primary.withOpacity(0.4)
+                            : (customColorsEnabled
+                                  ? primaryColor.withOpacity(0.4)
+                                  : const Color(0xFF6366f1).withOpacity(0.4)),
                         blurRadius: 8,
                         spreadRadius: 2,
                       ),
@@ -573,26 +602,41 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     required Color primaryColor,
     required Color secondaryColor,
   }) {
+    final customTheme = Provider.of<CustomThemeProvider>(
+      context,
+      listen: false,
+    );
+    final useDynamicColors = customTheme.useDynamicColors;
     return Container(
       decoration: BoxDecoration(
         gradient: isPitchBlack
             ? null
-            : customColorsEnabled
-            ? RadialGradient(
-                center: Alignment.topLeft,
-                radius: 1.5,
-                colors: [
-                  secondaryColor,
-                  secondaryColor.withOpacity(0.8),
-                  Colors.black,
-                ],
-              )
-            : const RadialGradient(
-                center: Alignment.topLeft,
-                radius: 1.5,
-                colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Colors.black],
-              ),
-        color: isPitchBlack ? Colors.black : null,
+            : (customColorsEnabled
+                  ? RadialGradient(
+                      center: Alignment.topLeft,
+                      radius: 1.5,
+                      colors: [
+                        secondaryColor,
+                        secondaryColor.withOpacity(0.8),
+                        Colors.black,
+                      ],
+                    )
+                  : (useDynamicColors
+                        ? null
+                        : const RadialGradient(
+                            center: Alignment.topLeft,
+                            radius: 1.5,
+                            colors: [
+                              Color(0xFF1a1a2e),
+                              Color(0xFF16213e),
+                              Colors.black,
+                            ],
+                          ))),
+        color: isPitchBlack
+            ? Colors.black
+            : (useDynamicColors
+                  ? Theme.of(context).colorScheme.background
+                  : null),
       ),
     );
   }
@@ -602,6 +646,10 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
     required Color primaryColor,
     required Color secondaryColor,
   }) {
+    final customTheme = Provider.of<CustomThemeProvider>(
+      context,
+      listen: false,
+    );
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -642,11 +690,28 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: customColorsEnabled
-                            ? [primaryColor, primaryColor.withOpacity(0.8)]
-                            : [Color(0xFF6366f1), Color(0xFF8b5cf6)],
-                      ),
+                      gradient: customTheme.useDynamicColors
+                          ? LinearGradient(
+                              colors: [
+                                Theme.of(context).colorScheme.primary,
+                                Theme.of(
+                                  context,
+                                ).colorScheme.primary.withOpacity(0.8),
+                              ],
+                            )
+                          : (customColorsEnabled
+                                ? LinearGradient(
+                                    colors: [
+                                      primaryColor,
+                                      primaryColor.withOpacity(0.8),
+                                    ],
+                                  )
+                                : LinearGradient(
+                                    colors: [
+                                      Color(0xFF6366f1),
+                                      Color(0xFF8b5cf6),
+                                    ],
+                                  )),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -667,13 +732,34 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                     width: 4,
                     height: 32,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: customColorsEnabled
-                            ? [primaryColor, primaryColor.withOpacity(0.7)]
-                            : [Color(0xFF6366f1), Color(0xFF8b5cf6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      gradient: customTheme.useDynamicColors
+                          ? LinearGradient(
+                              colors: [
+                                Theme.of(context).colorScheme.primary,
+                                Theme.of(
+                                  context,
+                                ).colorScheme.primary.withOpacity(0.7),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : (customColorsEnabled
+                                ? LinearGradient(
+                                    colors: [
+                                      primaryColor,
+                                      primaryColor.withOpacity(0.7),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : LinearGradient(
+                                    colors: [
+                                      Color(0xFF6366f1),
+                                      Color(0xFF8b5cf6),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )),
                       borderRadius: BorderRadius.all(Radius.circular(2)),
                     ),
                   ),
@@ -745,18 +831,31 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                               width: 60,
                               height: 60,
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: customColorsEnabled
-                                      ? [
-                                          primaryColor,
-                                          primaryColor.withOpacity(0.8),
-                                        ]
-                                      : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-                                ),
+                                gradient: customTheme.useDynamicColors
+                                    ? LinearGradient(
+                                        colors: [
+                                          Theme.of(context).colorScheme.primary,
+                                          Theme.of(context).colorScheme.primary
+                                              .withOpacity(0.8),
+                                        ],
+                                      )
+                                    : (customColorsEnabled
+                                          ? LinearGradient(
+                                              colors: [
+                                                primaryColor,
+                                                primaryColor.withOpacity(0.8),
+                                              ],
+                                            )
+                                          : LinearGradient(
+                                              colors: [
+                                                Color(0xFFff7d78),
+                                                Color(0xFF9c27b0),
+                                              ],
+                                            )),
                                 borderRadius: BorderRadius.circular(30),
                               ),
-                              child: const Padding(
-                                padding: EdgeInsets.all(12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
                                 child: CircularProgressIndicator(
                                   valueColor: AlwaysStoppedAnimation<Color>(
                                     Colors.white,
@@ -926,7 +1025,11 @@ class _ArtistSongsPageState extends State<ArtistSongsPage>
                         opacity: _fadeAnimation,
                         child: RefreshIndicator(
                           onRefresh: _searchArtistSongs,
-                          color: const Color(0xFFff7d78),
+                          color: customTheme.useDynamicColors
+                              ? Theme.of(context).colorScheme.primary
+                              : (customColorsEnabled
+                                    ? primaryColor
+                                    : const Color(0xFFff7d78)),
                           backgroundColor: isPitchBlack
                               ? Colors.black
                               : Colors.black,

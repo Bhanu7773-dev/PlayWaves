@@ -107,30 +107,38 @@ class _AnimatedNavBarState extends State<AnimatedNavBar>
                         ..scale(isSelected ? 1.2 : 1.0),
                       child: customColorsEnabled && isSelected
                           ? Icon(icons[index], color: primaryColor, size: 24)
-                          : ShaderMask(
-                              shaderCallback: (Rect bounds) {
-                                return isSelected
-                                    ? const LinearGradient(
-                                        colors: [
-                                          Color(0xFF6366f1),
-                                          Color(0xFF8b5cf6),
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ).createShader(bounds)
-                                    : const LinearGradient(
-                                        colors: [
-                                          Colors.white60,
-                                          Colors.white60,
-                                        ],
-                                      ).createShader(bounds);
-                              },
-                              child: Icon(
-                                icons[index],
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
+                          : (isSelected && customTheme.useDynamicColors
+                                ? Icon(
+                                    icons[index],
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                    size: 24,
+                                  )
+                                : ShaderMask(
+                                    shaderCallback: (Rect bounds) {
+                                      return isSelected
+                                          ? const LinearGradient(
+                                              colors: [
+                                                Color(0xFF6366f1),
+                                                Color(0xFF8b5cf6),
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ).createShader(bounds)
+                                          : const LinearGradient(
+                                              colors: [
+                                                Colors.white60,
+                                                Colors.white60,
+                                              ],
+                                            ).createShader(bounds);
+                                    },
+                                    child: Icon(
+                                      icons[index],
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  )),
                     ),
                     const SizedBox(height: 4),
                     AnimatedDefaultTextStyle(

@@ -16,8 +16,6 @@ class ThemeModel {
   final int blendLevel;
   @HiveField(4, defaultValue: false)
   final bool swapColors;
-  @HiveField(5, defaultValue: false)
-  final bool useMaterialPreset;
 
   ThemeModel({
     this.themeMode = 'system',
@@ -25,7 +23,6 @@ class ThemeModel {
     this.flexScheme,
     this.blendLevel = 11,
     this.swapColors = false,
-    this.useMaterialPreset = false,
   });
 
   ThemeModel copyWith({
@@ -34,7 +31,6 @@ class ThemeModel {
     String? flexScheme,
     int? blendLevel,
     bool? swapColors,
-    bool? useMaterialPreset,
   }) {
     return ThemeModel(
       themeMode: themeMode ?? this.themeMode,
@@ -42,7 +38,6 @@ class ThemeModel {
       flexScheme: flexScheme ?? this.flexScheme,
       blendLevel: blendLevel ?? this.blendLevel,
       swapColors: swapColors ?? this.swapColors,
-      useMaterialPreset: useMaterialPreset ?? this.useMaterialPreset,
     );
   }
 

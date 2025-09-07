@@ -1,19 +1,20 @@
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
-import 'package:provider/provider.dart' as provider;
+import 'package:provider/provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
+import '../widgets/animated_navbar.dart';
+import '../models/liked_song.dart';
+import '../models/playlist_song.dart';
 import 'liked_songs_screen.dart';
 import 'my_playlist_screen.dart';
 import 'downloaded_songs_screen.dart';
 import 'recently_played_screen.dart';
 import '../logic/playlist_storage_logic.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/theme_provider.dart';
-import 'package:flex_color_scheme/flex_color_scheme.dart';
 
-class LibraryScreen extends ConsumerStatefulWidget {
+class LibraryScreen extends StatefulWidget {
   final Function(int)? onNavTap;
   final int selectedNavIndex;
 
@@ -21,10 +22,10 @@ class LibraryScreen extends ConsumerStatefulWidget {
     : super(key: key);
 
   @override
-  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+  State<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends ConsumerState<LibraryScreen>
+class _LibraryScreenState extends State<LibraryScreen>
     with TickerProviderStateMixin {
   late AnimationController _masterController;
   late AnimationController _floatController;
@@ -40,7 +41,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     PlaylistStorageLogic.openRecentlyPlayedBox();
     _searchFocusNode = FocusNode();
     _searchFocusNode.addListener(() {
-      setState(() {}); // Rebuild when focus changes to show/hide close button
+      setState(() {});
     });
     _masterController = PlaylistStorageLogic.createMasterController(this);
     _floatController = PlaylistStorageLogic.createFloatController(this);
@@ -70,48 +71,30 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   @override
   Widget build(BuildContext context) {
-    final themeSettings = ref.watch(themeSettingsProvider);
     final isPitchBlack = context.watch<PitchBlackThemeProvider>().isPitchBlack;
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
     final useDynamicColors = customTheme.useDynamicColors;
     final scheme = Theme.of(context).colorScheme;
 
-    // Use Riverpod theme settings for consistent theming
-    final flexScheme = FlexScheme.values.firstWhere(
-      (scheme) => scheme.name == themeSettings.flexScheme,
-      orElse: () => FlexScheme.material,
-    );
-    final currentThemeData = Theme.of(context).brightness == Brightness.dark
-        ? FlexThemeData.dark(
-            scheme: flexScheme,
-            blendLevel: themeSettings.blendLevel,
-            swapColors: themeSettings.swapColors,
-          )
-        : FlexThemeData.light(
-            scheme: flexScheme,
-            blendLevel: themeSettings.blendLevel,
-            swapColors: themeSettings.swapColors,
-          );
-    final themeScheme = currentThemeData.colorScheme;
-
-    // For all color logic
-    final primaryColor = useDynamicColors
-        ? themeScheme.primary
-        : customTheme.primaryColor;
+    final primaryColor = customColorsEnabled
+        ? customTheme.primaryColor
+        : (useDynamicColors ? scheme.primary : scheme.primary);
     final secondaryColor = useDynamicColors
-        ? themeScheme.secondary
-        : customTheme.secondaryColor;
+        ? scheme.secondary
+        : customColorsEnabled
+        ? customTheme.secondaryColor
+        : scheme.secondary;
     final backgroundColor = isPitchBlack
         ? Colors.black
         : useDynamicColors
-        ? themeScheme.background
+        ? scheme.background
         : customColorsEnabled
         ? secondaryColor
         : const Color(0xFF16213e);
 
     final accentGradient = useDynamicColors
-        ? [themeScheme.primary, themeScheme.secondary]
+        ? [scheme.primary, scheme.secondary]
         : customColorsEnabled
         ? [primaryColor, secondaryColor]
         : const [Color(0xFF6366f1), Color(0xFF8b5cf6)];
@@ -223,6 +206,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                               libraryItems[index],
                               index,
                               scheme,
+                              customColorsEnabled,
+                              primaryColor,
+                              secondaryColor,
+                              useDynamicColors,
+                              accentGradient,
                             ),
                             childCount: libraryItems.length,
                           ),
@@ -233,7 +221,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 ),
               ),
             ),
-            // Navigation bar removed as requested
           ],
         ),
       ),
@@ -287,7 +274,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
             children: [
               ...List.generate(12, (index) {
                 final Color meteorColor = useDynamicColors
-                    ? scheme.tertiary
+                    ? scheme.primary
                     : customColorsEnabled
                     ? primaryColor
                     : accentGradient.first;
@@ -402,10 +389,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
             style: TextStyle(
               fontSize: 32,
               fontWeight: FontWeight.w900,
-              color: useDynamicColors
-                  ? scheme.primary
-                  : (customColorsEnabled
-                        ? primaryColor
+              color: customColorsEnabled
+                  ? primaryColor
+                  : (useDynamicColors
+                        ? scheme.primary
                         : const Color(0xFF6366f1)),
               letterSpacing: -0.5,
               height: 1.1,
@@ -447,8 +434,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 ),
           border: Border.all(
             color: useDynamicColors
-                ? scheme.onSurface.withOpacity(0.15)
-                : Colors.white.withOpacity(0.15),
+                ? scheme.primary
+                : (customColorsEnabled
+                      ? primaryColor
+                      : const Color(0xFF6366f1)),
             width: 1,
           ),
         ),
@@ -462,7 +451,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 Icon(
                   Icons.search_rounded,
                   color: useDynamicColors
-                      ? scheme.tertiary
+                      ? scheme.primary
                       : (customColorsEnabled
                             ? primaryColor
                             : const Color(0xFF6366f1)),
@@ -479,7 +468,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                     ),
                     cursorColor: useDynamicColors
                         ? scheme.primary
-                        : Color(0xFF6366f1),
+                        : const Color(0xFF6366f1),
                     decoration: InputDecoration(
                       hintText: "Search your music...",
                       hintStyle: TextStyle(
@@ -521,6 +510,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     LibraryItemData item,
     int index,
     ColorScheme scheme,
+    bool customColorsEnabled,
+    Color primaryColor,
+    Color secondaryColor,
+    bool useDynamicColors,
+    List<Color> accentGradient,
   ) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -531,7 +525,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           offset: Offset(0, (1 - value) * 20),
           child: Opacity(
             opacity: value,
-            child: MinimalLibraryCard(item: item, index: index, scheme: scheme),
+            child: MinimalLibraryCard(
+              item: item,
+              index: index,
+              scheme: scheme,
+              customColorsEnabled: customColorsEnabled,
+              primaryColor: primaryColor,
+              secondaryColor: secondaryColor,
+              useDynamicColors: useDynamicColors,
+              accentGradient: accentGradient,
+            ),
           ),
         );
       },
@@ -561,11 +564,21 @@ class MinimalLibraryCard extends StatefulWidget {
   final LibraryItemData item;
   final int index;
   final ColorScheme scheme;
+  final bool customColorsEnabled;
+  final Color primaryColor;
+  final Color secondaryColor;
+  final bool useDynamicColors;
+  final List<Color> accentGradient;
 
   const MinimalLibraryCard({
     required this.item,
     required this.index,
     required this.scheme,
+    required this.customColorsEnabled,
+    required this.primaryColor,
+    required this.secondaryColor,
+    required this.useDynamicColors,
+    required this.accentGradient,
     Key? key,
   }) : super(key: key);
 
@@ -607,13 +620,40 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
   @override
   Widget build(BuildContext context) {
     final scheme = widget.scheme;
-    final customTheme = provider.Provider.of<CustomThemeProvider>(
-      context,
-      listen: false,
-    );
-    final useDynamicColors = customTheme.useDynamicColors;
-    // Fallback for blue-purple gradient
+    final customColorsEnabled = widget.customColorsEnabled;
+    final useDynamicColors = widget.useDynamicColors;
+    final primaryColor = widget.primaryColor;
+    final secondaryColor = widget.secondaryColor;
+    final accentGradient = widget.accentGradient;
     final bluePurpleGradient = const [Color(0xFF6366f1), Color(0xFF8b5cf6)];
+
+    // Perfect logic for all icon containers:
+    // 1. If customColorsEnabled, use primaryColor for icon bg and shadow.
+    // 2. Else if useDynamicColors, use scheme.primary for icon bg and shadow.
+    // 3. Else use bluePurpleGradient.
+
+    Color? iconBgColor;
+    Gradient? iconBgGradient;
+    Color iconShadowColor;
+
+    if (customColorsEnabled) {
+      iconBgColor = primaryColor;
+      iconBgGradient = null;
+      iconShadowColor = primaryColor.withOpacity(0.3);
+    } else if (useDynamicColors) {
+      iconBgColor = scheme.primary;
+      iconBgGradient = null;
+      iconShadowColor = scheme.primary.withOpacity(0.3);
+    } else {
+      iconBgColor = null;
+      iconBgGradient = LinearGradient(
+        colors: bluePurpleGradient,
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+      iconShadowColor = bluePurpleGradient.first.withOpacity(0.3);
+    }
+
     return GestureDetector(
       onTap: () {
         widget.item.onTap();
@@ -636,9 +676,11 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
                     : Colors.white.withOpacity(0.12),
                 border: Border.all(
                   color: widget.item.isActive
-                      ? (useDynamicColors
-                                ? scheme.primary
-                                : const Color(0xFF6366f1))
+                      ? (customColorsEnabled
+                                ? primaryColor
+                                : (useDynamicColors
+                                      ? scheme.primary
+                                      : bluePurpleGradient.first))
                             .withOpacity(0.3)
                       : scheme.outline.withOpacity(
                           0.12 + _glowAnimation.value * 0.08,
@@ -649,9 +691,11 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
                   if (widget.item.isActive)
                     BoxShadow(
                       color:
-                          (useDynamicColors
-                                  ? scheme.primary
-                                  : const Color(0xFF6366f1))
+                          (customColorsEnabled
+                                  ? primaryColor
+                                  : (useDynamicColors
+                                        ? scheme.primary
+                                        : bluePurpleGradient.first))
                               .withOpacity(0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
@@ -667,203 +711,74 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: useDynamicColors
-                    ? BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                color: useDynamicColors ? scheme.primary : null,
-                                gradient: useDynamicColors
-                                    ? null
-                                    : LinearGradient(
-                                        colors: bluePurpleGradient,
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color:
-                                        (useDynamicColors
-                                                ? scheme.primary
-                                                : bluePurpleGradient.first)
-                                            .withOpacity(0.3),
-                                    blurRadius: 15,
-                                    offset: const Offset(0, 5),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                widget.item.iconData,
-                                color: useDynamicColors
-                                    ? scheme.onPrimary
-                                    : Colors.white,
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.item.title,
-                                    style: TextStyle(
-                                      color: scheme.onSurface,
-                                      fontSize: 18,
-                                      fontWeight: widget.item.isActive
-                                          ? FontWeight.w700
-                                          : FontWeight.w600,
-                                      letterSpacing: -0.2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.item.subtitle,
-                                    style: TextStyle(
-                                      color: scheme.onSurface.withOpacity(0.6),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (widget.item.isActive)
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: useDynamicColors
-                                      ? scheme.primary
-                                      : null,
-                                  gradient: useDynamicColors
-                                      ? null
-                                      : LinearGradient(
-                                          colors: bluePurpleGradient,
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                ),
-                                child: Icon(
-                                  Icons.play_arrow,
-                                  color: useDynamicColors
-                                      ? scheme.onPrimary
-                                      : Colors.white,
-                                  size: 20,
-                                ),
-                              )
-                            else
-                              Icon(
-                                Icons.arrow_forward_ios,
-                                color: scheme.onSurface.withOpacity(0.4),
-                                size: 16,
-                              ),
-                          ],
-                        ),
-                      )
-                    : BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                color: useDynamicColors ? scheme.primary : null,
-                                gradient: useDynamicColors
-                                    ? null
-                                    : LinearGradient(
-                                        colors: bluePurpleGradient,
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color:
-                                        (useDynamicColors
-                                                ? scheme.primary
-                                                : bluePurpleGradient.first)
-                                            .withOpacity(0.3),
-                                    blurRadius: 15,
-                                    offset: const Offset(0, 5),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                widget.item.iconData,
-                                color: useDynamicColors
-                                    ? scheme.onPrimary
-                                    : Colors.white,
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.item.title,
-                                    style: TextStyle(
-                                      color: scheme.onSurface,
-                                      fontSize: 18,
-                                      fontWeight: widget.item.isActive
-                                          ? FontWeight.w700
-                                          : FontWeight.w600,
-                                      letterSpacing: -0.2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.item.subtitle,
-                                    style: TextStyle(
-                                      color: scheme.onSurface.withOpacity(0.6),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (widget.item.isActive)
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: useDynamicColors
-                                      ? scheme.primary
-                                      : null,
-                                  gradient: useDynamicColors
-                                      ? null
-                                      : LinearGradient(
-                                          colors: bluePurpleGradient,
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                ),
-                                child: Icon(
-                                  Icons.play_arrow,
-                                  color: useDynamicColors
-                                      ? scheme.onPrimary
-                                      : Colors.white,
-                                  size: 20,
-                                ),
-                              )
-                            else
-                              Icon(
-                                Icons.arrow_forward_ios,
-                                color: scheme.onSurface.withOpacity(0.4),
-                                size: 16,
-                              ),
-                          ],
-                        ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        color: iconBgColor,
+                        gradient: iconBgGradient,
+                        boxShadow: [
+                          BoxShadow(
+                            color: iconShadowColor,
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
+                      child: Icon(
+                        widget.item.iconData,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.item.title,
+                            style: TextStyle(
+                              color: scheme.onSurface,
+                              fontSize: 18,
+                              fontWeight: widget.item.isActive
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            widget.item.subtitle,
+                            style: TextStyle(
+                              color: scheme.onSurface.withOpacity(0.6),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: iconBgColor,
+                        gradient: iconBgGradient,
+                      ),
+                      child: Icon(
+                        widget.item.isActive
+                            ? Icons.play_arrow
+                            : Icons.arrow_forward_ios,
+                        color: Colors.white,
+                        size: widget.item.isActive ? 20 : 16,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           );

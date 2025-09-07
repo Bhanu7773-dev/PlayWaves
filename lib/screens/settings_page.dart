@@ -41,15 +41,23 @@ class _SettingsPageState extends State<SettingsPage>
   final Color defaultSecondaryColor = Color(0xFF16213e);
 
   Color get primaryColor {
+    final provider = Provider.of<CustomThemeProvider>(context);
+    if (materialPresetEnabled) {
+      return provider.primaryColor; // Preset color from provider
+    }
     if (customColorsEnabled) {
-      return Provider.of<CustomThemeProvider>(context).primaryColor;
+      return provider.primaryColor;
     }
     return defaultPrimaryColor;
   }
 
   Color get secondaryColor {
+    final provider = Provider.of<CustomThemeProvider>(context);
+    if (materialPresetEnabled) {
+      return provider.secondaryColor; // Preset color from provider
+    }
     if (customColorsEnabled) {
-      return Provider.of<CustomThemeProvider>(context).secondaryColor;
+      return provider.secondaryColor;
     }
     return defaultSecondaryColor;
   }
@@ -491,11 +499,26 @@ class _SettingsPageState extends State<SettingsPage>
     final isPitchBlack =
         context.watch<PitchBlackThemeProvider>().isPitchBlack ||
         pitchBlackEnabled;
+    final provider = Provider.of<CustomThemeProvider>(context);
+    final useMaterialPreset = materialPresetEnabled;
+    final useCustomColors = customColorsEnabled;
+    final scheme = Theme.of(context).colorScheme;
+    Color bgColor = (isPitchBlack || useMaterialPreset)
+        ? Colors.black
+        : useDynamicColors
+        ? scheme.background
+        : useCustomColors
+        ? provider.secondaryColor
+        : defaultSecondaryColor;
     return Scaffold(
-      backgroundColor: isPitchBlack ? Colors.black : secondaryColor,
+      backgroundColor: bgColor,
       body: Stack(
         children: [
-          _buildAnimatedBackground(isPitchBlack: isPitchBlack),
+          _buildAnimatedBackground(
+            isPitchBlack: isPitchBlack,
+            useDynamicColors: useDynamicColors,
+            scheme: scheme,
+          ),
           SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,
@@ -534,25 +557,62 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildAnimatedBackground({required bool isPitchBlack}) {
+  Widget _buildAnimatedBackground({
+    required bool isPitchBlack,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
+  }) {
+    // Accept new params for dynamic color
+    final useMaterialPreset = materialPresetEnabled;
+    final useDynamicColors = this.useDynamicColors;
+    final scheme = Theme.of(context).colorScheme;
     return Container(
-      color: isPitchBlack ? Colors.black : secondaryColor,
+      decoration: BoxDecoration(
+        gradient: isPitchBlack || useMaterialPreset
+            ? null
+            : useDynamicColors
+            ? RadialGradient(
+                center: Alignment.topLeft,
+                radius: 1.5,
+                colors: [scheme.background, scheme.surface, Colors.black],
+              )
+            : null,
+        color: isPitchBlack || useMaterialPreset
+            ? Colors.black
+            : useDynamicColors
+            ? null
+            : secondaryColor,
+      ),
       child: Stack(
         children: List.generate(
           20,
-          (index) => _buildMeteor(index, isPitchBlack: isPitchBlack),
+          (index) => _buildMeteor(
+            index,
+            isPitchBlack: isPitchBlack || useMaterialPreset,
+          ),
         ),
       ),
     );
   }
 
   Widget _buildMeteor(int index, {required bool isPitchBlack}) {
+    final useMaterialPreset = materialPresetEnabled;
+    final useDynamicColors = this.useDynamicColors;
+    final useCustomColors = customColorsEnabled;
+    final scheme = Theme.of(context).colorScheme;
     return AnimatedBuilder(
       animation: _meteorsController,
       builder: (context, child) {
         final double progress = _meteorsController.value;
         final double staggeredProgress = ((progress + (index * 0.1)) % 1.0)
             .clamp(0.0, 1.0);
+        final meteorColor = (isPitchBlack || useMaterialPreset)
+            ? Colors.white
+            : useDynamicColors
+            ? scheme.primary
+            : useCustomColors
+            ? primaryColor
+            : primaryColor;
         return Positioned(
           top: (index * 60.0) % MediaQuery.of(context).size.height,
           left: (index * 90.0) % MediaQuery.of(context).size.width,
@@ -562,13 +622,15 @@ class _SettingsPageState extends State<SettingsPage>
               staggeredProgress * 100 - 50,
             ),
             child: Opacity(
-              opacity: isPitchBlack ? 0 : (1.0 - staggeredProgress) * 0.6,
+              opacity: (isPitchBlack || useMaterialPreset)
+                  ? (1.0 - staggeredProgress) * 0.6
+                  : (1.0 - staggeredProgress) * 0.6,
               child: Container(
                 width: 3,
                 height: 3,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(1.5),
-                  color: primaryColor,
+                  color: meteorColor,
                 ),
               ),
             ),
@@ -579,6 +641,17 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildHeader(bool isPitchBlack) {
+    final provider = Provider.of<CustomThemeProvider>(context);
+    final useMaterialPreset = materialPresetEnabled;
+    final useCustomColors = customColorsEnabled;
+    final scheme = Theme.of(context).colorScheme;
+    Color headerColor = useCustomColors
+        ? provider.primaryColor
+        : useMaterialPreset
+        ? provider.primaryColor
+        : useDynamicColors
+        ? scheme.primary
+        : Color(0xFF6366f1);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
       child: Row(
@@ -595,15 +668,13 @@ class _SettingsPageState extends State<SettingsPage>
                 Text(
                   'Settings',
                   style: TextStyle(
-                    color: customColorsEnabled
-                        ? primaryColor
-                        : Color(0xFF6366f1),
+                    color: headerColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 35,
                     letterSpacing: 0.5,
                     shadows: [
                       Shadow(
-                        color: Color(0xFF8b5cf6).withOpacity(0.3),
+                        color: headerColor.withOpacity(0.3),
                         blurRadius: 8,
                         offset: Offset(0, 2),
                       ),
@@ -615,20 +686,23 @@ class _SettingsPageState extends State<SettingsPage>
           ),
           Container(
             decoration: BoxDecoration(
-              gradient: !customColorsEnabled
+              gradient:
+                  (!useCustomColors && !useMaterialPreset && !useDynamicColors)
                   ? const LinearGradient(
                       colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                     )
                   : null,
-              color: customColorsEnabled ? primaryColor : null,
+              color: (useCustomColors || useMaterialPreset)
+                  ? headerColor
+                  : useDynamicColors
+                  ? scheme.primary
+                  : null,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color:
-                      (customColorsEnabled ? primaryColor : Color(0xFF6366f1))
-                          .withOpacity(0.3),
+                  color: headerColor.withOpacity(0.3),
                   blurRadius: 8,
                   spreadRadius: 2,
                 ),
@@ -648,6 +722,17 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildMusicStatsCard(bool isPitchBlack) {
+    final provider = Provider.of<CustomThemeProvider>(context);
+    final useMaterialPreset = materialPresetEnabled;
+    final useCustomColors = customColorsEnabled;
+    final scheme = Theme.of(context).colorScheme;
+    Color statsColor = useCustomColors
+        ? provider.primaryColor
+        : useMaterialPreset
+        ? scheme.primary
+        : useDynamicColors
+        ? scheme.primary
+        : Color(0xFF6366f1);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
@@ -656,7 +741,7 @@ class _SettingsPageState extends State<SettingsPage>
         border: Border.all(color: Colors.white.withOpacity(0.2)),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.1),
+            color: statsColor.withOpacity(0.1),
             blurRadius: 20,
             spreadRadius: 5,
           ),
@@ -678,63 +763,28 @@ class _SettingsPageState extends State<SettingsPage>
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: customColorsEnabled
-                      ? ClipRRect(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(12),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.25),
-                                  width: 1.2,
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.bar_chart,
-                                color: primaryColor,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.25),
-                                  width: 1.2,
-                                ),
-                              ),
-                              child: ShaderMask(
-                                shaderCallback: (Rect bounds) {
-                                  return const LinearGradient(
-                                    colors: [
-                                      Color(0xFF6366f1),
-                                      Color(0xFF8b5cf6),
-                                    ],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                  ).createShader(bounds);
-                                },
-                                child: Icon(
-                                  Icons.bar_chart,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.25),
+                            width: 1.2,
                           ),
                         ),
+                        child: Icon(
+                          Icons.bar_chart,
+                          color: statsColor,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 Text(
                   "Your Music Journey",
@@ -753,9 +803,26 @@ class _SettingsPageState extends State<SettingsPage>
                   "Minutes",
                   "$totalListeningMinutes",
                   Icons.access_time,
+                  (useMaterialPreset || useDynamicColors
+                      ? scheme.primary
+                      : null),
                 ),
-                _buildStatBox("Songs", "$songsPlayed", Icons.music_note),
-                _buildStatBox("Downloads", "$totalDownloads", Icons.download),
+                _buildStatBox(
+                  "Songs",
+                  "$songsPlayed",
+                  Icons.music_note,
+                  (useMaterialPreset || useDynamicColors
+                      ? scheme.primary
+                      : null),
+                ),
+                _buildStatBox(
+                  "Downloads",
+                  "$totalDownloads",
+                  Icons.download,
+                  (useMaterialPreset || useDynamicColors
+                      ? scheme.primary
+                      : null),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -772,7 +839,9 @@ class _SettingsPageState extends State<SettingsPage>
                 children: [
                   Row(
                     children: [
-                      customColorsEnabled
+                      (useMaterialPreset || useDynamicColors)
+                          ? Icon(Icons.star, color: scheme.primary, size: 16)
+                          : customColorsEnabled
                           ? Icon(Icons.star, color: primaryColor, size: 16)
                           : ShaderMask(
                               shaderCallback: (Rect bounds) {
@@ -809,7 +878,13 @@ class _SettingsPageState extends State<SettingsPage>
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      customColorsEnabled
+                      (useMaterialPreset || useDynamicColors)
+                          ? Icon(
+                              Icons.favorite,
+                              color: scheme.primary,
+                              size: 16,
+                            )
+                          : customColorsEnabled
                           ? Icon(Icons.favorite, color: primaryColor, size: 16)
                           : ShaderMask(
                               shaderCallback: (Rect bounds) {
@@ -855,7 +930,12 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _buildStatBox(String label, String value, IconData icon) {
+  Widget _buildStatBox(
+    String label,
+    String value,
+    IconData icon, [
+    Color? iconColor,
+  ]) {
     return Expanded(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -867,7 +947,9 @@ class _SettingsPageState extends State<SettingsPage>
         ),
         child: Column(
           children: [
-            customColorsEnabled
+            iconColor != null
+                ? Icon(icon, color: iconColor, size: 20)
+                : customColorsEnabled
                 ? Icon(icon, color: primaryColor, size: 20)
                 : ShaderMask(
                     shaderCallback: (Rect bounds) {
@@ -900,9 +982,11 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildThemeSection(BuildContext context, bool isPitchBlack) {
+    final scheme = Theme.of(context).colorScheme;
     return _buildSection(
       title: "Themes & Appearance",
       icon: Icons.palette,
+      iconColor: useDynamicColors ? scheme.primary : null,
       isPitchBlack: isPitchBlack,
       children: [
         _buildIOSToggle(
@@ -922,6 +1006,7 @@ class _SettingsPageState extends State<SettingsPage>
           isActive: useDynamicColors,
           otherActive:
               pitchBlackEnabled || customColorsEnabled || materialPresetEnabled,
+          iconColor: useDynamicColors ? scheme.primary : null,
         ),
         if (useDynamicColors)
           Padding(
@@ -947,7 +1032,7 @@ class _SettingsPageState extends State<SettingsPage>
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.storefront, color: Colors.white70),
+                      Icon(Icons.storefront, color: scheme.primary),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
@@ -1009,6 +1094,7 @@ class _SettingsPageState extends State<SettingsPage>
     required ValueChanged<bool> onChanged,
     required bool isActive,
     required bool otherActive,
+    Color? iconColor,
   }) {
     final isDisabled = !isActive && otherActive;
     return Opacity(
@@ -1058,23 +1144,43 @@ class _SettingsPageState extends State<SettingsPage>
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     gradient: value
-                        ? (!customColorsEnabled
-                              ? const LinearGradient(
+                        ? (useDynamicColors
+                              ? LinearGradient(
                                   colors: [
-                                    Color(0xFF6366f1),
-                                    Color(0xFF8b5cf6),
+                                    Theme.of(context).colorScheme.primary,
+                                    Theme.of(
+                                      context,
+                                    ).colorScheme.primary.withOpacity(0.8),
                                   ],
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                 )
-                              : LinearGradient(
-                                  colors: [
-                                    primaryColor,
-                                    primaryColor.withOpacity(0.8),
-                                  ],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ))
+                              : (!customColorsEnabled
+                                    ? (iconColor != null
+                                          ? LinearGradient(
+                                              colors: [
+                                                iconColor,
+                                                iconColor.withOpacity(0.8),
+                                              ],
+                                              begin: Alignment.centerLeft,
+                                              end: Alignment.centerRight,
+                                            )
+                                          : const LinearGradient(
+                                              colors: [
+                                                Color(0xFF6366f1),
+                                                Color(0xFF8b5cf6),
+                                              ],
+                                              begin: Alignment.centerLeft,
+                                              end: Alignment.centerRight,
+                                            ))
+                                    : LinearGradient(
+                                        colors: [
+                                          primaryColor,
+                                          primaryColor.withOpacity(0.8),
+                                        ],
+                                        begin: Alignment.centerLeft,
+                                        end: Alignment.centerRight,
+                                      )))
                         : null,
                     color: value ? null : Colors.grey.withOpacity(0.3),
                     boxShadow: value
@@ -1083,7 +1189,8 @@ class _SettingsPageState extends State<SettingsPage>
                               color:
                                   (customColorsEnabled
                                           ? primaryColor
-                                          : const Color(0xFF6366f1))
+                                          : iconColor ??
+                                                const Color(0xFF6366f1))
                                       .withOpacity(0.4),
                               blurRadius: 12,
                               spreadRadius: 2,
@@ -1128,9 +1235,12 @@ class _SettingsPageState extends State<SettingsPage>
                               value ? thumbIcon : Icons.close,
                               key: ValueKey(value),
                               color: value
-                                  ? (customColorsEnabled
-                                        ? primaryColor
-                                        : const Color(0xFF6366f1))
+                                  ? (useDynamicColors
+                                        ? Theme.of(context).colorScheme.primary
+                                        : (customColorsEnabled
+                                              ? primaryColor
+                                              : iconColor ??
+                                                    const Color(0xFF6366f1)))
                                   : Colors.grey[600],
                               size: 16,
                             ),
@@ -1456,11 +1566,13 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildAudioSection(bool isPitchBlack) {
+    final scheme = Theme.of(context).colorScheme;
     return Consumer<PlayerStateProvider>(
       builder: (context, playerState, child) {
         return _buildSection(
           title: "Audio & Playback",
           icon: Icons.audiotrack,
+          iconColor: useDynamicColors ? scheme.primary : null,
           isPitchBlack: isPitchBlack,
           children: [
             _buildQualitySelector(
@@ -1498,6 +1610,7 @@ class _SettingsPageState extends State<SettingsPage>
     required ValueChanged<String> onChanged,
   }) {
     // Removed unused variable isPitchBlack
+    final scheme = Theme.of(context).colorScheme;
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: BackdropFilter(
@@ -1505,17 +1618,19 @@ class _SettingsPageState extends State<SettingsPage>
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.white.withOpacity(0.04),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Colors.white.withOpacity(0.25),
+              color: Colors.white.withOpacity(0.05),
               width: 1.2,
             ),
           ),
           child: ListTile(
             leading: Icon(
               icon,
-              color: (title == "Language" || title == "Notifications")
+              color: useDynamicColors
+                  ? scheme.primary
+                  : (title == "Language" || title == "Notifications")
                   ? Colors.grey[400]
                   : Colors.white,
             ),
@@ -1531,7 +1646,16 @@ class _SettingsPageState extends State<SettingsPage>
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    gradient: !customColorsEnabled
+                    gradient: useDynamicColors
+                        ? LinearGradient(
+                            colors: [
+                              scheme.primary,
+                              scheme.primary.withOpacity(0.8),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : !customColorsEnabled
                         ? const LinearGradient(
                             colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
                             begin: Alignment.topLeft,
@@ -1572,6 +1696,7 @@ class _SettingsPageState extends State<SettingsPage>
     ValueChanged<String> onChanged,
   ) {
     // Removed unused variable isPitchBlack
+    final scheme = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1604,7 +1729,9 @@ class _SettingsPageState extends State<SettingsPage>
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: customColorsEnabled
+                                  color: useDynamicColors
+                                      ? scheme.primary
+                                      : customColorsEnabled
                                       ? primaryColor
                                       : Colors.white.withOpacity(0.12),
                                   borderRadius: BorderRadius.circular(8),
@@ -1638,13 +1765,19 @@ class _SettingsPageState extends State<SettingsPage>
                               return Container(
                                 margin: const EdgeInsets.symmetric(vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: isSelected
+                                  color: useDynamicColors
+                                      ? (isSelected
+                                            ? scheme.primary.withOpacity(0.12)
+                                            : scheme.primary.withOpacity(0.05))
+                                      : isSelected
                                       ? Colors.white.withOpacity(0.12)
                                       : Colors.white.withOpacity(0.05),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                     color: isSelected
-                                        ? (customColorsEnabled
+                                        ? (useDynamicColors
+                                              ? scheme.primary
+                                              : customColorsEnabled
                                               ? primaryColor
                                               : const Color(0xFF8b5cf6))
                                         : Colors.white.withOpacity(0.1),
@@ -1655,7 +1788,9 @@ class _SettingsPageState extends State<SettingsPage>
                                     option,
                                     style: TextStyle(
                                       color: isSelected
-                                          ? (customColorsEnabled
+                                          ? (useDynamicColors
+                                                ? scheme.primary
+                                                : customColorsEnabled
                                                 ? primaryColor
                                                 : const Color(0xFF8b5cf6))
                                           : Colors.white,
@@ -1667,7 +1802,9 @@ class _SettingsPageState extends State<SettingsPage>
                                   leading: isSelected
                                       ? Icon(
                                           Icons.check_circle,
-                                          color: customColorsEnabled
+                                          color: useDynamicColors
+                                              ? scheme.primary
+                                              : customColorsEnabled
                                               ? primaryColor
                                               : const Color(0xFF8b5cf6),
                                         )
@@ -1756,7 +1893,9 @@ class _SettingsPageState extends State<SettingsPage>
     required IconData icon,
     required List<Widget> children,
     bool isPitchBlack = false,
+    Color? iconColor,
   }) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
@@ -1785,21 +1924,16 @@ class _SettingsPageState extends State<SettingsPage>
                           width: 1.2,
                         ),
                       ),
-                      child: customColorsEnabled
-                          ? Icon(icon, color: primaryColor, size: 20)
-                          : ShaderMask(
-                              shaderCallback: (Rect bounds) {
-                                return const LinearGradient(
-                                  colors: [
-                                    Color(0xFF6366f1),
-                                    Color(0xFF8b5cf6),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ).createShader(bounds);
-                              },
-                              child: Icon(icon, color: Colors.white, size: 20),
-                            ),
+                      child: Icon(
+                        icon,
+                        color: useDynamicColors
+                            ? Theme.of(context).colorScheme.primary
+                            : (iconColor ??
+                                  (customColorsEnabled
+                                      ? primaryColor
+                                      : Colors.white)),
+                        size: 20,
+                      ),
                     ),
                   ),
                 ),
@@ -1828,6 +1962,7 @@ class _SettingsPageState extends State<SettingsPage>
     required VoidCallback onTap,
   }) {
     // Removed unused variable isPitchBlack
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -1837,16 +1972,14 @@ class _SettingsPageState extends State<SettingsPage>
       ),
       child: ListTile(
         leading: (title == "Language" || title == "Notifications")
-            ? Icon(icon, color: Colors.grey[400])
+            ? Icon(
+                icon,
+                color: useDynamicColors
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey[400],
+              )
             : Container(
                 decoration: BoxDecoration(
-                  gradient: !customColorsEnabled
-                      ? const LinearGradient(
-                          colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
                   color: customColorsEnabled ? primaryColor : null,
                   shape: BoxShape.circle,
                 ),
@@ -1866,132 +1999,192 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildDeveloperInfoCard(bool isPitchBlack) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Colors.white.withOpacity(0.05),
-        border: Border.all(color: primaryColor.withOpacity(0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: primaryColor.withOpacity(0.2),
-            blurRadius: 20,
-            spreadRadius: 5,
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: !customColorsEnabled
-                  ? const LinearGradient(
-                      colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: customColorsEnabled ? primaryColor : null,
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withOpacity(0.4),
-                  blurRadius: 15,
-                  spreadRadius: 3,
-                ),
-              ],
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/image/dev_avatar.png',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 40,
-                  );
-                },
-              ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.25),
+              width: 1.2,
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            "Bhanu Pratap",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "Flutter Developer",
-            style: TextStyle(fontSize: 14, color: Colors.white70),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          padding: const EdgeInsets.all(24),
+          child: Column(
             children: [
-              _buildSocialButton(
-                FontAwesomeIcons.github,
-                Colors.white,
-                "GitHub",
-                () => _launchURL("https://github.com/yourprofile"),
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: useDynamicColors
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.white.withOpacity(0.3),
+                    width: 2,
+                  ),
+                ),
+                child: CircleAvatar(
+                  backgroundImage: AssetImage('assets/image/dev_avatar.png'),
+                  radius: 30,
+                  backgroundColor: useDynamicColors
+                      ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                      : Colors.white.withOpacity(0.1),
+                ),
               ),
-              const SizedBox(width: 16),
-              _buildSocialButton(
-                FontAwesomeIcons.linkedin,
-                Colors.blueAccent,
-                "LinkedIn",
-                () => _launchURL("https://linkedin.com/in/yourprofile"),
+              const SizedBox(height: 16),
+              Text(
+                '🌑 I am DARK 🌑',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Colors.white,
+                  letterSpacing: 1.2,
+                ),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(width: 16),
-              _buildSocialButton(
-                FontAwesomeIcons.telegram,
-                Colors.blue,
-                "Telegram",
-                () => _launchURL("https://t.me/darkdevil7773"),
+              const SizedBox(height: 6),
+              Text(
+                'BCA Student & Aspiring Developer',
+                style: TextStyle(
+                  fontStyle: FontStyle.italic,
+                  color: Colors.white70,
+                  fontSize: 13,
+                ),
+                textAlign: TextAlign.center,
               ),
-              _buildSocialButton(
-                FontAwesomeIcons.instagram,
-                Colors.pinkAccent,
-                "Instagram",
-                () => _launchURL(
-                  "https://www.instagram.com/bhanu.pratap__7773?igsh=MWZoM2w5NTZqeHc2NQ==",
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  "Hope you're enjoying my PlayWaves app!",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    color: useDynamicColors
+                        ? Theme.of(context).colorScheme.primary
+                        : Color(0xFF6366F1),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Special thanks to our amazing collaborators:\nineffable & darkx dev',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white60,
+                  fontStyle: FontStyle.italic,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '"Code, Create, Conquer!"',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: useDynamicColors
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.amberAccent,
+                  fontStyle: FontStyle.italic,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildGlassSocialButton(
+                    FontAwesomeIcons.github,
+                    Colors.white,
+                    () => _launchURL("https://github.com/Bhanu7773-dev"),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildGlassSocialButton(
+                    FontAwesomeIcons.telegram,
+                    Color(0xFF29A7DF),
+                    () => _launchURL("https://t.me/darkdevil7773"),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildGlassSocialButton(
+                    FontAwesomeIcons.instagram,
+                    Colors.pinkAccent,
+                    () => _launchURL(
+                      "https://www.instagram.com/bhanu.pratap__7773?igsh=MWZoM2w5NTZqeHc2NQ==",
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.15),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  'App Version: 1.0.0',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: useDynamicColors
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.white60,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Column(
-              children: [
-                Text(
-                  "App Version: 1.0.0",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  "Contact: bhanucv9887@gmail.com",
-                  style: TextStyle(color: Colors.white60, fontSize: 11),
-                ),
-              ],
-            ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlassSocialButton(
+    IconData icon,
+    Color iconColor,
+    VoidCallback onPressed,
+  ) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+        child: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
           ),
-        ],
+          child: IconButton(
+            icon: Icon(icon, color: iconColor, size: 20),
+            onPressed: onPressed,
+          ),
+        ),
       ),
     );
   }
