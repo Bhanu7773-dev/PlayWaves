@@ -754,11 +754,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             ? RadialGradient(
                 center: Alignment.topLeft,
                 radius: 1.5,
-                colors: [
-                  scheme.background,
-                  scheme.surface,
-                  Colors.black,
-                ],
+                colors: [scheme.background, scheme.surface, Colors.black],
               )
             : customColorsEnabled
             ? RadialGradient(
@@ -859,7 +855,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               Text(
                 'PlayWaves',
                 style: TextStyle(
-                  fontSize: 28,
+                  fontFamily: 'Wednesday',
+                  fontSize: 38,
                   fontWeight: FontWeight.bold,
                   foreground: Paint()
                     ..shader = (useDynamicColors
@@ -1014,9 +1011,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   child: Text(
                     title,
                     style: TextStyle(
-                      color: useDynamicColors
-                          ? scheme.onSurface
-                          : Colors.white,
+                      color: useDynamicColors ? scheme.onSurface : Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1512,10 +1507,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           decoration: BoxDecoration(
             gradient: useDynamicColors
                 ? LinearGradient(
-                    colors: [
-                      scheme.primary,
-                      scheme.primary.withOpacity(0.8),
-                    ],
+                    colors: [scheme.primary, scheme.primary.withOpacity(0.8)],
                   )
                 : customColorsEnabled
                 ? LinearGradient(
