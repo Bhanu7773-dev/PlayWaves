@@ -20,8 +20,10 @@ class MasonrySongSection extends StatelessWidget {
     return Consumer<CustomThemeProvider>(
       builder: (context, customTheme, child) {
         final customColorsEnabled = customTheme.customColorsEnabled;
+        final useDynamicColors = customTheme.useDynamicColors;
         final primaryColor = customTheme.primaryColor;
         final secondaryColor = customTheme.secondaryColor;
+        final scheme = Theme.of(context).colorScheme;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -34,7 +36,14 @@ class MasonrySongSection extends StatelessWidget {
                     width: 4,
                     height: 24,
                     decoration: BoxDecoration(
-                      gradient: customColorsEnabled
+                      gradient: useDynamicColors
+                          ? LinearGradient(
+                              colors: [
+                                scheme.primary,
+                                scheme.primary.withOpacity(0.7),
+                              ],
+                            )
+                          : customColorsEnabled
                           ? LinearGradient(
                               colors: [
                                 primaryColor,
@@ -77,6 +86,8 @@ class MasonrySongSection extends StatelessWidget {
                   customColorsEnabled: customColorsEnabled,
                   primaryColor: primaryColor,
                   secondaryColor: secondaryColor,
+                  useDynamicColors: useDynamicColors,
+                  scheme: scheme,
                 );
               },
             ),
@@ -93,6 +104,8 @@ class MasonrySongSection extends StatelessWidget {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     final imageUrl = getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
@@ -111,15 +124,27 @@ class MasonrySongSection extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: customColorsEnabled
+          color: useDynamicColors
+              ? scheme.surface.withOpacity(0.05)
+              : customColorsEnabled
               ? primaryColor.withValues(alpha: 0.05)
               : Colors.white.withOpacity(0.05),
           border: Border.all(
-            color: customColorsEnabled
+            color: useDynamicColors
+                ? scheme.outline.withOpacity(0.2)
+                : customColorsEnabled
                 ? primaryColor.withValues(alpha: 0.2)
                 : Colors.white.withOpacity(0.1),
           ),
-          boxShadow: customColorsEnabled
+          boxShadow: useDynamicColors
+              ? [
+                  BoxShadow(
+                    color: scheme.primary.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : customColorsEnabled
               ? [
                   BoxShadow(
                     color: primaryColor.withValues(alpha: 0.1),
@@ -192,7 +217,9 @@ class MasonrySongSection extends StatelessWidget {
                   Text(
                     title,
                     style: TextStyle(
-                      color: customColorsEnabled
+                      color: useDynamicColors
+                          ? scheme.onSurface.withOpacity(0.9)
+                          : customColorsEnabled
                           ? primaryColor.withValues(alpha: 0.9)
                           : Colors.white,
                       fontWeight: FontWeight.w600,
@@ -204,7 +231,12 @@ class MasonrySongSection extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     artist,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    style: TextStyle(
+                      color: useDynamicColors
+                          ? scheme.onSurface.withOpacity(0.7)
+                          : Colors.white,
+                      fontSize: 12,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

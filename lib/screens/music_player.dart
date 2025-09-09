@@ -783,12 +783,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
   Widget build(BuildContext context) {
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
+    final useDynamicColors = customTheme.useDynamicColors;
     final primaryColor = customColorsEnabled
         ? customTheme.primaryColor
         : const Color(0xFFff7d78);
     final secondaryColor = customColorsEnabled
         ? customTheme.secondaryColor
         : Colors.black;
+    final scheme = Theme.of(context).colorScheme;
 
     final double progress = widget.totalDuration.inSeconds > 0
         ? (widget.currentPosition.inSeconds / widget.totalDuration.inSeconds)
@@ -870,7 +872,16 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                               icon: Icons.keyboard_arrow_down,
                               onPressed: () => Navigator.pop(context),
                             ),
-                            customColorsEnabled
+                            useDynamicColors
+                                ? Text(
+                                    'Now Playing',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: scheme.primary,
+                                    ),
+                                  )
+                                : customColorsEnabled
                                 ? Text(
                                     'Now Playing',
                                     style: TextStyle(
@@ -1079,7 +1090,13 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                             ? _likeScale.value
                                             : 1.0,
                                         child: _isLiked
-                                            ? (customColorsEnabled
+                                            ? (useDynamicColors
+                                                  ? Icon(
+                                                      Icons.favorite,
+                                                      color: scheme.primary,
+                                                      size: 28,
+                                                    )
+                                                  : customColorsEnabled
                                                   ? Icon(
                                                       Icons.favorite,
                                                       color: primaryColor,
@@ -1313,7 +1330,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                 overlayShape: const RoundSliderOverlayShape(
                                   overlayRadius: 16,
                                 ),
-                                activeTrackColor: customColorsEnabled
+                                activeTrackColor: useDynamicColors
+                                    ? scheme.primary
+                                    : customColorsEnabled
                                     ? primaryColor
                                     : const Color(0xFF6366f1),
                                 inactiveTrackColor: Colors.white.withOpacity(
@@ -1321,7 +1340,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                 ),
                                 thumbColor: Colors.white,
                                 overlayColor:
-                                    (customColorsEnabled
+                                    (useDynamicColors
+                                            ? scheme.primary
+                                            : customColorsEnabled
                                             ? primaryColor
                                             : const Color(0xFF8b5cf6))
                                         .withOpacity(0.2),
@@ -1400,10 +1421,13 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                             ),
                             Container(
                               decoration: BoxDecoration(
-                                color: customColorsEnabled
+                                color: useDynamicColors
+                                    ? scheme.primary
+                                    : customColorsEnabled
                                     ? primaryColor
                                     : null,
-                                gradient: !customColorsEnabled
+                                gradient:
+                                    !useDynamicColors && !customColorsEnabled
                                     ? const LinearGradient(
                                         colors: [
                                           Color(0xFF6366f1),
@@ -1460,10 +1484,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
   Widget _buildAnimatedBackground({required bool isPitchBlack}) {
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
+    final useDynamicColors = customTheme.useDynamicColors;
+    final scheme = Theme.of(context).colorScheme;
 
     return Container(
       decoration: isPitchBlack
           ? const BoxDecoration(color: Colors.black)
+          : useDynamicColors
+          ? BoxDecoration(color: scheme.secondary)
           : customColorsEnabled
           ? BoxDecoration(color: customTheme.secondaryColor)
           : const BoxDecoration(

@@ -5,7 +5,7 @@ import '../services/jiosaavn_api_service.dart';
 import '../screens/artist_songs_page.dart';
 import '../services/custom_theme_provider.dart';
 
-class ArtistSection extends StatelessWidget {
+class ArtistSection extends StatefulWidget {
   final List<Map<String, dynamic>> artists;
   final JioSaavnApiService apiService;
   final AudioPlayer audioPlayer;
@@ -16,6 +16,63 @@ class ArtistSection extends StatelessWidget {
     required this.apiService,
     required this.audioPlayer,
   }) : super(key: key);
+
+  @override
+  State<ArtistSection> createState() => _ArtistSectionState();
+}
+
+class _ArtistSectionState extends State<ArtistSection>
+    with TickerProviderStateMixin {
+  late Map<String, bool> _likedArtists;
+  late Map<String, AnimationController> _likeAnimationControllers;
+  late Map<String, Animation<double>> _likeAnimations;
+
+  @override
+  void initState() {
+    super.initState();
+    _likedArtists = {};
+    _likeAnimationControllers = {};
+    _likeAnimations = {};
+
+    // Initialize liked state and animations for each artist
+    for (var artist in widget.artists) {
+      final artistId = artist['id']?.toString() ?? artist['name']?.toString() ?? '';
+      _likedArtists[artistId] = false;
+
+      _likeAnimationControllers[artistId] = AnimationController(
+        duration: const Duration(milliseconds: 200),
+        vsync: this,
+      );
+
+      _likeAnimations[artistId] = Tween<double>(
+        begin: 1.0,
+        end: 1.2,
+      ).animate(CurvedAnimation(
+        parent: _likeAnimationControllers[artistId]!,
+        curve: Curves.elasticOut,
+      ));
+    }
+  }
+
+  @override
+  void dispose() {
+    for (var controller in _likeAnimationControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _toggleLike(String artistId) {
+    setState(() {
+      _likedArtists[artistId] = !(_likedArtists[artistId] ?? false);
+    });
+
+    if (_likedArtists[artistId] == true) {
+      _likeAnimationControllers[artistId]?.forward().then((_) {
+        _likeAnimationControllers[artistId]?.reverse();
+      });
+    }
+  }
 
   String? _getBestImageUrl(dynamic images) {
     if (images is List && images.isNotEmpty) {
@@ -38,8 +95,10 @@ class ArtistSection extends StatelessWidget {
     return Consumer<CustomThemeProvider>(
       builder: (context, customTheme, child) {
         final customColorsEnabled = customTheme.customColorsEnabled;
+        final useDynamicColors = customTheme.useDynamicColors;
         final primaryColor = customTheme.primaryColor;
         final secondaryColor = customTheme.secondaryColor;
+        final scheme = Theme.of(context).colorScheme;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,7 +111,14 @@ class ArtistSection extends StatelessWidget {
                     width: 4,
                     height: 24,
                     decoration: BoxDecoration(
-                      gradient: customColorsEnabled
+                      gradient: useDynamicColors
+                          ? LinearGradient(
+                              colors: [
+                                scheme.primary,
+                                scheme.primary.withOpacity(0.7),
+                              ],
+                            )
+                          : customColorsEnabled
                           ? LinearGradient(
                               colors: [
                                 primaryColor,
@@ -83,16 +149,16 @@ class ArtistSection extends StatelessWidget {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: artists.length,
+                itemCount: widget.artists.length,
                 itemBuilder: (context, index) {
-                  final artist = artists[index];
+                  final artist = widget.artists[index];
                   return GestureDetector(
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => ArtistSongsPage(
                             artistName: artist['name'] ?? 'Unknown Artist',
-                            apiService: apiService,
+                            apiService: widget.apiService,
                           ),
                         ),
                       );
@@ -102,6 +168,11 @@ class ArtistSection extends StatelessWidget {
                       customColorsEnabled: customColorsEnabled,
                       primaryColor: primaryColor,
                       secondaryColor: secondaryColor,
+                      useDynamicColors: useDynamicColors,
+                      scheme: scheme,
+                      onLikeToggle: _toggleLike,
+                      isLiked: _likedArtists[artist['id']?.toString() ?? artist['name']?.toString() ?? ''] ?? false,
+                      likeAnimation: _likeAnimations[artist['id']?.toString() ?? artist['name']?.toString() ?? ''] ?? AlwaysStoppedAnimation(1.0),
                     ),
                   );
                 },
@@ -119,6 +190,11 @@ class ArtistSection extends StatelessWidget {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
+    required Function(String) onLikeToggle,
+    required bool isLiked,
+    required Animation<double> likeAnimation,
   }) {
     return Container(
       width: 120,
@@ -131,7 +207,12 @@ class ArtistSection extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
-                colors: customColorsEnabled
+                colors: useDynamicColors
+                    ? [
+                        scheme.surface.withOpacity(0.4),
+                        scheme.surface.withOpacity(0.2),
+                      ]
+                    : customColorsEnabled
                     ? [
                         primaryColor.withValues(alpha: 0.4),
                         primaryColor.withValues(alpha: 0.2),
@@ -141,7 +222,9 @@ class ArtistSection extends StatelessWidget {
                         const Color(0xFF9c27b0).withValues(alpha: 0.3),
                       ],
               ),
-              border: customColorsEnabled
+              border: useDynamicColors
+                  ? Border.all(color: scheme.outline.withOpacity(0.5), width: 2)
+                  : customColorsEnabled
                   ? Border.all(
                       color: primaryColor.withValues(alpha: 0.5),
                       width: 2,
@@ -156,7 +239,9 @@ class ArtistSection extends StatelessWidget {
                       errorBuilder: (context, error, stackTrace) {
                         return Icon(
                           Icons.person,
-                          color: customColorsEnabled
+                          color: useDynamicColors
+                              ? scheme.onSurface.withOpacity(0.8)
+                              : customColorsEnabled
                               ? primaryColor.withValues(alpha: 0.8)
                               : Colors.white,
                           size: 40,
@@ -165,7 +250,9 @@ class ArtistSection extends StatelessWidget {
                     )
                   : Icon(
                       Icons.person,
-                      color: customColorsEnabled
+                      color: useDynamicColors
+                          ? scheme.onSurface.withOpacity(0.8)
+                          : customColorsEnabled
                           ? primaryColor.withValues(alpha: 0.8)
                           : Colors.white,
                       size: 40,
@@ -176,7 +263,9 @@ class ArtistSection extends StatelessWidget {
           Text(
             artist['name'] ?? 'Unknown Artist',
             style: TextStyle(
-              foreground: customColorsEnabled
+              foreground: useDynamicColors
+                  ? (Paint()..color = scheme.onSurface)
+                  : customColorsEnabled
                   ? (Paint()..color = Colors.white)
                   : (Paint()
                       ..shader = const LinearGradient(

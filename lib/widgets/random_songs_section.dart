@@ -72,8 +72,10 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
     return Consumer<CustomThemeProvider>(
       builder: (context, customTheme, child) {
         final customColorsEnabled = customTheme.customColorsEnabled;
+        final useDynamicColors = customTheme.useDynamicColors;
         final primaryColor = customTheme.primaryColor;
         final secondaryColor = customTheme.secondaryColor;
+        final scheme = Theme.of(context).colorScheme;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,7 +88,14 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                     width: 4,
                     height: 24,
                     decoration: BoxDecoration(
-                      gradient: customColorsEnabled
+                      gradient: useDynamicColors
+                          ? LinearGradient(
+                              colors: [
+                                scheme.primary,
+                                scheme.primary.withOpacity(0.7),
+                              ],
+                            )
+                          : customColorsEnabled
                           ? LinearGradient(
                               colors: [
                                 primaryColor,
@@ -126,6 +135,8 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                         customColorsEnabled: customColorsEnabled,
                         primaryColor: primaryColor,
                         secondaryColor: secondaryColor,
+                        useDynamicColors: useDynamicColors,
+                        scheme: scheme,
                       );
                     },
                     onStackFinished: () {
@@ -166,6 +177,8 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     final imageUrl = widget.getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
@@ -177,7 +190,9 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
     return Card(
       elevation: 8,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      color: customColorsEnabled
+      color: useDynamicColors
+          ? scheme.surface.withOpacity(0.8)
+          : customColorsEnabled
           ? secondaryColor.withOpacity(0.8)
           : const Color.fromARGB(255, 17, 17, 17),
       child: Stack(
@@ -306,7 +321,14 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                             : Container(
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  gradient: customColorsEnabled
+                                  gradient: useDynamicColors
+                                      ? LinearGradient(
+                                          colors: [
+                                            scheme.primary,
+                                            scheme.primary.withOpacity(0.8),
+                                          ],
+                                        )
+                                      : customColorsEnabled
                                       ? LinearGradient(
                                           colors: [
                                             primaryColor,
@@ -367,7 +389,9 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: customColorsEnabled
+                color: useDynamicColors
+                    ? scheme.primary.withOpacity(0.8)
+                    : customColorsEnabled
                     ? primaryColor.withOpacity(0.8)
                     : Colors.deepPurple.withOpacity(0.84),
                 borderRadius: BorderRadius.circular(12),

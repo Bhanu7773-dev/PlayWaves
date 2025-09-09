@@ -223,15 +223,19 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return Container(
       decoration: BoxDecoration(
         color: isPitchBlack
             ? Colors.black
+            : useDynamicColors
+            ? scheme.background
             : customColorsEnabled
             ? secondaryColor
             : null,
-        gradient: isPitchBlack || customColorsEnabled
+        gradient: isPitchBlack || customColorsEnabled || useDynamicColors
             ? null
             : const LinearGradient(
                 begin: Alignment.topLeft,
@@ -252,7 +256,11 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
             18,
             (index) => _buildFloatingParticle(
               index,
-              customColorsEnabled ? primaryColor : const Color(0xFF6366f1),
+              useDynamicColors
+                  ? scheme.primary
+                  : customColorsEnabled
+                  ? primaryColor
+                  : const Color(0xFF6366f1),
             ),
           ),
           // Floating musical notes
@@ -260,7 +268,11 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
             8,
             (index) => _buildFloatingNote(
               index,
-              customColorsEnabled ? primaryColor : const Color(0xFF8b5cf6),
+              useDynamicColors
+                  ? scheme.primary
+                  : customColorsEnabled
+                  ? primaryColor
+                  : const Color(0xFF8b5cf6),
             ),
           ),
           // Floating orbs
@@ -268,7 +280,11 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
             4,
             (index) => _buildFloatingOrb(
               index,
-              customColorsEnabled ? primaryColor : const Color(0xFF6366f1),
+              useDynamicColors
+                  ? scheme.primary
+                  : customColorsEnabled
+                  ? primaryColor
+                  : const Color(0xFF6366f1),
             ),
           ),
         ],
@@ -404,7 +420,15 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
   Widget _buildHeader({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
+    final headingColor = customColorsEnabled
+        ? primaryColor
+        : (useDynamicColors ? scheme.primary : const Color(0xFF6366f1));
+    final subtitleColor = useDynamicColors
+        ? scheme.onBackground
+        : Colors.grey[400];
     return FadeTransition(
       opacity: _headerAnimation,
       child: SlideTransition(
@@ -447,31 +471,19 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                     Text(
                       'Music History',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: subtitleColor,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    ShaderMask(
-                      shaderCallback: (bounds) => LinearGradient(
-                        colors: customColorsEnabled
-                            ? [primaryColor, primaryColor.withOpacity(0.7)]
-                            : [
-                                const Color(0xFF6366f1),
-                                const Color(0xFF8b5cf6),
-                              ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ).createShader(bounds),
-                      child: const Text(
-                        'Recently Played',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: -0.5,
-                        ),
+                    Text(
+                      'Recently Played',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: headingColor,
+                        letterSpacing: -0.5,
                       ),
                     ),
                   ],
@@ -488,7 +500,14 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
     required int songCount,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
+    final iconColor = useDynamicColors
+        ? scheme.primary
+        : customColorsEnabled
+        ? primaryColor
+        : const Color(0xFF6366f1);
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
@@ -511,11 +530,7 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                 height: 44,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
-                    colors: customColorsEnabled
-                        ? [primaryColor, primaryColor.withOpacity(0.7)]
-                        : [const Color(0xFF6366f1), const Color(0xFF8b5cf6)],
-                  ),
+                  color: iconColor,
                   boxShadow: [
                     BoxShadow(
                       color: customColorsEnabled
@@ -743,6 +758,8 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
     required List<Map<String, dynamic>> songs,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     final playerState = Provider.of<PlayerStateProvider>(context);
 
@@ -779,6 +796,8 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                     customColorsEnabled,
                     primaryColor,
                     animationProgress,
+                    useDynamicColors,
+                    scheme,
                   ),
                 ),
               ),
@@ -799,6 +818,8 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     bool customColorsEnabled,
     Color primaryColor,
     double animationProgress,
+    bool useDynamicColors,
+    ColorScheme scheme,
   ) {
     final imageUrl = _getBestImageUrl(song['image']);
     final songTitle = song['name'] ?? song['title'] ?? 'Unknown Song';
@@ -985,6 +1006,8 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                             customColorsEnabled,
                             primaryColor,
                             animationProgress,
+                            useDynamicColors,
+                            scheme,
                           ),
                         ],
                       ),
@@ -1009,9 +1032,16 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     bool customColorsEnabled,
     Color primaryColor,
     double animationProgress,
+    bool useDynamicColors,
+    ColorScheme scheme,
   ) {
     final shouldShowPause = isCurrentSong && isPlaying;
     final showLoader = isCurrentSong && isLoading;
+    final buttonColor = useDynamicColors
+        ? scheme.primary
+        : customColorsEnabled
+        ? primaryColor
+        : const Color(0xFF6366f1);
 
     return Transform.scale(
       scale: 0.6 + (0.4 * animationProgress),
@@ -1020,11 +1050,7 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
         height: 36,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: LinearGradient(
-            colors: customColorsEnabled
-                ? [primaryColor, primaryColor.withOpacity(0.8)]
-                : [const Color(0xFF6366f1), const Color(0xFF8b5cf6)],
-          ),
+          color: buttonColor,
           boxShadow: [
             BoxShadow(
               color: customColorsEnabled
@@ -1119,6 +1145,8 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     final customColorsEnabled = customTheme.customColorsEnabled;
     final primaryColor = customTheme.primaryColor;
     final secondaryColor = customTheme.secondaryColor;
+    final useDynamicColors = customTheme.useDynamicColors;
+    final scheme = Theme.of(context).colorScheme;
 
     return Consumer<PlayerStateProvider>(
       builder: (context, playerState, child) {
@@ -1127,6 +1155,10 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
         return Scaffold(
           backgroundColor: isPitchBlack
               ? Colors.black
+              : useDynamicColors
+              ? scheme.background
+              : customColorsEnabled
+              ? secondaryColor
               : const Color(0xFF0a0a0a),
           body: Stack(
             children: [
@@ -1135,17 +1167,23 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                 customColorsEnabled: customColorsEnabled,
                 primaryColor: primaryColor,
                 secondaryColor: secondaryColor,
+                useDynamicColors: useDynamicColors,
+                scheme: scheme,
               ),
               Column(
                 children: [
                   _buildHeader(
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
+                    useDynamicColors: useDynamicColors,
+                    scheme: scheme,
                   ),
                   _buildStatsSection(
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
                     songCount: recentlyPlayed.length,
+                    useDynamicColors: useDynamicColors,
+                    scheme: scheme,
                   ),
                   const SizedBox(height: 20),
                   Expanded(
@@ -1158,6 +1196,8 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                             customColorsEnabled: customColorsEnabled,
                             primaryColor: primaryColor,
                             songs: recentlyPlayed,
+                            useDynamicColors: useDynamicColors,
+                            scheme: scheme,
                           ),
                   ),
                 ],

@@ -24,8 +24,10 @@ class AlbumsSection extends StatelessWidget {
     return Consumer<CustomThemeProvider>(
       builder: (context, customTheme, child) {
         final customColorsEnabled = customTheme.customColorsEnabled;
+        final useDynamicColors = customTheme.useDynamicColors;
         final primaryColor = customTheme.primaryColor;
         final secondaryColor = customTheme.secondaryColor;
+        final scheme = Theme.of(context).colorScheme;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -38,7 +40,14 @@ class AlbumsSection extends StatelessWidget {
                     width: 4,
                     height: 24,
                     decoration: BoxDecoration(
-                      gradient: customColorsEnabled
+                      gradient: useDynamicColors
+                          ? LinearGradient(
+                              colors: [
+                                scheme.primary,
+                                scheme.primary.withOpacity(0.7),
+                              ],
+                            )
+                          : customColorsEnabled
                           ? LinearGradient(
                               colors: [
                                 primaryColor,
@@ -78,6 +87,8 @@ class AlbumsSection extends StatelessWidget {
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
                     secondaryColor: secondaryColor,
+                    useDynamicColors: useDynamicColors,
+                    scheme: scheme,
                   );
                 },
               ),
@@ -94,10 +105,28 @@ class AlbumsSection extends StatelessWidget {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     final imageUrl = getBestImageUrl(album['image']);
     final title = album['name'] ?? album['title'] ?? 'Unknown Album';
-    final subtitle = album['subtitle'] ?? album['artist'] ?? 'Unknown Artist';
+
+    // Extract artist name using the same logic as songs
+    String artistName = 'Unknown Artist';
+    if (album['artists'] != null &&
+        album['artists']['primary'] != null &&
+        (album['artists']['primary'] as List?)?.isNotEmpty == true) {
+      artistName = album['artists']['primary'][0]['name'] ?? 'Unknown Artist';
+    } else if (album['primaryArtists'] != null &&
+        album['primaryArtists'].toString().isNotEmpty) {
+      artistName = album['primaryArtists'];
+    } else if (album['subtitle'] != null) {
+      artistName = album['subtitle'];
+    } else if (album['artist'] != null) {
+      artistName = album['artist'];
+    }
+
+    final subtitle = artistName;
 
     return Container(
       width: 160,
@@ -107,7 +136,12 @@ class AlbumsSection extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: customColorsEnabled
+          colors: useDynamicColors
+              ? [
+                  scheme.surface.withOpacity(0.2),
+                  scheme.surface.withOpacity(0.1),
+                ]
+              : customColorsEnabled
               ? [
                   secondaryColor.withOpacity(0.2),
                   secondaryColor.withOpacity(0.1),
@@ -115,7 +149,9 @@ class AlbumsSection extends StatelessWidget {
               : [Colors.white.withOpacity(0.1), Colors.white.withOpacity(0.05)],
         ),
         border: Border.all(
-          color: customColorsEnabled
+          color: useDynamicColors
+              ? scheme.outline.withOpacity(0.3)
+              : customColorsEnabled
               ? primaryColor.withOpacity(0.3)
               : Colors.white.withOpacity(0.1),
         ),
@@ -222,7 +258,14 @@ class AlbumsSection extends StatelessWidget {
             right: 8,
             child: Container(
               decoration: BoxDecoration(
-                gradient: customColorsEnabled
+                gradient: useDynamicColors
+                    ? LinearGradient(
+                        colors: [
+                          scheme.primary,
+                          scheme.primary.withOpacity(0.8),
+                        ],
+                      )
+                    : customColorsEnabled
                     ? LinearGradient(
                         colors: [primaryColor, primaryColor.withOpacity(0.8)],
                       )
@@ -234,7 +277,9 @@ class AlbumsSection extends StatelessWidget {
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: customColorsEnabled
+                    color: useDynamicColors
+                        ? scheme.primary.withOpacity(0.3)
+                        : customColorsEnabled
                         ? primaryColor.withOpacity(0.3)
                         : const Color(0xFF6366f1).withOpacity(0.3),
                     blurRadius: 8,

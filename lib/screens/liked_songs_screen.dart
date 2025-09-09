@@ -153,15 +153,19 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return Container(
       decoration: BoxDecoration(
         color: isPitchBlack
             ? Colors.black
+            : useDynamicColors
+            ? scheme.background
             : customColorsEnabled
             ? secondaryColor
             : null,
-        gradient: isPitchBlack || customColorsEnabled
+        gradient: isPitchBlack || customColorsEnabled || useDynamicColors
             ? null
             : const LinearGradient(
                 begin: Alignment.topLeft,
@@ -182,7 +186,11 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
             18,
             (index) => _buildFloatingParticle(
               index,
-              customColorsEnabled ? primaryColor : const Color(0xFF6366f1),
+              useDynamicColors
+                  ? scheme.primary
+                  : customColorsEnabled
+                  ? primaryColor
+                  : const Color(0xFF6366f1),
             ),
           ),
           // Floating musical notes
@@ -190,7 +198,11 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
             8,
             (index) => _buildFloatingNote(
               index,
-              customColorsEnabled ? primaryColor : const Color(0xFF8b5cf6),
+              useDynamicColors
+                  ? scheme.primary
+                  : customColorsEnabled
+                  ? primaryColor
+                  : const Color(0xFF8b5cf6),
             ),
           ),
           // Floating orbs
@@ -335,6 +347,18 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
   }) {
+    final customTheme = Provider.of<CustomThemeProvider>(
+      context,
+      listen: false,
+    );
+    final useDynamicColors = customTheme.useDynamicColors;
+    final scheme = Theme.of(context).colorScheme;
+    final headingColor = customColorsEnabled
+        ? primaryColor
+        : (useDynamicColors ? scheme.primary : const Color(0xFF6366f1));
+    final subtitleColor = useDynamicColors
+        ? scheme.onBackground
+        : Colors.grey[400];
     return FadeTransition(
       opacity: _headerAnimation,
       child: SlideTransition(
@@ -377,7 +401,7 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                     Text(
                       'Favorite Collection',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: subtitleColor,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -385,13 +409,13 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Liked Songs',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF6366f1),
+                              color: headingColor,
                               letterSpacing: -0.5,
                             ),
                           ),
@@ -412,7 +436,15 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
     required int songCount,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
+    required Color secondaryColor,
   }) {
+    final iconColor = useDynamicColors
+        ? scheme.primary
+        : customColorsEnabled
+        ? primaryColor
+        : const Color(0xFF6366f1);
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
@@ -435,11 +467,7 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                 height: 44,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
-                    colors: customColorsEnabled
-                        ? [primaryColor, primaryColor.withOpacity(0.7)]
-                        : [const Color(0xFF6366f1), const Color(0xFF8b5cf6)],
-                  ),
+                  color: iconColor,
                   boxShadow: [
                     BoxShadow(
                       color: customColorsEnabled
@@ -797,6 +825,9 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
     required List<LikedSong> songs,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
+    required Color secondaryColor,
   }) {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -831,6 +862,9 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                     customColorsEnabled,
                     primaryColor,
                     animationProgress,
+                    useDynamicColors,
+                    scheme,
+                    secondaryColor,
                   ),
                 ),
               ),
@@ -851,6 +885,9 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
     bool customColorsEnabled,
     Color primaryColor,
     double animationProgress,
+    bool useDynamicColors,
+    ColorScheme scheme,
+    Color secondaryColor,
   ) {
     final shouldShowPause =
         isCurrentSong && isPlaying && playerState.currentContext == "liked";
@@ -1042,17 +1079,11 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                                   height: 36,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: LinearGradient(
-                                      colors: customColorsEnabled
-                                          ? [
-                                              primaryColor,
-                                              primaryColor.withOpacity(0.8),
-                                            ]
-                                          : [
-                                              const Color(0xFF6366f1),
-                                              const Color(0xFF8b5cf6),
-                                            ],
-                                    ),
+                                    color: useDynamicColors
+                                        ? scheme.primary
+                                        : customColorsEnabled
+                                        ? primaryColor
+                                        : const Color(0xFF6366f1),
                                     boxShadow: [
                                       BoxShadow(
                                         color: customColorsEnabled
@@ -1187,10 +1218,16 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
         final customColorsEnabled = customTheme.customColorsEnabled;
         final primaryColor = customTheme.primaryColor;
         final secondaryColor = customTheme.secondaryColor;
+        final useDynamicColors = customTheme.useDynamicColors;
+        final scheme = Theme.of(context).colorScheme;
 
         return Scaffold(
           backgroundColor: isPitchBlack
               ? Colors.black
+              : useDynamicColors
+              ? scheme.background
+              : customColorsEnabled
+              ? secondaryColor
               : const Color(0xFF0a0a0a),
           body: Stack(
             children: [
@@ -1199,6 +1236,8 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                 customColorsEnabled: customColorsEnabled,
                 primaryColor: primaryColor,
                 secondaryColor: secondaryColor,
+                useDynamicColors: useDynamicColors,
+                scheme: scheme,
               ),
               Column(
                 children: [
@@ -1213,6 +1252,9 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                         customColorsEnabled: customColorsEnabled,
                         primaryColor: primaryColor,
                         songCount: box.values.length,
+                        useDynamicColors: customTheme.useDynamicColors,
+                        scheme: Theme.of(context).colorScheme,
+                        secondaryColor: secondaryColor,
                       );
                     },
                   ),
@@ -1234,6 +1276,9 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                           customColorsEnabled: customColorsEnabled,
                           primaryColor: primaryColor,
                           songs: songs,
+                          useDynamicColors: customTheme.useDynamicColors,
+                          scheme: Theme.of(context).colorScheme,
+                          secondaryColor: secondaryColor,
                         );
                       },
                     ),

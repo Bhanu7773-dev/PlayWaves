@@ -1,13 +1,9 @@
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
-import '../widgets/animated_navbar.dart';
-import '../models/liked_song.dart';
-import '../models/playlist_song.dart';
 import 'liked_songs_screen.dart';
 import 'my_playlist_screen.dart';
 import 'downloaded_songs_screen.dart';
@@ -32,17 +28,11 @@ class _LibraryScreenState extends State<LibraryScreen>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _floatAnimation;
-  late FocusNode _searchFocusNode;
-  final TextEditingController _searchControllerText = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     PlaylistStorageLogic.openRecentlyPlayedBox();
-    _searchFocusNode = FocusNode();
-    _searchFocusNode.addListener(() {
-      setState(() {});
-    });
     _masterController = PlaylistStorageLogic.createMasterController(this);
     _floatController = PlaylistStorageLogic.createFloatController(this);
     _fadeAnimation = PlaylistStorageLogic.createFadeAnimation(
@@ -64,8 +54,6 @@ class _LibraryScreenState extends State<LibraryScreen>
     _floatController.stop();
     _masterController.dispose();
     _floatController.dispose();
-    _searchControllerText.dispose();
-    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -190,16 +178,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                           primaryColor,
                         ),
                       ),
-                      SliverToBoxAdapter(
-                        child: _buildSearchBar(
-                          scheme,
-                          useDynamicColors,
-                          customColorsEnabled,
-                          primaryColor,
-                        ),
-                      ),
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+                        padding: const EdgeInsets.fromLTRB(20, 32, 20, 100),
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (context, index) => _buildLibraryItem(
@@ -399,109 +379,6 @@ class _LibraryScreenState extends State<LibraryScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar(
-    ColorScheme scheme,
-    bool useDynamicColors,
-    bool customColorsEnabled,
-    Color primaryColor,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: Container(
-        height: 56,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          gradient: useDynamicColors
-              ? LinearGradient(
-                  colors: [
-                    scheme.surface.withOpacity(0.1),
-                    scheme.surface.withOpacity(0.05),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : LinearGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.1),
-                    Colors.white.withOpacity(0.05),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-          border: Border.all(
-            color: useDynamicColors
-                ? scheme.primary
-                : (customColorsEnabled
-                      ? primaryColor
-                      : const Color(0xFF6366f1)),
-            width: 1,
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Row(
-              children: [
-                const SizedBox(width: 20),
-                Icon(
-                  Icons.search_rounded,
-                  color: useDynamicColors
-                      ? scheme.primary
-                      : (customColorsEnabled
-                            ? primaryColor
-                            : const Color(0xFF6366f1)),
-                  size: 24,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextField(
-                    controller: _searchControllerText,
-                    focusNode: _searchFocusNode,
-                    style: TextStyle(
-                      color: useDynamicColors ? scheme.onSurface : Colors.white,
-                      fontSize: 16,
-                    ),
-                    cursorColor: useDynamicColors
-                        ? scheme.primary
-                        : const Color(0xFF6366f1),
-                    decoration: InputDecoration(
-                      hintText: "Search your music...",
-                      hintStyle: TextStyle(
-                        color: useDynamicColors
-                            ? scheme.onSurface.withOpacity(0.5)
-                            : Colors.white.withOpacity(0.5),
-                        fontSize: 16,
-                      ),
-                      border: InputBorder.none,
-                      fillColor: Colors.transparent,
-                      filled: true,
-                    ),
-                    onEditingComplete: () {
-                      FocusScope.of(context).unfocus();
-                    },
-                  ),
-                ),
-                if (_searchFocusNode.hasFocus)
-                  IconButton(
-                    icon: Icon(
-                      Icons.close,
-                      color: useDynamicColors ? scheme.onSurface : Colors.white,
-                      size: 20,
-                    ),
-                    onPressed: () {
-                      _searchControllerText.clear();
-                      _searchFocusNode.unfocus();
-                    },
-                  ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

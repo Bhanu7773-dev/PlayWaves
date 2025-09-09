@@ -219,16 +219,27 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: isPitchBlack
-            ? Colors.black
-            : customColorsEnabled
-            ? secondaryColor
-            : null,
-        gradient: isPitchBlack || customColorsEnabled
+        gradient: isPitchBlack
             ? null
+            : useDynamicColors
+            ? null
+            : customColorsEnabled
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  primaryColor.withOpacity(0.1),
+                  secondaryColor.withOpacity(0.3),
+                  const Color(0xFF0f172a),
+                  Colors.black,
+                ],
+                stops: const [0.0, 0.3, 0.7, 1.0],
+              )
             : const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -240,6 +251,11 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
                 ],
                 stops: [0.0, 0.3, 0.7, 1.0],
               ),
+        color: isPitchBlack
+            ? Colors.black
+            : useDynamicColors
+            ? scheme.background
+            : null,
       ),
       child: Stack(
         children: [
@@ -248,7 +264,11 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
             15,
             (index) => _buildFloatingParticle(
               index,
-              customColorsEnabled ? primaryColor : const Color(0xFF6366f1),
+              useDynamicColors
+                  ? scheme.primary
+                  : customColorsEnabled
+                  ? primaryColor
+                  : const Color(0xFF6366f1),
             ),
           ),
           // Slow moving orbs
@@ -256,7 +276,11 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
             3,
             (index) => _buildFloatingOrb(
               index,
-              customColorsEnabled ? primaryColor : const Color(0xFF8b5cf6),
+              useDynamicColors
+                  ? scheme.primary
+                  : customColorsEnabled
+                  ? primaryColor
+                  : const Color(0xFF8b5cf6),
             ),
           ),
         ],
@@ -361,6 +385,8 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
   Widget _buildHeader({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return FadeTransition(
       opacity: _headerAnimation,
@@ -418,7 +444,9 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w800,
-                              color: customColorsEnabled
+                              color: useDynamicColors
+                                  ? scheme.primary
+                                  : customColorsEnabled
                                   ? primaryColor
                                   : const Color(0xFF6366f1),
                               letterSpacing: -0.5,
@@ -441,6 +469,8 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
     required int songCount,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -465,13 +495,17 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   gradient: LinearGradient(
-                    colors: customColorsEnabled
+                    colors: useDynamicColors
+                        ? [scheme.primary, scheme.primary.withOpacity(0.7)]
+                        : customColorsEnabled
                         ? [primaryColor, primaryColor.withOpacity(0.7)]
                         : [const Color(0xFF6366f1), const Color(0xFF8b5cf6)],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: customColorsEnabled
+                      color: useDynamicColors
+                          ? scheme.primary.withOpacity(0.25)
+                          : customColorsEnabled
                           ? primaryColor.withOpacity(0.25)
                           : const Color(0xFF6366f1).withOpacity(0.25),
                       blurRadius: 6,
@@ -609,6 +643,8 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
   Widget _buildSongsList({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return StreamBuilder<PlayerState>(
       stream: _audioPlayer.playerStateStream,
@@ -648,6 +684,8 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
                             primaryColor,
                             isPlaying,
                             animationProgress,
+                            useDynamicColors,
+                            scheme,
                           ),
                         ),
                       ),
@@ -668,202 +706,177 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
     Color primaryColor,
     bool isPlaying,
     double animationProgress,
+    bool useDynamicColors,
+    ColorScheme scheme,
   ) {
     final file = _songs[index];
     final songName = _formatSongName(file.path);
     final fileSize = _formatFileSize(File(file.path));
 
-    final playlistCardMargin = const EdgeInsets.symmetric(
-      horizontal: 7,
-      vertical: 4,
-    );
-    final playlistCardPadding = const EdgeInsets.all(12);
-    final albumArtSize = 50.0;
-    final borderRadius = BorderRadius.circular(16);
-    final albumArtRadius = BorderRadius.circular(12);
-    final gradientColors = isPlaying
-        ? customColorsEnabled
-              ? [primaryColor.withOpacity(0.15), primaryColor.withOpacity(0.05)]
-              : [
-                  const Color(0xFF6366f1).withOpacity(0.15),
-                  const Color(0xFF8b5cf6).withOpacity(0.05),
-                ]
-        : [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.03)];
-    final borderColor = isPlaying
-        ? customColorsEnabled
-              ? primaryColor.withOpacity(0.3)
-              : const Color(0xFF6366f1).withOpacity(0.3)
-        : Colors.white.withOpacity(0.1);
-    final boxShadow = [
-      BoxShadow(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
         color: isPlaying
-            ? customColorsEnabled
-                  ? primaryColor.withOpacity(0.2)
-                  : const Color(0xFF6366f1).withOpacity(0.2)
-            : Colors.black.withOpacity(0.1),
-        blurRadius: 12,
-        offset: const Offset(0, 6),
-      ),
-    ];
-    return AnimatedBuilder(
-      animation: _cardController,
-      builder: (context, child) {
-        final animationProgress = Curves.easeOutBack.transform(
-          (_cardController.value - (index * 0.1)).clamp(0.0, 1.0),
-        );
-        return Transform.translate(
-          offset: Offset(0, 50 * (1 - animationProgress)),
-          child: Transform.scale(
-            scale: (0.8 + (0.2 * animationProgress)).clamp(0.1, 1.0),
-            child: Opacity(
-              opacity: animationProgress.clamp(0.0, 1.0),
-              child: Container(
-                margin: playlistCardMargin,
-                decoration: BoxDecoration(
-                  borderRadius: borderRadius,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: gradientColors,
-                  ),
-                  border: Border.all(
-                    color: borderColor,
-                    width: isPlaying ? 1.2 : 0.8,
-                  ),
-                  boxShadow: boxShadow,
+            ? useDynamicColors
+                  ? scheme.primary.withOpacity(0.08)
+                  : customColorsEnabled
+                  ? primaryColor.withOpacity(0.08)
+                  : const Color(0xFF6366f1).withOpacity(0.08)
+            : Colors.white.withOpacity(0.04),
+        border: Border.all(
+          color: isPlaying
+              ? useDynamicColors
+                    ? scheme.primary.withOpacity(0.25)
+                    : customColorsEnabled
+                    ? primaryColor.withOpacity(0.25)
+                    : const Color(0xFF6366f1).withOpacity(0.25)
+              : Colors.white.withOpacity(0.06),
+          width: isPlaying ? 1.2 : 0.8,
+        ),
+        boxShadow: isPlaying
+            ? [
+                BoxShadow(
+                  color: useDynamicColors
+                      ? scheme.primary.withOpacity(0.15)
+                      : customColorsEnabled
+                      ? primaryColor.withOpacity(0.15)
+                      : const Color(0xFF6366f1).withOpacity(0.15),
+                  blurRadius: 8,
+                  spreadRadius: 0,
                 ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: borderRadius,
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) {
-                          return DraggableScrollableSheet(
-                            initialChildSize: 0.88,
-                            minChildSize: 0.56,
-                            maxChildSize: 0.95,
-                            expand: false,
-                            builder: (_, scrollController) =>
-                                OfflineMusicPlayer(
-                                  playlist: _songs,
-                                  initialIndex: index,
-                                  audioPlayer: _audioPlayer,
-                                ),
-                          );
-                        },
-                      );
-                    },
-                    child: Padding(
-                      padding: playlistCardPadding,
-                      child: Row(
-                        children: [
-                          Transform.rotate(
-                            angle: ((1 - animationProgress) * 0.2).clamp(
-                              0.0,
-                              1.0,
-                            ),
-                            child: Container(
-                              width: albumArtSize,
-                              height: albumArtSize,
-                              decoration: BoxDecoration(
-                                borderRadius: albumArtRadius,
-                                gradient: LinearGradient(
-                                  colors: isPlaying
-                                      ? customColorsEnabled
-                                            ? [
-                                                primaryColor.withOpacity(0.25),
-                                                primaryColor.withOpacity(0.08),
-                                              ]
-                                            : [
-                                                const Color(
-                                                  0xFF6366f1,
-                                                ).withOpacity(0.25),
-                                                const Color(
-                                                  0xFF8b5cf6,
-                                                ).withOpacity(0.15),
-                                              ]
-                                      : [
-                                          Colors.white.withOpacity(0.15),
-                                          Colors.white.withOpacity(0.05),
-                                        ],
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.music_note_rounded,
-                                color: isPlaying
-                                    ? Colors.white
-                                    : Colors.white.withOpacity(0.7),
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  songName,
-                                  style: TextStyle(
-                                    color: isPlaying
-                                        ? customColorsEnabled
-                                              ? primaryColor
-                                              : const Color(0xFF6366f1)
-                                        : Colors.white,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 3),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.storage_rounded,
-                                      color: Colors.white.withOpacity(0.6),
-                                      size: 12,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        fileSize,
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.7),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) {
+                return DraggableScrollableSheet(
+                  initialChildSize: 0.88,
+                  minChildSize: 0.56,
+                  maxChildSize: 0.95,
+                  expand: false,
+                  builder: (_, scrollController) => OfflineMusicPlayer(
+                    playlist: _songs,
+                    initialIndex: index,
+                    audioPlayer: _audioPlayer,
+                  ),
+                );
+              },
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                // Album art with entrance animation
+                Transform.rotate(
+                  angle: ((1 - animationProgress) * 0.2).clamp(0.0, 1.0),
+                  child: Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: isPlaying
+                            ? useDynamicColors
+                                  ? [
+                                      scheme.primary.withOpacity(0.25),
+                                      scheme.primary.withOpacity(0.08),
+                                    ]
+                                  : customColorsEnabled
+                                  ? [
+                                      primaryColor.withOpacity(0.25),
+                                      primaryColor.withOpacity(0.08),
+                                    ]
+                                  : [
+                                      const Color(0xFF6366f1).withOpacity(0.25),
+                                      const Color(0xFF8b5cf6).withOpacity(0.15),
+                                    ]
+                            : [
+                                Colors.white.withOpacity(0.15),
+                                Colors.white.withOpacity(0.05),
                               ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildPlayButton(
-                            index,
-                            isPlaying,
-                            customColorsEnabled,
-                            primaryColor,
-                            animationProgress,
-                          ),
-                        ],
                       ),
+                    ),
+                    child: Icon(
+                      Icons.music_note_rounded,
+                      color: isPlaying
+                          ? Colors.white
+                          : Colors.white.withOpacity(0.7),
+                      size: 22,
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        songName,
+                        style: TextStyle(
+                          color: isPlaying
+                              ? useDynamicColors
+                                    ? scheme.primary
+                                    : customColorsEnabled
+                                    ? primaryColor
+                                    : const Color(0xFF6366f1)
+                              : Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.storage_rounded,
+                            color: Colors.white.withOpacity(0.6),
+                            size: 12,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              fileSize,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _buildPlayButton(
+                  index,
+                  isPlaying,
+                  customColorsEnabled,
+                  primaryColor,
+                  animationProgress,
+                  useDynamicColors,
+                  scheme,
+                ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -873,6 +886,8 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
     bool customColorsEnabled,
     Color primaryColor,
     double animationProgress,
+    bool useDynamicColors,
+    ColorScheme scheme,
   ) {
     return Transform.scale(
       scale: (0.6 + (0.4 * animationProgress)).clamp(0.1, 1.0),
@@ -882,13 +897,17 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: LinearGradient(
-            colors: customColorsEnabled
+            colors: useDynamicColors
+                ? [scheme.primary, scheme.primary.withOpacity(0.8)]
+                : customColorsEnabled
                 ? [primaryColor, primaryColor.withOpacity(0.8)]
                 : [const Color(0xFF6366f1), const Color(0xFF8b5cf6)],
           ),
           boxShadow: [
             BoxShadow(
-              color: customColorsEnabled
+              color: useDynamicColors
+                  ? scheme.primary.withOpacity(0.35)
+                  : customColorsEnabled
                   ? primaryColor.withOpacity(0.35)
                   : const Color(0xFF6366f1).withOpacity(0.35),
               blurRadius: 6,
@@ -923,12 +942,18 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
     final secondaryColor = customColorsEnabled
         ? customTheme.secondaryColor
         : const Color(0xFF1e293b);
+    final useDynamicColors = customTheme.useDynamicColors;
+    final scheme = Theme.of(context).colorScheme;
 
     // Assign global AudioPlayer from Provider
     _audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
 
     return Scaffold(
-      backgroundColor: isPitchBlack ? Colors.black : const Color(0xFF0f172a),
+      backgroundColor: isPitchBlack
+          ? Colors.black
+          : useDynamicColors
+          ? scheme.background
+          : const Color(0xFF0f172a),
       body: Stack(
         children: [
           _buildAnimatedBackground(
@@ -936,17 +961,23 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
             customColorsEnabled: customColorsEnabled,
             primaryColor: primaryColor,
             secondaryColor: secondaryColor,
+            useDynamicColors: useDynamicColors,
+            scheme: scheme,
           ),
           Column(
             children: [
               _buildHeader(
                 customColorsEnabled: customColorsEnabled,
                 primaryColor: primaryColor,
+                useDynamicColors: useDynamicColors,
+                scheme: scheme,
               ),
               _buildStatsSection(
                 customColorsEnabled: customColorsEnabled,
                 primaryColor: primaryColor,
                 songCount: _songs.length,
+                useDynamicColors: useDynamicColors,
+                scheme: scheme,
               ),
               const SizedBox(height: 20),
               Expanded(
@@ -968,6 +999,8 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
                     : _buildSongsList(
                         customColorsEnabled: customColorsEnabled,
                         primaryColor: primaryColor,
+                        useDynamicColors: useDynamicColors,
+                        scheme: scheme,
                       ),
               ),
             ],

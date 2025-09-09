@@ -543,8 +543,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         .isPitchBlack; // <-- READ PROVIDER
     final customTheme = context.watch<CustomThemeProvider>();
     final customColorsEnabled = customTheme.customColorsEnabled;
+    final useDynamicColors = customTheme.useDynamicColors;
     final primaryColor = customTheme.primaryColor;
     final secondaryColor = customTheme.secondaryColor;
+    final scheme = Theme.of(context).colorScheme;
 
     final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     final List<Widget> pages = [
@@ -552,6 +554,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         customColorsEnabled: customColorsEnabled,
         primaryColor: primaryColor,
         secondaryColor: secondaryColor,
+        useDynamicColors: useDynamicColors,
+        scheme: scheme,
       ),
       SearchPage(onNavTap: _onNavTap, selectedNavIndex: _selectedNavIndex),
       LibraryScreen(onNavTap: _onNavTap, selectedNavIndex: _selectedNavIndex),
@@ -567,6 +571,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: isPitchBlack
           ? Colors.black
+          : useDynamicColors
+          ? scheme.background
           : customColorsEnabled
           ? secondaryColor
           : Colors.black, // <-- USE PROVIDER AND CUSTOM THEME
@@ -577,6 +583,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             customColorsEnabled: customColorsEnabled,
             primaryColor: primaryColor,
             secondaryColor: secondaryColor,
+            useDynamicColors: useDynamicColors,
+            scheme: scheme,
           ), // <-- USE PROVIDER
           SafeArea(
             child: Column(
@@ -586,6 +594,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
                     secondaryColor: secondaryColor,
+                    useDynamicColors: useDynamicColors,
+                    scheme: scheme,
                   ),
                 Expanded(
                   child: AnimatedBuilder(
@@ -733,11 +743,23 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return Container(
       decoration: BoxDecoration(
         gradient: isPitchBlack
             ? null
+            : useDynamicColors
+            ? RadialGradient(
+                center: Alignment.topLeft,
+                radius: 1.5,
+                colors: [
+                  scheme.background,
+                  scheme.surface,
+                  Colors.black,
+                ],
+              )
             : customColorsEnabled
             ? RadialGradient(
                 center: Alignment.topLeft,
@@ -763,6 +785,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             isPitchBlack: isPitchBlack,
             customColorsEnabled: customColorsEnabled,
             primaryColor: primaryColor,
+            useDynamicColors: useDynamicColors,
+            scheme: scheme,
           ),
         ),
       ),
@@ -774,6 +798,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     required bool isPitchBlack,
     required bool customColorsEnabled,
     required Color primaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return AnimatedBuilder(
       animation: _meteorsController,
@@ -796,7 +822,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 height: 3,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(1.5),
-                  color: customColorsEnabled
+                  color: useDynamicColors
+                      ? scheme.primary
+                      : customColorsEnabled
                       ? primaryColor
                       : const Color(0xFFff7d78),
                 ),
@@ -812,6 +840,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -832,14 +862,18 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                   foreground: Paint()
-                    ..shader = (customColorsEnabled
+                    ..shader = (useDynamicColors
+                        ? null
+                        : customColorsEnabled
                         ? null
                         : const LinearGradient(
                             colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ).createShader(Rect.fromLTWH(0, 0, 200, 40)))
-                    ..color = (customColorsEnabled
+                    ..color = (useDynamicColors
+                        ? scheme.primary
+                        : customColorsEnabled
                         ? primaryColor
                         : Colors.white),
                 ),
@@ -855,6 +889,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
     required VoidCallback onTrendingTap,
     required VoidCallback onRandomTap,
     required VoidCallback onAlbumsTap,
@@ -877,6 +913,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           customColorsEnabled: customColorsEnabled,
           primaryColor: primaryColor,
           secondaryColor: secondaryColor,
+          useDynamicColors: useDynamicColors,
+          scheme: scheme,
         ),
         _buildActionCard(
           'Random',
@@ -888,6 +926,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           customColorsEnabled: customColorsEnabled,
           primaryColor: primaryColor,
           secondaryColor: secondaryColor,
+          useDynamicColors: useDynamicColors,
+          scheme: scheme,
         ),
         _buildActionCard(
           'Collection',
@@ -899,6 +939,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           customColorsEnabled: customColorsEnabled,
           primaryColor: primaryColor,
           secondaryColor: secondaryColor,
+          useDynamicColors: useDynamicColors,
+          scheme: scheme,
         ),
         _buildActionCard(
           'Stars',
@@ -910,6 +952,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           customColorsEnabled: customColorsEnabled,
           primaryColor: primaryColor,
           secondaryColor: secondaryColor,
+          useDynamicColors: useDynamicColors,
+          scheme: scheme,
         ),
       ],
     );
@@ -925,6 +969,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -950,7 +996,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
               child: Text(
                 tag.toUpperCase(),
                 style: TextStyle(
-                  color: customColorsEnabled ? primaryColor : color,
+                  color: useDynamicColors
+                      ? scheme.primary
+                      : customColorsEnabled
+                      ? primaryColor
+                      : color,
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
                 ),
@@ -963,8 +1013,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: useDynamicColors
+                          ? scheme.onSurface
+                          : Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -984,6 +1036,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     if (_isLoading) {
       return Center(
@@ -1044,6 +1098,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
                     secondaryColor: secondaryColor,
+                    useDynamicColors: useDynamicColors,
+                    scheme: scheme,
                     onTrendingTap: _scrollToTrending,
                     onRandomTap: _scrollToRandom,
                     onAlbumsTap: _scrollToAlbums,
@@ -1056,6 +1112,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
                     secondaryColor: secondaryColor,
+                    useDynamicColors: useDynamicColors,
+                    scheme: scheme,
                   ),
                 const SizedBox(height: 20),
                 if (_albums.isNotEmpty)
@@ -1091,6 +1149,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return SizedBox(
       height: 180,
@@ -1104,6 +1164,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             customColorsEnabled: customColorsEnabled,
             primaryColor: primaryColor,
             secondaryColor: secondaryColor,
+            useDynamicColors: useDynamicColors,
+            scheme: scheme,
           );
         },
       ),
@@ -1115,6 +1177,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     final imageUrl = _getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
@@ -1235,7 +1299,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
                 Container(
                   decoration: BoxDecoration(
-                    gradient: customColorsEnabled
+                    gradient: useDynamicColors
+                        ? LinearGradient(
+                            colors: [
+                              scheme.primary,
+                              scheme.primary.withOpacity(0.8),
+                            ],
+                          )
+                        : customColorsEnabled
                         ? LinearGradient(
                             colors: [
                               primaryColor,
@@ -1342,6 +1413,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     final imageUrl = _getBestImageUrl(song['image']);
     final title = song['name'] ?? song['title'] ?? 'Unknown Song';
@@ -1437,11 +1510,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
         trailing: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: customColorsEnabled
-                  ? [primaryColor, primaryColor.withOpacity(0.8)]
-                  : [Color(0xFFff7d78), Color(0xFF9c27b0)],
-            ),
+            gradient: useDynamicColors
+                ? LinearGradient(
+                    colors: [
+                      scheme.primary,
+                      scheme.primary.withOpacity(0.8),
+                    ],
+                  )
+                : customColorsEnabled
+                ? LinearGradient(
+                    colors: [primaryColor, primaryColor.withOpacity(0.8)],
+                  )
+                : LinearGradient(
+                    colors: [Color(0xFFff7d78), Color(0xFF9c27b0)],
+                  ),
             shape: BoxShape.circle,
           ),
           child: Consumer<PlayerStateProvider>(

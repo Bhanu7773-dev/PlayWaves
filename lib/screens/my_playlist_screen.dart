@@ -150,15 +150,19 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
     required Color secondaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
     return Container(
       decoration: BoxDecoration(
         color: isPitchBlack
             ? Colors.black
+            : useDynamicColors
+            ? scheme.background
             : customColorsEnabled
             ? secondaryColor
             : null,
-        gradient: isPitchBlack || customColorsEnabled
+        gradient: isPitchBlack || customColorsEnabled || useDynamicColors
             ? null
             : const LinearGradient(
                 begin: Alignment.topLeft,
@@ -179,7 +183,11 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
             15,
             (index) => _buildFloatingParticle(
               index,
-              customColorsEnabled ? primaryColor : const Color(0xFF6366f1),
+              useDynamicColors
+                  ? scheme.primary
+                  : customColorsEnabled
+                  ? primaryColor
+                  : const Color(0xFF6366f1),
             ),
           ),
           // Slow moving orbs
@@ -187,7 +195,11 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
             3,
             (index) => _buildFloatingOrb(
               index,
-              customColorsEnabled ? primaryColor : const Color(0xFF8b5cf6),
+              useDynamicColors
+                  ? scheme.primary
+                  : customColorsEnabled
+                  ? primaryColor
+                  : const Color(0xFF8b5cf6),
             ),
           ),
         ],
@@ -294,7 +306,15 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
   Widget _buildHeader({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
+    final headingColor = customColorsEnabled
+        ? primaryColor
+        : (useDynamicColors ? scheme.primary : const Color(0xFF6366f1));
+    final subtitleColor = useDynamicColors
+        ? scheme.onBackground
+        : Colors.grey[400];
     return FadeTransition(
       opacity: _headerAnimation,
       child: SlideTransition(
@@ -337,7 +357,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                     Text(
                       'Personal Collection',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: subtitleColor,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -348,9 +368,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
-                        color: customColorsEnabled
-                            ? primaryColor
-                            : const Color(0xFF6366f1),
+                        color: headingColor,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -368,7 +386,14 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     required bool customColorsEnabled,
     required Color primaryColor,
     required int songCount,
+    required bool useDynamicColors,
+    required ColorScheme scheme,
   }) {
+    final iconColor = useDynamicColors
+        ? scheme.primary
+        : customColorsEnabled
+        ? primaryColor
+        : const Color(0xFF6366f1);
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
@@ -391,11 +416,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                 height: 44,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
-                  gradient: LinearGradient(
-                    colors: customColorsEnabled
-                        ? [primaryColor, primaryColor.withOpacity(0.7)]
-                        : [const Color(0xFF6366f1), const Color(0xFF8b5cf6)],
-                  ),
+                  color: iconColor,
                   boxShadow: [
                     BoxShadow(
                       color: customColorsEnabled
@@ -719,6 +740,8 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     Color primaryColor,
     Color secondaryColor,
     VoidCallback onDelete,
+    bool useDynamicColors,
+    ColorScheme scheme,
   ) {
     final audioPlayer = Provider.of<AudioPlayer>(context, listen: false);
     final shouldShowPause =
@@ -816,6 +839,8 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                             onDelete,
                             audioPlayer,
                             animationProgress,
+                            useDynamicColors,
+                            scheme,
                           ),
                         ],
                       ),
@@ -952,7 +977,14 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     VoidCallback onDelete,
     AudioPlayer audioPlayer,
     double animationProgress,
+    bool useDynamicColors,
+    ColorScheme scheme,
   ) {
+    final buttonColor = useDynamicColors
+        ? scheme.primary
+        : customColorsEnabled
+        ? primaryColor
+        : const Color(0xFF6366f1);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -979,11 +1011,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: customColorsEnabled
-                      ? [primaryColor, primaryColor.withOpacity(0.8)]
-                      : [const Color(0xFF6366f1), const Color(0xFF8b5cf6)],
-                ),
+                color: buttonColor,
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
@@ -1205,16 +1233,18 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
             .isPitchBlack;
         final customTheme = context.watch<CustomThemeProvider>();
         final customColorsEnabled = customTheme.customColorsEnabled;
-        final primaryColor = customColorsEnabled
-            ? customTheme.primaryColor
-            : const Color(0xFF6366f1);
-        final secondaryColor = customColorsEnabled
-            ? customTheme.secondaryColor
-            : const Color(0xFF1e293b);
+        final primaryColor = customTheme.primaryColor;
+        final secondaryColor = customTheme.secondaryColor;
+        final useDynamicColors = customTheme.useDynamicColors;
+        final scheme = Theme.of(context).colorScheme;
 
         return Scaffold(
           backgroundColor: isPitchBlack
               ? Colors.black
+              : useDynamicColors
+              ? scheme.background
+              : customColorsEnabled
+              ? secondaryColor
               : const Color(0xFF0f172a),
           body: Stack(
             children: [
@@ -1224,6 +1254,8 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                 customColorsEnabled: customColorsEnabled,
                 primaryColor: primaryColor,
                 secondaryColor: secondaryColor,
+                useDynamicColors: useDynamicColors,
+                scheme: scheme,
               ),
 
               // Main content
@@ -1232,6 +1264,8 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                   _buildHeader(
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
+                    useDynamicColors: useDynamicColors,
+                    scheme: scheme,
                   ),
                   ValueListenableBuilder(
                     valueListenable: playlistBox.listenable(),
@@ -1240,6 +1274,8 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                         customColorsEnabled: customColorsEnabled,
                         primaryColor: primaryColor,
                         songCount: box.values.length,
+                        useDynamicColors: useDynamicColors,
+                        scheme: scheme,
                       );
                     },
                   ),
@@ -1277,6 +1313,8 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                               primaryColor,
                               secondaryColor,
                               () => playlistBox.delete(song.id),
+                              useDynamicColors,
+                              scheme,
                             );
                           },
                         );

@@ -130,7 +130,9 @@ class _RippleFlowEffectState extends State<RippleFlowEffect>
   Widget build(BuildContext context) {
     final customTheme = Provider.of<CustomThemeProvider>(context);
     final customColorsEnabled = customTheme.customColorsEnabled;
+    final useDynamicColors = customTheme.useDynamicColors;
     final primaryColor = customTheme.primaryColor;
+    final scheme = Theme.of(context).colorScheme;
     return AnimatedBuilder(
       animation: Listenable.merge([
         _animation1,
@@ -147,8 +149,14 @@ class _RippleFlowEffectState extends State<RippleFlowEffect>
             animation3: _animation3.value,
             animation4: _animation4.value,
             animation5: _animation5.value,
-            color: customColorsEnabled ? primaryColor : null,
-            gradient: customColorsEnabled
+            color: useDynamicColors
+                ? scheme.primary
+                : customColorsEnabled
+                ? primaryColor
+                : null,
+            gradient: useDynamicColors
+                ? null
+                : customColorsEnabled
                 ? null
                 : const LinearGradient(
                     colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
@@ -301,7 +309,9 @@ class MiniPlayer extends StatelessWidget {
 
     final customTheme = Provider.of<CustomThemeProvider>(context);
     final useCustom = customTheme.customColorsEnabled;
+    final useDynamicColors = customTheme.useDynamicColors;
     final primaryColor = customTheme.primaryColor;
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -336,7 +346,11 @@ class MiniPlayer extends StatelessWidget {
                     final isPlaying = snapshot.data ?? false;
                     return RippleFlowEffect(
                       isPlaying: isPlaying,
-                      color: useCustom ? primaryColor : const Color(0xFFff7d78),
+                      color: useDynamicColors
+                          ? scheme.primary
+                          : useCustom
+                          ? primaryColor
+                          : const Color(0xFFff7d78),
                     );
                   },
                 ),
@@ -456,7 +470,15 @@ class MiniPlayer extends StatelessWidget {
                             final isPlaying = snapshot.data ?? false;
                             return IconButton(
                               onPressed: onPlayPause,
-                              icon: useCustom
+                              icon: useDynamicColors
+                                  ? Icon(
+                                      isPlaying
+                                          ? Icons.pause
+                                          : Icons.play_arrow,
+                                      color: scheme.primary,
+                                      size: 28,
+                                    )
+                                  : useCustom
                                   ? Icon(
                                       isPlaying
                                           ? Icons.pause
