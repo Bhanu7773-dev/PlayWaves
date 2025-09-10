@@ -8,6 +8,7 @@ import 'liked_songs_screen.dart';
 import 'my_playlist_screen.dart';
 import 'downloaded_songs_screen.dart';
 import 'recently_played_screen.dart';
+import '../services/player_state_provider.dart';
 import '../logic/playlist_storage_logic.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -87,65 +88,6 @@ class _LibraryScreenState extends State<LibraryScreen>
         ? [primaryColor, secondaryColor]
         : const [Color(0xFF6366f1), Color(0xFF8b5cf6)];
 
-    final likedSongsCount = PlaylistStorageLogic.getLikedSongsCount();
-    final playlistSongsCount = PlaylistStorageLogic.getPlaylistSongsCount();
-
-    final libraryItems = [
-      LibraryItemData(
-        title: "Favorites",
-        subtitle: "$likedSongsCount songs",
-        iconData: Icons.favorite,
-        gradient: accentGradient,
-        isActive: true,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const LikedSongsScreen()),
-          );
-        },
-      ),
-      LibraryItemData(
-        title: "My Playlists",
-        subtitle: "$playlistSongsCount songs",
-        iconData: Icons.queue_music,
-        gradient: accentGradient,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const MyPlaylistScreen()),
-          );
-        },
-      ),
-      LibraryItemData(
-        title: "Recently Played",
-        subtitle: "89 tracks",
-        iconData: Icons.history,
-        gradient: accentGradient,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const RecentlyPlayedScreen(),
-            ),
-          );
-        },
-      ),
-      LibraryItemData(
-        title: "Downloaded",
-        subtitle: "32 songs",
-        iconData: Icons.download_done,
-        gradient: accentGradient,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const DownloadedSongsScreen(),
-            ),
-          );
-        },
-      ),
-    ];
-
     return Scaffold(
       backgroundColor: backgroundColor,
       body: GestureDetector(
@@ -180,20 +122,106 @@ class _LibraryScreenState extends State<LibraryScreen>
                       ),
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(20, 32, 20, 100),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) => _buildLibraryItem(
-                              libraryItems[index],
-                              index,
-                              scheme,
-                              customColorsEnabled,
-                              primaryColor,
-                              secondaryColor,
-                              useDynamicColors,
-                              accentGradient,
-                            ),
-                            childCount: libraryItems.length,
-                          ),
+                        sliver: Consumer<PlayerStateProvider>(
+                          builder: (context, playerState, _) {
+                            return FutureBuilder<int>(
+                              future:
+                                  PlaylistStorageLogic.getDownloadedSongsCount(),
+                              builder: (context, snapshot) {
+                                final likedSongsCount =
+                                    PlaylistStorageLogic.getLikedSongsCount();
+                                final playlistSongsCount =
+                                    PlaylistStorageLogic.getPlaylistSongsCount();
+                                final recentlyPlayedCount =
+                                    playerState.recentlyPlayed.length;
+                                final downloadedSongsCount = snapshot.data ?? 0;
+
+                                final libraryItems = [
+                                  LibraryItemData(
+                                    title: "Favorites",
+                                    subtitle:
+                                        "$likedSongsCount ${likedSongsCount == 1 ? 'song' : 'songs'}",
+                                    iconData: Icons.favorite,
+                                    gradient: accentGradient,
+                                    isActive: true,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const LikedSongsScreen(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  LibraryItemData(
+                                    title: "My Playlists",
+                                    subtitle:
+                                        "$playlistSongsCount ${playlistSongsCount == 1 ? 'song' : 'songs'}",
+                                    iconData: Icons.queue_music,
+                                    gradient: accentGradient,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const MyPlaylistScreen(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  LibraryItemData(
+                                    title: "Recently Played",
+                                    subtitle:
+                                        "$recentlyPlayedCount ${recentlyPlayedCount == 1 ? 'track' : 'tracks'}",
+                                    iconData: Icons.history,
+                                    gradient: accentGradient,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const RecentlyPlayedScreen(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  LibraryItemData(
+                                    title: "Downloaded",
+                                    subtitle:
+                                        "$downloadedSongsCount ${downloadedSongsCount == 1 ? 'song' : 'songs'}",
+                                    iconData: Icons.download_done,
+                                    gradient: accentGradient,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const DownloadedSongsScreen(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ];
+
+                                return SliverList(
+                                  delegate: SliverChildBuilderDelegate(
+                                    (context, index) => _buildLibraryItem(
+                                      libraryItems[index],
+                                      index,
+                                      scheme,
+                                      customColorsEnabled,
+                                      primaryColor,
+                                      secondaryColor,
+                                      useDynamicColors,
+                                      accentGradient,
+                                    ),
+                                    childCount: libraryItems.length,
+                                  ),
+                                );
+                              },
+                            );
+                          },
                         ),
                       ),
                     ],

@@ -9,6 +9,7 @@ import '../models/liked_song.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
 import '../services/player_state_provider.dart';
+import '../services/liked_song_service.dart';
 import '../screens/music_player.dart';
 
 class LikedSongsScreen extends StatefulWidget {
@@ -509,71 +510,7 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                   ],
                 ),
               ),
-              if (songCount > 0) ...[
-                GestureDetector(
-                  onTap: () {
-                    // Show confirmation dialog before clearing
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext context) {
-                        return AlertDialog(
-                          backgroundColor: const Color(0xFF1a1a2e),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          title: const Text(
-                            'Clear Liked Songs',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          content: const Text(
-                            'Are you sure you want to remove all songs from your liked songs?',
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: Text(
-                                'Cancel',
-                                style: TextStyle(
-                                  color: customColorsEnabled
-                                      ? primaryColor
-                                      : const Color(0xFF6366f1),
-                                ),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                final likedSongsBox = Hive.box<LikedSong>(
-                                  'likedSongs',
-                                );
-                                likedSongsBox.clear();
-                                Navigator.of(context).pop();
-                              },
-                              child: const Text(
-                                'Clear',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.red.withOpacity(0.15),
-                    ),
-                    child: const Icon(
-                      Icons.delete_outline,
-                      color: Colors.red,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ],
+              // Clear liked songs button removed
             ],
           ),
         ),
@@ -1152,11 +1089,10 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                                   1.0,
                                 ),
                                 child: GestureDetector(
-                                  onTap: () {
-                                    final likedSongsBox = Hive.box<LikedSong>(
-                                      'likedSongs',
+                                  onTap: () async {
+                                    await LikedSongService.removeFromLikedSongs(
+                                      song.id,
                                     );
-                                    likedSongsBox.delete(song.id);
                                   },
                                   child: Container(
                                     width: 32,

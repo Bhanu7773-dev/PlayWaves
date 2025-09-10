@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import '../models/playlist_song.dart';
+import 'playlist_sync_service.dart';
 
 class PlaylistService {
   static final Box<PlaylistSong> playlistBox = Hive.box<PlaylistSong>(
@@ -10,7 +11,7 @@ class PlaylistService {
     return playlistBox.containsKey(songId);
   }
 
-  static void addToPlaylist(Map<String, dynamic> song) {
+  static Future<void> addToPlaylist(Map<String, dynamic> song) async {
     print('Adding to playlist: $song');
     final songId = song['id'] ?? song['songId'] ?? '';
     if (songId.isEmpty) return;
@@ -25,11 +26,17 @@ class PlaylistService {
           downloadUrl: _getDownloadUrl(song),
         ),
       );
+      // Sync to cloud after adding
+      await PlaylistSyncService.autoSync();
+      print('➕ PLAYLIST: Added song and synced to cloud');
     }
   }
 
-  static void removeFromPlaylist(String songId) {
+  static Future<void> removeFromPlaylist(String songId) async {
     playlistBox.delete(songId);
+    // Sync to cloud after removing
+    await PlaylistSyncService.autoSync();
+    print('➖ PLAYLIST: Removed song and synced to cloud');
   }
 
   static String _getArtistName(Map<String, dynamic> song) {

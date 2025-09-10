@@ -33,6 +33,7 @@ class _SettingsPageState extends State<SettingsPage>
   bool pitchBlackEnabled = false;
   bool offlineMode = false;
   bool materialPresetEnabled = false; // Added for Material Preset toggle
+  bool _isLoggingOut = false; // Added for logout loading state
   Color pickedPrimaryColor = const Color(0xFFff7d78);
   Color pickedSecondaryColor = const Color(0xFF16213e);
 
@@ -709,11 +710,261 @@ class _SettingsPageState extends State<SettingsPage>
               ],
             ),
             child: IconButton(
-              tooltip: 'Logout',
-              icon: const Icon(Icons.logout, color: Colors.white),
-              onPressed: () {
-                widget.onLogout();
-              },
+              tooltip: _isLoggingOut ? 'Logging out...' : 'Logout',
+              icon: _isLoggingOut
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.logout, color: Colors.white, size: 28),
+              onPressed: _isLoggingOut
+                  ? null
+                  : () async {
+                      // Show confirmation dialog
+                      final shouldLogout = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => Dialog(
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
+                          child: Container(
+                            width: MediaQuery.of(context).size.width * 0.85,
+                            constraints: const BoxConstraints(maxWidth: 400),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(24),
+                              gradient: LinearGradient(
+                                colors: [
+                                  (isPitchBlack ? Colors.black : Colors.white)
+                                      .withOpacity(0.15),
+                                  (isPitchBlack ? Colors.black : Colors.white)
+                                      .withOpacity(0.05),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(
+                                color: headerColor.withOpacity(0.3),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: headerColor.withOpacity(0.1),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                  offset: const Offset(0, 10),
+                                ),
+                                BoxShadow(
+                                  color:
+                                      (isPitchBlack
+                                              ? Colors.white
+                                              : Colors.black)
+                                          .withOpacity(0.1),
+                                  blurRadius: 30,
+                                  spreadRadius: -5,
+                                  offset: const Offset(0, -5),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: 20,
+                                  sigmaY: 20,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        headerColor.withOpacity(0.05),
+                                        Colors.transparent,
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Icon
+                                      Container(
+                                        width: 60,
+                                        height: 60,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              headerColor.withOpacity(0.2),
+                                              headerColor.withOpacity(0.1),
+                                            ],
+                                          ),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: headerColor.withOpacity(0.3),
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.logout_rounded,
+                                          color: headerColor,
+                                          size: 30,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
+
+                                      // Title
+                                      const Text(
+                                        'Logout',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 12),
+
+                                      // Content
+                                      const Text(
+                                        'Are you sure you want to logout from PlayWaves?',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          height: 1.5,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 32),
+
+                                      // Buttons
+                                      Row(
+                                        children: [
+                                          // Cancel Button
+                                          Expanded(
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    (isPitchBlack
+                                                            ? Colors.white
+                                                            : Colors.black)
+                                                        .withOpacity(0.1),
+                                                    (isPitchBlack
+                                                            ? Colors.white
+                                                            : Colors.black)
+                                                        .withOpacity(0.05),
+                                                  ],
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color:
+                                                      (isPitchBlack
+                                                              ? Colors.white
+                                                              : Colors.black)
+                                                          .withOpacity(0.1),
+                                                ),
+                                              ),
+                                              child: TextButton(
+                                                onPressed: () => Navigator.of(
+                                                  context,
+                                                ).pop(false),
+                                                style: TextButton.styleFrom(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 16,
+                                                      ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                  ),
+                                                ),
+                                                child: const Text(
+                                                  'Cancel',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+
+                                          // Logout Button
+                                          Expanded(
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    Colors.red.withOpacity(0.2),
+                                                    Colors.red.withOpacity(0.1),
+                                                  ],
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: Colors.red.withOpacity(
+                                                    0.3,
+                                                  ),
+                                                ),
+                                              ),
+                                              child: TextButton(
+                                                onPressed: () => Navigator.of(
+                                                  context,
+                                                ).pop(true),
+                                                style: TextButton.styleFrom(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 16,
+                                                      ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                  ),
+                                                ),
+                                                child: const Text(
+                                                  'Logout',
+                                                  style: TextStyle(
+                                                    color: Colors.red,
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+
+                      if (shouldLogout == true) {
+                        setState(() => _isLoggingOut = true);
+                        try {
+                          widget.onLogout();
+                        } finally {
+                          if (mounted) {
+                            setState(() => _isLoggingOut = false);
+                          }
+                        }
+                      }
+                    },
             ),
           ),
         ],

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import '../models/liked_song.dart';
 import '../models/playlist_song.dart';
 
@@ -12,8 +14,38 @@ class PlaylistStorageLogic {
     return Hive.box<LikedSong>('likedSongs').length;
   }
 
+  static int getRecentlyPlayedCount() {
+    return Hive.box<PlaylistSong>('recentlyPlayed').length;
+  }
+
   static int getPlaylistSongsCount() {
     return Hive.box<PlaylistSong>('playlistSongs').length;
+  }
+
+  static Future<int> getDownloadedSongsCount() async {
+    try {
+      Directory? dir;
+      if (Platform.isAndroid) {
+        final dirs = await getExternalStorageDirectories(
+          type: StorageDirectory.downloads,
+        );
+        dir = dirs?.first;
+      } else {
+        dir = await getApplicationDocumentsDirectory();
+      }
+
+      if (dir != null) {
+        final files = dir
+            .listSync()
+            .where((f) => f.path.toLowerCase().endsWith('.mp3'))
+            .toList();
+        return files.length;
+      }
+      return 0;
+    } catch (e) {
+      debugPrint('Error getting downloaded songs count: $e');
+      return 0;
+    }
   }
 
   static AnimationController createMasterController(TickerProvider vsync) {

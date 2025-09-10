@@ -14,10 +14,32 @@ class CustomThemeProvider with ChangeNotifier {
   bool customColorsEnabled = false;
   Color primaryColor = const Color(0xFFff7d78);
   Color secondaryColor = const Color(0xFF16213e);
-  IconData? _customIcon;
+  String? _customIconName;
+
+  // Predefined icons that can be selected (all constant)
+  static const Map<String, IconData> _availableIcons = {
+    'color_lens': Icons.color_lens,
+    'palette': Icons.palette,
+    'brush': Icons.brush,
+    'format_paint': Icons.format_paint,
+    'colorize': Icons.colorize,
+    'gradient': Icons.gradient,
+    'style': Icons.style,
+    'wallpaper': Icons.wallpaper,
+  };
 
   static const IconData _defaultIcon = Icons.color_lens;
-  IconData get customIcon => _customIcon ?? _defaultIcon;
+  IconData get customIcon {
+    if (_customIconName != null &&
+        _availableIcons.containsKey(_customIconName)) {
+      return _availableIcons[_customIconName]!;
+    }
+    return _defaultIcon;
+  }
+
+  // Get list of available icons for UI selection
+  List<IconData> get availableIcons => _availableIcons.values.toList();
+  List<String> get availableIconNames => _availableIcons.keys.toList();
 
   CustomThemeProvider() {
     loadThemeFromPrefs();
@@ -28,10 +50,7 @@ class CustomThemeProvider with ChangeNotifier {
     customColorsEnabled = prefs.getBool('customColorsEnabled') ?? false;
     primaryColor = Color(prefs.getInt('primaryColor') ?? 0xFFff7d78);
     secondaryColor = Color(prefs.getInt('secondaryColor') ?? 0xFF16213e);
-    int? iconCode = prefs.getInt('customIcon');
-    _customIcon = iconCode != null
-        ? IconData(iconCode, fontFamily: 'MaterialIcons')
-        : null;
+    _customIconName = prefs.getString('customIconName');
     notifyListeners();
   }
 
@@ -51,8 +70,17 @@ class CustomThemeProvider with ChangeNotifier {
 
   void setCustomIcon(IconData icon) async {
     final prefs = await SharedPreferences.getInstance();
-    _customIcon = icon;
-    await prefs.setInt('customIcon', icon.codePoint);
+    // Find the icon name from the available icons
+    String? iconName;
+    _availableIcons.forEach((key, value) {
+      if (value.codePoint == icon.codePoint) {
+        iconName = key;
+      }
+    });
+    _customIconName = iconName;
+    if (iconName != null) {
+      await prefs.setString('customIconName', iconName!);
+    }
     notifyListeners();
   }
 

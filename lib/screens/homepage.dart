@@ -18,6 +18,8 @@ import '../widgets/artist_section.dart'; // <-- Import the new artist page widge
 import '../widgets/masonry_song_section.dart';
 import '../widgets/random_songs_section.dart';
 import '../widgets/album_section.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'Welcome_page.dart';
 import '../services/pitch_black_theme_provider.dart'; // <-- Import pitch black provider
 import '../services/custom_theme_provider.dart';
 import '../screens/music_player.dart';
@@ -560,8 +562,31 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       SearchPage(onNavTap: _onNavTap, selectedNavIndex: _selectedNavIndex),
       LibraryScreen(onNavTap: _onNavTap, selectedNavIndex: _selectedNavIndex),
       SettingsPage(
-        onLogout: () {
-          // Implement your logout logic here
+        onLogout: () async {
+          try {
+            // Sign out from Firebase Auth
+            await FirebaseAuth.instance.signOut();
+
+            // Navigate to Welcome Page and clear navigation stack
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const WelcomePage()),
+                (Route<dynamic> route) => false, // Remove all previous routes
+              );
+            }
+          } catch (e) {
+            print('Error during logout: $e');
+            // Show error message if logout fails
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Logout failed: $e'),
+                  backgroundColor: Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          }
         },
         onNavTap: _onNavTap,
         selectedNavIndex: _selectedNavIndex,

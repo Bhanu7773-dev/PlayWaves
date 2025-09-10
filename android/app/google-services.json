@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "309848875745",
+    "project_id": "playwaves-5bb60",
+    "storage_bucket": "playwaves-5bb60.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:309848875745:android:b8824fb13255cace6b4da0",
+        "android_client_info": {
+          "package_name": "com.playwaves.dark"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "309848875745-k6psrc4gocdqsdo8vj2ckelkbff7hiol.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.playwaves.dark",
+            "certificate_hash": "92123c7026e9a5e04c881e3f4d4456d73f4e5767"
+          }
+        },
+        {
+          "client_id": "309848875745-1h57qd57r3p7donpl9n7dhjrrqtm24aa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBReuvN9JuKjVYbPBGzAfo-anJlEBMYTI4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "309848875745-1h57qd57r3p7donpl9n7dhjrrqtm24aa.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
