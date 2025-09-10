@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'dart:async';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart';
@@ -77,6 +78,7 @@ class _SettingsPageState extends State<SettingsPage>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late AnimationController _meteorsController;
+  Timer? _statsTimer;
 
   int totalListeningMinutes = 1234;
   int songsPlayed = 567;
@@ -101,6 +103,10 @@ class _SettingsPageState extends State<SettingsPage>
 
     _animationController.forward();
     _loadSettings();
+    _refreshStats();
+    _statsTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      _refreshStats();
+    });
   }
 
   Future<void> _loadSettings() async {
@@ -117,7 +123,69 @@ class _SettingsPageState extends State<SettingsPage>
       pickedSecondaryColor = Color(
         prefs.getInt('secondaryColor') ?? 0xFF16213e,
       );
+
+      // Load total listening time
+      final totalSeconds = prefs.getInt('total_listening_seconds') ?? 0;
+      totalListeningMinutes = totalSeconds ~/ 60;
     });
+  }
+
+  Future<void> _refreshStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    final totalSeconds = prefs.getInt('total_listening_seconds') ?? 0;
+    setState(() {
+      totalListeningMinutes = totalSeconds ~/ 60;
+    });
+  }
+
+  Future<void> _resetStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('total_listening_seconds', 0);
+    setState(() {
+      totalListeningMinutes = 0;
+    });
+  }
+
+  void _showResetStatsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1a1a2e),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'Reset Stats',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'Are you sure you want to reset your listening minutes? This action cannot be undone.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: customColorsEnabled
+                      ? primaryColor
+                      : const Color(0xFF6366f1),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                await _resetStats();
+                Navigator.of(context).pop();
+              },
+              child: const Text('Reset', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _saveSettings() async {
@@ -1037,13 +1105,20 @@ class _SettingsPageState extends State<SettingsPage>
                     ),
                   ),
                 ),
-                Text(
-                  "Your Music Journey",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
+                Expanded(
+                  child: Text(
+                    "Your Music Journey",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
                   ),
+                ),
+                IconButton(
+                  onPressed: () => _showResetStatsDialog(context),
+                  icon: Icon(Icons.refresh, color: statsColor, size: 24),
+                  tooltip: 'Reset Stats',
                 ),
               ],
             ),
@@ -2464,6 +2539,7 @@ class _SettingsPageState extends State<SettingsPage>
   void dispose() {
     _animationController.dispose();
     _meteorsController.dispose();
+    _statsTimer?.cancel();
     super.dispose();
   }
 }

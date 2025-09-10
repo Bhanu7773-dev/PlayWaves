@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:just_audio/just_audio.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/jiosaavn_api_service.dart';
 import '../widgets/animated_navbar.dart';
 import '../widgets/mini_player.dart';
@@ -91,6 +92,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   final GlobalKey _albumsSectionKey = GlobalKey();
   final GlobalKey _artistsSectionKey = GlobalKey();
 
+  // Listening time tracker
+  Timer? _listeningTimer;
+  int _currentSessionSeconds = 0;
+  bool _isTracking = false;
+
   @override
   void initState() {
     super.initState();
@@ -132,6 +138,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       playerState.setPlaying(playing);
       if (playing) {
         playerState.setSongLoading(false);
+        _startListeningTimer();
+      } else {
+        _stopListeningTimer();
       }
     });
 
@@ -148,13 +157,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       if (state.processingState == ProcessingState.ready) {
         playerState.setSongLoading(false);
       } else if (state.processingState == ProcessingState.completed) {
-        // Song finished, play next song automatically
+        // Song finished, stop timer and play next song automatically
+        _stopListeningTimer();
         print('Song completed, scheduling next song...');
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             _playNextSong();
           }
         });
+      } else if (state.processingState == ProcessingState.idle) {
+        // Player stopped, stop timer
+        _stopListeningTimer();
       }
     });
 
@@ -1919,9 +1932,47 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     _playSong(song, index, useRandom);
   }
 
+  // Listening time tracker methods
+  void _startListeningTimer() {
+    if (_isTracking) return;
+    _isTracking = true;
+    _listeningTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _currentSessionSeconds++;
+      debugPrint('Listening time: $_currentSessionSeconds seconds');
+    });
+  }
+
+  void _stopListeningTimer() {
+    if (!_isTracking) return;
+    _isTracking = false;
+    _listeningTimer?.cancel();
+    _listeningTimer = null;
+
+    // Save accumulated time to shared preferences
+    if (_currentSessionSeconds > 0) {
+      _saveListeningTime(_currentSessionSeconds);
+      debugPrint(
+        'Saved $_currentSessionSeconds seconds to total listening time',
+      );
+      _currentSessionSeconds = 0;
+    }
+  }
+
+  Future<void> _saveListeningTime(int seconds) async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentTotal = prefs.getInt('total_listening_seconds') ?? 0;
+    final newTotal = currentTotal + seconds;
+    await prefs.setInt('total_listening_seconds', newTotal);
+
+    // Convert to minutes for debug print
+    final minutes = newTotal ~/ 60;
+    debugPrint('Total listening time recorded: $minutes minutes');
+  }
+
   @override
   void dispose() {
     _bannerTimer?.cancel();
+    _listeningTimer?.cancel();
     _bannerController.dispose();
     _animationController.dispose();
     // Do not dispose global AudioPlayer here
