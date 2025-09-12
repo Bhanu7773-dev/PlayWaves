@@ -14,8 +14,9 @@ import '../services/custom_theme_provider.dart';
 import '../models/liked_song.dart';
 import '../models/playlist_song.dart';
 import '../services/playlist_service.dart';
-import '../services/liked_song_service.dart';
 import 'package:just_audio/just_audio.dart';
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Decodes Unicode escapes in a string (e.g., \u0a38)
 String decodeUnicodeEscapes(String input) {
@@ -456,19 +457,92 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
       setState(() {
         _isDownloading = false;
       });
+      // Increment download stats only when a song is actually downloaded
+      final prefs = await SharedPreferences.getInstance();
+      final currentCount = prefs.getInt('total_downloads') ?? 0;
+      await prefs.setInt('total_downloads', currentCount + 1);
+      debugPrint('Total downloads incremented: [32m${currentCount + 1}[0m');
     }
   }
 
   bool isLiked(String songId) {
-    return LikedSongService.isLiked(songId);
+    return likedSongsBox.containsKey(songId);
   }
 
-  Future<void> toggleLike(Map<String, dynamic> song) async {
+  void toggleLike(Map<String, dynamic> song) {
     final songId = song['id'] ?? song['title'];
     if (isLiked(songId)) {
-      await LikedSongService.removeFromLikedSongs(songId);
+      likedSongsBox.delete(songId);
     } else {
-      await LikedSongService.addToLikedSongs(song);
+      String imageUrl = '';
+      final img = song['image'];
+      if (img is List && img.isNotEmpty) {
+        for (var item in img) {
+          if (item is Map &&
+              item['link'] != null &&
+              item['link'].toString().contains('500x500')) {
+            imageUrl = item['link'];
+            break;
+          }
+        }
+        if (imageUrl.isEmpty) {
+          for (var item in img.reversed) {
+            if (item is Map &&
+                item['link'] != null &&
+                item['link'].toString().isNotEmpty) {
+              imageUrl = item['link'];
+              break;
+            }
+            if (item is Map &&
+                item['url'] != null &&
+                item['url'].toString().isNotEmpty) {
+              imageUrl = item['url'];
+              break;
+            }
+          }
+        }
+        if (imageUrl.isEmpty && img.last is Map && img.last['link'] != null) {
+          imageUrl = img.last['link'];
+        }
+      } else if (img is String && img.isNotEmpty) {
+        imageUrl = img;
+      }
+      String artistName = '';
+      if (song['artists'] != null &&
+          song['artists'] is Map &&
+          song['artists']['primary'] is List &&
+          (song['artists']['primary'] as List).isNotEmpty) {
+        artistName = song['artists']['primary'][0]['name'] ?? '';
+      } else if (song['primaryArtists'] != null &&
+          song['primaryArtists'].toString().isNotEmpty) {
+        artistName = song['primaryArtists'];
+      } else if (song['subtitle'] != null &&
+          song['subtitle'].toString().isNotEmpty) {
+        artistName = song['subtitle'];
+      }
+      String downloadUrl = '';
+      if (song['downloadUrl'] != null &&
+          song['downloadUrl'] is List &&
+          (song['downloadUrl'] as List).isNotEmpty) {
+        final urlObj = (song['downloadUrl'] as List).last;
+        if (urlObj is Map && urlObj['url'] != null) {
+          downloadUrl = urlObj['url'];
+        }
+      } else if (song['media_url'] != null) {
+        downloadUrl = song['media_url'];
+      } else if (song['media_preview_url'] != null) {
+        downloadUrl = song['media_preview_url'];
+      }
+      likedSongsBox.put(
+        songId,
+        LikedSong(
+          id: songId,
+          title: song['name'] ?? song['title'] ?? '',
+          artist: artistName,
+          imageUrl: imageUrl,
+          downloadUrl: downloadUrl,
+        ),
+      );
     }
     setState(() {});
   }
@@ -720,9 +794,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     final primaryColor = customColorsEnabled
         ? customTheme.primaryColor
         : const Color(0xFFff7d78);
-    final secondaryColor = customColorsEnabled
-        ? customTheme.secondaryColor
-        : Colors.black;
     final scheme = Theme.of(context).colorScheme;
 
     final double progress = widget.totalDuration.inSeconds > 0
@@ -1579,7 +1650,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
 
     try {
       final ps = Provider.of<PlayerStateProvider>(context, listen: false);
-      final List<dynamic> playlistAtOpen = (ps.currentPlaylist ?? []) as List;
+      final List<dynamic> playlistAtOpen = ps.currentPlaylist as List;
       final int currentAtOpen = (ps.currentSongIndex < 0)
           ? 0
           : ps.currentSongIndex;
@@ -1607,7 +1678,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
             builder: (context, scrollController) {
               return Consumer<PlayerStateProvider>(
                 builder: (ctx, playerState, _) {
-                  final playlist = playerState.currentPlaylist ?? [];
+                  final playlist = playerState.currentPlaylist;
                   if (playlist.isEmpty || indices.isEmpty) {
                     return Container(
                       decoration: BoxDecoration(

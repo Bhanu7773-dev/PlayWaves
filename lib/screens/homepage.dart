@@ -58,6 +58,22 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+  Future<void> _incrementDownloads() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentCount = prefs.getInt('total_downloads') ?? 0;
+    await prefs.setInt('total_downloads', currentCount + 1);
+    debugPrint('Total downloads incremented: ${currentCount + 1}');
+  }
+
+  String? _lastCountedSongId;
+  // Increment total_songs_played in SharedPreferences
+  Future<void> _incrementSongsPlayed() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentCount = prefs.getInt('total_songs_played') ?? 0;
+    await prefs.setInt('total_songs_played', currentCount + 1);
+    debugPrint('Total songs played incremented: ${currentCount + 1}');
+  }
+
   final JioSaavnApiService _apiService = JioSaavnApiService();
   // Use global AudioPlayer from Provider
   final PageController _bannerController = PageController();
@@ -139,6 +155,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       if (playing) {
         playerState.setSongLoading(false);
         _startListeningTimer();
+        final currentSong = playerState.currentSong;
+        final currentSongId = currentSong != null
+            ? currentSong['id'] as String?
+            : null;
+        if (currentSongId != null && currentSongId != _lastCountedSongId) {
+          _incrementSongsPlayed();
+          _lastCountedSongId = currentSongId;
+        }
       } else {
         _stopListeningTimer();
       }
@@ -159,6 +183,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       } else if (state.processingState == ProcessingState.completed) {
         // Song finished, stop timer and play next song automatically
         _stopListeningTimer();
+        // Increment songs played only when song completes
+        _incrementSongsPlayed();
         print('Song completed, scheduling next song...');
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -1720,6 +1746,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
             );
+            // Increment downloads when a song is downloaded successfully
+            await _incrementDownloads();
             await audioPlayer.play();
           } else {
             throw Exception('Invalid audio URL format');

@@ -80,11 +80,11 @@ class _SettingsPageState extends State<SettingsPage>
   late AnimationController _meteorsController;
   Timer? _statsTimer;
 
-  int totalListeningMinutes = 1234;
-  int songsPlayed = 567;
-  String topArtist = "Arijit Singh";
-  String topSong = "Tum Hi Ho";
-  int totalDownloads = 89;
+  int totalListeningMinutes = 0;
+  int songsPlayed = 0;
+  String topArtist = "";
+  String topSong = "";
+  int totalDownloads = 0;
 
   @override
   void initState() {
@@ -133,16 +133,24 @@ class _SettingsPageState extends State<SettingsPage>
   Future<void> _refreshStats() async {
     final prefs = await SharedPreferences.getInstance();
     final totalSeconds = prefs.getInt('total_listening_seconds') ?? 0;
+    final songsCount = prefs.getInt('total_songs_played') ?? 0;
+    final downloadsCount = prefs.getInt('total_downloads') ?? 0;
     setState(() {
       totalListeningMinutes = totalSeconds ~/ 60;
+      songsPlayed = songsCount;
+      totalDownloads = downloadsCount;
     });
   }
 
   Future<void> _resetStats() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('total_listening_seconds', 0);
+    await prefs.setInt('total_songs_played', 0);
+    await prefs.setInt('total_downloads', 0);
     setState(() {
       totalListeningMinutes = 0;
+      songsPlayed = 0;
+      totalDownloads = 0;
     });
   }
 
@@ -1151,105 +1159,7 @@ class _SettingsPageState extends State<SettingsPage>
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Container(
-              width: 330,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      (useMaterialPreset || useDynamicColors)
-                          ? Icon(Icons.star, color: scheme.primary, size: 16)
-                          : customColorsEnabled
-                          ? Icon(Icons.star, color: primaryColor, size: 16)
-                          : ShaderMask(
-                              shaderCallback: (Rect bounds) {
-                                return const LinearGradient(
-                                  colors: [
-                                    Color(0xFF6366f1),
-                                    Color(0xFF8b5cf6),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ).createShader(bounds);
-                              },
-                              child: const Icon(
-                                Icons.star,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        "Top Artist: ",
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      Text(
-                        topArtist,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      (useMaterialPreset || useDynamicColors)
-                          ? Icon(
-                              Icons.favorite,
-                              color: scheme.primary,
-                              size: 16,
-                            )
-                          : customColorsEnabled
-                          ? Icon(Icons.favorite, color: primaryColor, size: 16)
-                          : ShaderMask(
-                              shaderCallback: (Rect bounds) {
-                                return const LinearGradient(
-                                  colors: [
-                                    Color(0xFF6366f1),
-                                    Color(0xFF8b5cf6),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ).createShader(bounds);
-                              },
-                              child: const Icon(
-                                Icons.favorite,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        "Top Song: ",
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      Expanded(
-                        child: Text(
-                          topSong,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            // Removed Top Song and Top Artist stats card section
           ],
         ),
       ),

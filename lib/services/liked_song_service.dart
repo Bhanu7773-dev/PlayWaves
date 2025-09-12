@@ -1,6 +1,7 @@
 import 'package:hive/hive.dart';
+import 'package:playwaves/services/liked_songs_sync_service.dart';
 import '../models/liked_song.dart';
-import 'liked_song_sync_service.dart';
+import 'liked_songs_sync_service.dart';
 
 class LikedSongService {
   static final Box<LikedSong> likedSongsBox = Hive.box<LikedSong>('likedSongs');

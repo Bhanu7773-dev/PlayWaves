@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:playwaves/services/liked_songs_sync_service.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:just_audio/just_audio.dart';
@@ -13,7 +14,8 @@ import 'services/player_state_provider.dart';
 import 'services/pitch_black_theme_provider.dart';
 import 'services/custom_theme_provider.dart';
 import 'services/playlist_sync_service.dart';
-import 'services/liked_song_sync_service.dart';
+import 'services/liked_songs_sync_service.dart';
+import '../services/liked_song_service.dart';
 
 void main() async {
   // Ensure Flutter is initialized
