@@ -1495,7 +1495,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
       decoration: isPitchBlack
           ? const BoxDecoration(color: Colors.black)
           : useDynamicColors
-          ? BoxDecoration(color: scheme.secondary)
+          ? BoxDecoration(color: scheme.background)
           : customColorsEnabled
           ? BoxDecoration(color: customTheme.secondaryColor)
           : const BoxDecoration(

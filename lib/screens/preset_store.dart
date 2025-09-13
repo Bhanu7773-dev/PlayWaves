@@ -3,10 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:playwaves/models/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/custom_theme_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import 'package:flex_color_scheme/flex_color_scheme.dart';
-import '../models/theme_model.dart';
 
 // Enhanced cache for better performance
 class _ColorSchemeCache {
@@ -39,10 +37,10 @@ class _ColorSchemeCache {
     ).colorScheme;
   }
 
-  static void clearCache() {
-    _lightCache.clear();
-    _darkCache.clear();
-  }
+  // static void clearCache() {
+  //   _lightCache.clear();
+  //   _darkCache.clear();
+  // }
 }
 
 class ColorPresetPage extends ConsumerStatefulWidget {
@@ -698,27 +696,32 @@ class _ColorPresetPageState extends ConsumerState<ColorPresetPage>
 
   Future<void> _handlePresetSelection(FlexScheme flexScheme) async {
     final prefs = await SharedPreferences.getInstance();
-    final convertedOn = prefs.getBool('useDynamicColors') ?? false;
+    final useDynamicColors = prefs.getBool('useDynamicColors') ?? false;
     final scheme = Theme.of(context).colorScheme;
 
-    if (!convertedOn) {
+    if (!useDynamicColors) {
       _showAdvancedSnackBar(
         icon: Icons.lock_outline_rounded,
         title: 'Feature Locked',
-        message: 'Enable "Converted Preset" in settings to apply themes',
+        message: 'Enable "Dynamic Colors" in settings to apply presets',
         color: Colors.redAccent,
       );
       return;
     }
 
-    // Add haptic feedback
-
+    // Update Riverpod provider and force rebuild
     ref
         .read(themeSettingsProvider.notifier)
         .updateSettings(
           (currentSettings) =>
               currentSettings.copyWith(flexScheme: flexScheme.name),
         );
+
+    // Optionally, trigger a rebuild by updating a dummy value in SharedPreferences
+    await prefs.setInt(
+      'lastPresetApplied',
+      DateTime.now().millisecondsSinceEpoch,
+    );
 
     _showAdvancedSnackBar(
       icon: Icons.check_circle_outline_rounded,

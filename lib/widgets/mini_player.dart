@@ -429,7 +429,9 @@ class MiniPlayer extends StatelessWidget {
                               child: Text(
                                 songTitle,
                                 style: TextStyle(
-                                  color: useCustom
+                                  color: useDynamicColors
+                                      ? scheme.primary
+                                      : useCustom
                                       ? primaryColor
                                       : Colors.white,
                                   fontSize: 14,

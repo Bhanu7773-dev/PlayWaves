@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/player_state_provider.dart';
 import '../services/pitch_black_theme_provider.dart';
 import 'preset_store.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' as riverpod;
 import '../services/custom_theme_provider.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -1251,7 +1252,8 @@ class _SettingsPageState extends State<SettingsPage>
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => const ColorPresetPage(),
+                    builder: (context) =>
+                        riverpod.ProviderScope(child: const ColorPresetPage()),
                   ),
                 );
               },
@@ -1652,7 +1654,8 @@ class _SettingsPageState extends State<SettingsPage>
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => const ColorPresetPage(),
+                    builder: (context) =>
+                        riverpod.ProviderScope(child: const ColorPresetPage()),
                   ),
                 );
               },

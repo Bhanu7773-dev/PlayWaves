@@ -48,6 +48,7 @@ class CustomThemeProvider with ChangeNotifier {
   Future<void> loadThemeFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     customColorsEnabled = prefs.getBool('customColorsEnabled') ?? false;
+    useDynamicColors = prefs.getBool('useDynamicColors') ?? false;
     primaryColor = Color(prefs.getInt('primaryColor') ?? 0xFFff7d78);
     secondaryColor = Color(prefs.getInt('secondaryColor') ?? 0xFF16213e);
     _customIconName = prefs.getString('customIconName');

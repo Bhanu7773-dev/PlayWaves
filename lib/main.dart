@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:playwaves/services/liked_songs_sync_service.dart';
-import 'package:provider/provider.dart';
+import 'package:provider/provider.dart' as pv;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -8,14 +8,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'models/liked_song.dart';
 import 'models/playlist_song.dart';
+import 'models/theme_provider.dart';
+import 'models/theme_model.dart';
 import 'screens/Welcome_page.dart';
 import 'screens/homepage.dart';
 import 'services/player_state_provider.dart';
 import 'services/pitch_black_theme_provider.dart';
+import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'services/custom_theme_provider.dart';
 import 'services/playlist_sync_service.dart';
 import 'services/liked_songs_sync_service.dart';
-import '../services/liked_song_service.dart';
 
 void main() async {
   // Ensure Flutter is initialized
@@ -28,8 +30,10 @@ void main() async {
   await Hive.initFlutter();
   Hive.registerAdapter(LikedSongAdapter());
   Hive.registerAdapter(PlaylistSongAdapter());
+  Hive.registerAdapter(ThemeModelAdapter());
   await Hive.openBox<LikedSong>('likedSongs');
   await Hive.openBox<PlaylistSong>('playlistSongs');
+  await Hive.openBox<ThemeModel>('theme_settings');
 
   // Initialize sync services
   await PlaylistSyncService.initialize();
@@ -52,14 +56,16 @@ void main() async {
   final audioPlayer = AudioPlayer();
 
   runApp(
-    MultiProvider(
-      providers: [
-        Provider<AudioPlayer>.value(value: audioPlayer),
-        ChangeNotifierProvider(create: (_) => PlayerStateProvider()),
-        ChangeNotifierProvider(create: (_) => PitchBlackThemeProvider()),
-        ChangeNotifierProvider(create: (_) => CustomThemeProvider()),
-      ],
-      child: const MyApp(),
+    ProviderScope(
+      child: pv.MultiProvider(
+        providers: [
+          pv.Provider<AudioPlayer>.value(value: audioPlayer),
+          pv.ChangeNotifierProvider(create: (_) => PlayerStateProvider()),
+          pv.ChangeNotifierProvider(create: (_) => PitchBlackThemeProvider()),
+          pv.ChangeNotifierProvider(create: (_) => CustomThemeProvider()),
+        ],
+        child: const MyApp(),
+      ),
     ),
   );
 }
@@ -69,21 +75,48 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPitchBlack = context.watch<PitchBlackThemeProvider>().isPitchBlack;
-    final customTheme = context.watch<CustomThemeProvider>();
+    return Consumer(
+      builder: (context, ref, _) {
+        final isPitchBlack = pv.Provider.of<PitchBlackThemeProvider>(
+          context,
+        ).isPitchBlack;
+        final customTheme = pv.Provider.of<CustomThemeProvider>(context);
+        final themeSettings = ref.watch(themeSettingsProvider);
+        final flexScheme = themeSettings.flexSchemeEnum;
 
-    final Color scaffoldColor = isPitchBlack
-        ? Colors.black
-        : (customTheme.customColorsEnabled
-              ? customTheme.secondaryColor
-              : const Color(0xFF16213e));
+        ThemeData lightTheme = ThemeData.dark();
+        ThemeData darkTheme = ThemeData.dark();
 
-    return MaterialApp(
-      color: Colors.transparent,
-      debugShowCheckedModeBanner: false,
-      title: 'PlayWaves',
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: scaffoldColor),
-      home: const AuthWrapper(),
+        if (customTheme.useDynamicColors) {
+          // Use FlexColorScheme preset from Riverpod
+          lightTheme = FlexThemeData.light(scheme: flexScheme);
+          darkTheme = FlexThemeData.dark(scheme: flexScheme);
+        } else if (customTheme.customColorsEnabled) {
+          lightTheme = ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: customTheme.secondaryColor,
+            colorScheme: ThemeData.dark().colorScheme.copyWith(
+              primary: customTheme.primaryColor,
+              secondary: customTheme.secondaryColor,
+            ),
+          );
+          darkTheme = lightTheme;
+        } else if (isPitchBlack) {
+          lightTheme = ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: Colors.black,
+          );
+          darkTheme = lightTheme;
+        }
+
+        return MaterialApp(
+          color: Colors.transparent,
+          debugShowCheckedModeBanner: false,
+          title: 'PlayWaves',
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: ThemeMode.system,
+          home: const AuthWrapper(),
+        );
+      },
     );
   }
 }
