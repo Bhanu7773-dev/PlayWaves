@@ -499,6 +499,7 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
   Widget _buildStatsSection({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required Color secondaryColor,
     required int songCount,
     required bool useDynamicColors,
     required ColorScheme scheme,
@@ -541,9 +542,11 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                     ),
                   ],
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.history_rounded,
-                  color: Colors.white,
+                  color: customColorsEnabled && primaryColor == Colors.white
+                      ? secondaryColor
+                      : Colors.white,
                   size: 22,
                 ),
               ),
@@ -757,6 +760,7 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
   Widget _buildSongsList({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required Color secondaryColor,
     required List<Map<String, dynamic>> songs,
     required bool useDynamicColors,
     required ColorScheme scheme,
@@ -795,6 +799,7 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                     isCurrentSong && playerState.isSongLoading,
                     customColorsEnabled,
                     primaryColor,
+                    secondaryColor,
                     animationProgress,
                     useDynamicColors,
                     scheme,
@@ -817,6 +822,7 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     bool isLoading,
     bool customColorsEnabled,
     Color primaryColor,
+    Color secondaryColor,
     double animationProgress,
     bool useDynamicColors,
     ColorScheme scheme,
@@ -1005,6 +1011,7 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                             isLoading,
                             customColorsEnabled,
                             primaryColor,
+                            secondaryColor,
                             animationProgress,
                             useDynamicColors,
                             scheme,
@@ -1031,6 +1038,7 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
     bool isLoading,
     bool customColorsEnabled,
     Color primaryColor,
+    Color secondaryColor,
     double animationProgress,
     bool useDynamicColors,
     ColorScheme scheme,
@@ -1112,7 +1120,10 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                         showPause
                             ? Icons.pause_rounded
                             : Icons.play_arrow_rounded,
-                        color: Colors.white,
+                        color:
+                            customColorsEnabled && primaryColor == Colors.white
+                            ? secondaryColor
+                            : Colors.white,
                         size: 18,
                       );
                     },
@@ -1181,6 +1192,7 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                   _buildStatsSection(
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
+                    secondaryColor: secondaryColor,
                     songCount: recentlyPlayed.length,
                     useDynamicColors: useDynamicColors,
                     scheme: scheme,
@@ -1195,6 +1207,7 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen>
                         : _buildSongsList(
                             customColorsEnabled: customColorsEnabled,
                             primaryColor: primaryColor,
+                            secondaryColor: secondaryColor,
                             songs: recentlyPlayed,
                             useDynamicColors: useDynamicColors,
                             scheme: scheme,

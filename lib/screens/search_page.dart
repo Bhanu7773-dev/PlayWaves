@@ -759,8 +759,12 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                         ),
                         child: Text(
                           '${index + 1}',
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color:
+                                customColorsEnabled &&
+                                    primaryColor == Colors.white
+                                ? customTheme.secondaryColor
+                                : Colors.white,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -879,7 +883,11 @@ class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
                               isPlaying
                                   ? Icons.pause_rounded
                                   : Icons.play_arrow_rounded,
-                              color: Colors.white,
+                              color:
+                                  customColorsEnabled &&
+                                      primaryColor == Colors.white
+                                  ? customTheme.secondaryColor
+                                  : Colors.white,
                               size: 37,
                             ),
                     ),

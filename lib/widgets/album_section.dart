@@ -331,7 +331,11 @@ class AlbumsSection extends StatelessWidget {
                           )
                         : Icon(
                             isPlaying ? Icons.pause : Icons.play_arrow,
-                            color: Colors.white,
+                            color:
+                                customColorsEnabled &&
+                                    primaryColor == Colors.white
+                                ? secondaryColor
+                                : Colors.white,
                             size: 20,
                           ),
                     onPressed: isLoading

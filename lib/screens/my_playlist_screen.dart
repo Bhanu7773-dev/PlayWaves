@@ -9,8 +9,6 @@ import '../models/playlist_song.dart';
 import '../services/pitch_black_theme_provider.dart';
 import '../services/custom_theme_provider.dart';
 import '../services/player_state_provider.dart';
-// import '../services/playlist_sync_service.dart';
-import '../services/playlist_service.dart';
 import 'music_player.dart';
 
 class MyPlaylistScreen extends StatefulWidget {
@@ -308,6 +306,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
   Widget _buildHeader({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required Color secondaryColor,
     required bool useDynamicColors,
     required ColorScheme scheme,
   }) {
@@ -344,9 +343,9 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                       width: 0.8,
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.arrow_back_ios_new,
-                    color: Colors.white,
+                    color: primaryColor,
                     size: 16,
                   ),
                 ),
@@ -387,6 +386,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
   Widget _buildStatsSection({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required Color secondaryColor,
     required int songCount,
     required bool useDynamicColors,
     required ColorScheme scheme,
@@ -429,9 +429,11 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                     ),
                   ],
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.queue_music,
-                  color: Colors.white,
+                  color: customColorsEnabled && primaryColor == Colors.white
+                      ? secondaryColor
+                      : Colors.white,
                   size: 22,
                 ),
               ),
@@ -460,6 +462,71 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                   ],
                 ),
               ),
+              if (songCount > 0) ...[
+                GestureDetector(
+                  onTap: () {
+                    // Show confirmation dialog before clearing
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          backgroundColor: const Color(0xFF1a1a2e),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: const Text(
+                            'Clear Playlist',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          content: const Text(
+                            'Are you sure you want to remove all songs from your playlist?',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: customColorsEnabled
+                                      ? primaryColor
+                                      : const Color(0xFF6366f1),
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                final playlistBox = Hive.box<PlaylistSong>(
+                                  'playlistSongs',
+                                );
+                                playlistBox.clear();
+                                Navigator.of(context).pop();
+                              },
+                              child: const Text(
+                                'Clear',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.red.withOpacity(0.15),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.red,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -749,6 +816,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                             isCurrentSong,
                             customColorsEnabled,
                             primaryColor,
+                            secondaryColor,
                             animationProgress,
                           ),
                           const SizedBox(width: 12),
@@ -773,6 +841,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                             showLoader,
                             customColorsEnabled,
                             primaryColor,
+                            secondaryColor,
                             onDelete,
                             audioPlayer,
                             animationProgress,
@@ -798,6 +867,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     bool isCurrentSong,
     bool customColorsEnabled,
     Color primaryColor,
+    Color secondaryColor,
     double animationProgress,
   ) {
     return Hero(
@@ -829,10 +899,15 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                       return _buildDefaultArtwork(
                         customColorsEnabled,
                         primaryColor,
+                        secondaryColor,
                       );
                     },
                   )
-                : _buildDefaultArtwork(customColorsEnabled, primaryColor),
+                : _buildDefaultArtwork(
+                    customColorsEnabled,
+                    primaryColor,
+                    secondaryColor,
+                  ),
           ),
         ),
       ),
@@ -911,6 +986,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     bool showLoader,
     bool customColorsEnabled,
     Color primaryColor,
+    Color secondaryColor,
     VoidCallback onDelete,
     AudioPlayer audioPlayer,
     double animationProgress,
@@ -977,7 +1053,9 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                       shouldShowPause
                           ? Icons.pause_rounded
                           : Icons.play_arrow_rounded,
-                      color: Colors.white,
+                      color: customColorsEnabled && primaryColor == Colors.white
+                          ? secondaryColor
+                          : Colors.white,
                       size: 18,
                     ),
             ),
@@ -1010,7 +1088,11 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
     );
   }
 
-  Widget _buildDefaultArtwork(bool customColorsEnabled, Color primaryColor) {
+  Widget _buildDefaultArtwork(
+    bool customColorsEnabled,
+    Color primaryColor,
+    Color secondaryColor,
+  ) {
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -1026,13 +1108,20 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                 ],
         ),
       ),
-      child: Icon(Icons.music_note_rounded, color: Colors.white, size: 24),
+      child: Icon(
+        Icons.music_note_rounded,
+        color: customColorsEnabled && primaryColor == Colors.white
+            ? secondaryColor
+            : Colors.white,
+        size: 24,
+      ),
     );
   }
 
   Widget _buildEmptyState({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required Color secondaryColor,
   }) {
     return Center(
       child: FadeTransition(
@@ -1120,12 +1209,16 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                         ),
                       ],
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Icons.explore_rounded,
-                          color: Colors.white,
+                          color:
+                              customColorsEnabled &&
+                                  primaryColor == Colors.white
+                              ? secondaryColor
+                              : Colors.white,
                           size: 18,
                         ),
                         SizedBox(width: 8),
@@ -1201,6 +1294,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                   _buildHeader(
                     customColorsEnabled: customColorsEnabled,
                     primaryColor: primaryColor,
+                    secondaryColor: secondaryColor,
                     useDynamicColors: useDynamicColors,
                     scheme: scheme,
                   ),
@@ -1210,6 +1304,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                       return _buildStatsSection(
                         customColorsEnabled: customColorsEnabled,
                         primaryColor: primaryColor,
+                        secondaryColor: secondaryColor,
                         songCount: box.values.length,
                         useDynamicColors: useDynamicColors,
                         scheme: scheme,
@@ -1227,6 +1322,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                           return _buildEmptyState(
                             customColorsEnabled: customColorsEnabled,
                             primaryColor: primaryColor,
+                            secondaryColor: secondaryColor,
                           );
                         }
 
@@ -1249,17 +1345,7 @@ class _MyPlaylistScreenState extends State<MyPlaylistScreen>
                               customColorsEnabled,
                               primaryColor,
                               secondaryColor,
-                              () async {
-                                print(
-                                  '🗑️ PLAYLIST: Deleting song "${song.title}" from playlist...',
-                                );
-                                await PlaylistService.removeFromPlaylist(
-                                  song.id,
-                                );
-                                print(
-                                  '✅ PLAYLIST: Successfully removed song "${song.title}" and synced to cloud',
-                                );
-                              },
+                              () => playlistBox.delete(song.id),
                               useDynamicColors,
                               scheme,
                             );

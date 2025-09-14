@@ -1457,7 +1457,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                                         widget.isPlaying
                                             ? Icons.pause
                                             : Icons.play_arrow,
-                                        color: Colors.white,
+                                        color:
+                                            customColorsEnabled &&
+                                                primaryColor == Colors.white
+                                            ? customTheme.secondaryColor
+                                            : Colors.white,
                                         size: 40,
                                       ),
                                 onPressed: widget.isLoading

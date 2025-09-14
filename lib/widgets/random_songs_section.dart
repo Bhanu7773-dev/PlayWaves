@@ -347,7 +347,11 @@ class _RandomSongsSectionState extends State<RandomSongsSection> {
                                 padding: const EdgeInsets.all(4),
                                 child: Icon(
                                   isPlaying ? Icons.pause : Icons.play_arrow,
-                                  color: Colors.white,
+                                  color:
+                                      customColorsEnabled &&
+                                          primaryColor == Colors.white
+                                      ? secondaryColor
+                                      : Colors.white,
                                   size: 40,
                                 ),
                               ),

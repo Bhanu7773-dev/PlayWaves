@@ -479,9 +479,11 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                     ),
                   ],
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.favorite_rounded,
-                  color: Colors.white,
+                  color: customColorsEnabled && primaryColor == Colors.white
+                      ? secondaryColor
+                      : Colors.white,
                   size: 22,
                 ),
               ),
@@ -982,7 +984,11 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                                           isPlaying
                                               ? Icons.volume_up
                                               : Icons.pause,
-                                          color: primaryColor,
+                                          color:
+                                              customColorsEnabled &&
+                                                  primaryColor == Colors.white
+                                              ? secondaryColor
+                                              : primaryColor,
                                           size: 10,
                                         ),
                                         const SizedBox(width: 4),
@@ -1074,7 +1080,12 @@ class _LikedSongsScreenState extends State<LikedSongsScreen>
                                               shouldShowPause
                                                   ? Icons.pause_rounded
                                                   : Icons.play_arrow_rounded,
-                                              color: Colors.white,
+                                              color:
+                                                  customColorsEnabled &&
+                                                      primaryColor ==
+                                                          Colors.white
+                                                  ? secondaryColor
+                                                  : Colors.white,
                                               size: 18,
                                             ),
                                     ),

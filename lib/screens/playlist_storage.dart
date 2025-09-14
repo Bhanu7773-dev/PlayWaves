@@ -635,7 +635,10 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
                       ),
                       child: Icon(
                         widget.item.iconData,
-                        color: Colors.white,
+                        color:
+                            customColorsEnabled && primaryColor == Colors.white
+                            ? secondaryColor
+                            : Colors.white,
                         size: 28,
                       ),
                     ),
@@ -678,7 +681,10 @@ class _MinimalLibraryCardState extends State<MinimalLibraryCard>
                         widget.item.isActive
                             ? Icons.play_arrow
                             : Icons.arrow_forward_ios,
-                        color: Colors.white,
+                        color:
+                            customColorsEnabled && primaryColor == Colors.white
+                            ? secondaryColor
+                            : Colors.white,
                         size: widget.item.isActive ? 20 : 16,
                       ),
                     ),

@@ -385,6 +385,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
   Widget _buildHeader({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required Color secondaryColor,
     required bool useDynamicColors,
     required ColorScheme scheme,
   }) {
@@ -415,9 +416,9 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
                       width: 0.8,
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.arrow_back_ios_new,
-                    color: Colors.white,
+                    color: primaryColor,
                     size: 16,
                   ),
                 ),
@@ -468,6 +469,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
   Widget _buildStatsSection({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required Color secondaryColor,
     required int songCount,
     required bool useDynamicColors,
     required ColorScheme scheme,
@@ -513,9 +515,11 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
                     ),
                   ],
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.download_done_rounded,
-                  color: Colors.white,
+                  color: customColorsEnabled && primaryColor == Colors.white
+                      ? secondaryColor
+                      : Colors.white,
                   size: 22,
                 ),
               ),
@@ -643,6 +647,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
   Widget _buildSongsList({
     required bool customColorsEnabled,
     required Color primaryColor,
+    required Color secondaryColor,
     required bool useDynamicColors,
     required ColorScheme scheme,
   }) {
@@ -682,6 +687,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
                             index,
                             customColorsEnabled,
                             primaryColor,
+                            secondaryColor,
                             isPlaying,
                             animationProgress,
                             useDynamicColors,
@@ -704,6 +710,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
     int index,
     bool customColorsEnabled,
     Color primaryColor,
+    Color secondaryColor,
     bool isPlaying,
     double animationProgress,
     bool useDynamicColors,
@@ -868,6 +875,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
                   isPlaying,
                   customColorsEnabled,
                   primaryColor,
+                  secondaryColor,
                   animationProgress,
                   useDynamicColors,
                   scheme,
@@ -885,6 +893,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
     bool isPlaying,
     bool customColorsEnabled,
     Color primaryColor,
+    Color secondaryColor,
     double animationProgress,
     bool useDynamicColors,
     ColorScheme scheme,
@@ -922,7 +931,9 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
             onTap: isPlaying ? _pauseSong : () => _playSong(index),
             child: Icon(
               isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              color: Colors.white,
+              color: customColorsEnabled && primaryColor == Colors.white
+                  ? secondaryColor
+                  : Colors.white,
               size: 18,
             ),
           ),
@@ -969,12 +980,14 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
               _buildHeader(
                 customColorsEnabled: customColorsEnabled,
                 primaryColor: primaryColor,
+                secondaryColor: secondaryColor,
                 useDynamicColors: useDynamicColors,
                 scheme: scheme,
               ),
               _buildStatsSection(
                 customColorsEnabled: customColorsEnabled,
                 primaryColor: primaryColor,
+                secondaryColor: secondaryColor,
                 songCount: _songs.length,
                 useDynamicColors: useDynamicColors,
                 scheme: scheme,
@@ -999,6 +1012,7 @@ class _DownloadedSongsScreenState extends State<DownloadedSongsScreen>
                     : _buildSongsList(
                         customColorsEnabled: customColorsEnabled,
                         primaryColor: primaryColor,
+                        secondaryColor: secondaryColor,
                         useDynamicColors: useDynamicColors,
                         scheme: scheme,
                       ),

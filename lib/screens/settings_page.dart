@@ -797,7 +797,13 @@ class _SettingsPageState extends State<SettingsPage>
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                  : const Icon(Icons.logout, color: Colors.white, size: 28),
+                  : Icon(
+                      Icons.logout,
+                      color: customColorsEnabled && primaryColor == Colors.white
+                          ? secondaryColor
+                          : Colors.white,
+                      size: 28,
+                    ),
               onPressed: _isLoggingOut
                   ? null
                   : () async {
@@ -1906,8 +1912,10 @@ class _SettingsPageState extends State<SettingsPage>
                   ),
                   child: Text(
                     currentValue,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: customColorsEnabled && primaryColor == Colors.white
+                          ? secondaryColor
+                          : Colors.white,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),

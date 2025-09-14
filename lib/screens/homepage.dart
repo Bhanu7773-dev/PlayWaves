@@ -1402,7 +1402,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                               )
                             : Icon(
                                 isPlaying ? Icons.pause : Icons.play_arrow,
-                                color: Colors.white,
+                                color:
+                                    customColorsEnabled &&
+                                        primaryColor == Colors.white
+                                    ? secondaryColor
+                                    : Colors.white,
                               ),
                         onPressed: isLoading
                             ? null
@@ -1604,7 +1608,10 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                       )
                     : Icon(
                         isPlaying ? Icons.pause : Icons.play_arrow,
-                        color: Colors.white,
+                        color:
+                            customColorsEnabled && primaryColor == Colors.white
+                            ? secondaryColor
+                            : Colors.white,
                       ),
                 onPressed: isLoading
                     ? null
