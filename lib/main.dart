@@ -6,6 +6,8 @@ import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/firebase_services.dart';
 import 'models/liked_song.dart';
 import 'models/playlist_song.dart';
 import 'models/theme_provider.dart';
@@ -19,12 +21,28 @@ import 'services/custom_theme_provider.dart';
 import 'services/playlist_sync_service.dart';
 import 'services/liked_songs_sync_service.dart';
 
+// Firebase Cloud Messaging Background Handler
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // If you're going to use other Firebase services in the background, such as Firestore,
+  // make sure you call `initializeApp` before using other Firebase services.
+  await Firebase.initializeApp();
+
+  debugPrint("Handling a background message: ${message.messageId}");
+  debugPrint('Message data: ${message.data}');
+  debugPrint('Message notification: ${message.notification?.title}');
+  debugPrint('Message notification body: ${message.notification?.body}');
+}
+
 void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize Firebase
   await Firebase.initializeApp();
+
+  // Initialize all Firebase services (Analytics, Crashlytics, Cloud Messaging, Performance)
+  await FirebaseService.instance.initializeAllServices();
 
   // Initialize Hive database
   await Hive.initFlutter();
@@ -46,14 +64,27 @@ void main() async {
     androidNotificationOngoing: true,
   );
 
-  // Error handling for Flutter errors
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    debugPrint('Flutter Error: ${details.exception}');
-  };
+  // Error handling for Flutter errors is now handled by Firebase Crashlytics above
 
   // Create a single global instance of AudioPlayer
   final audioPlayer = AudioPlayer();
+
+  // Set up Firebase Cloud Messaging foreground message handler
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    debugPrint('Received a foreground message!');
+    debugPrint('Message data: ${message.data}');
+
+    if (message.notification != null) {
+      debugPrint('Message notification: ${message.notification}');
+      // TODO: Show local notification using flutter_local_notifications
+    }
+  });
+
+  // Handle message when app is opened from terminated state
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    debugPrint('App opened from message!');
+    // TODO: Navigate to specific screen based on message data
+  });
 
   runApp(
     ProviderScope(

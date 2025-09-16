@@ -69,6 +69,7 @@ dependencies:
   firebase_remote_config: ^6.0.1
   firebase_database: ^12.0.1
   firebase_performance: ^0.11.0+1
+  flutter_launcher_icons: ^0.14.4
 
 
 dev_dependencies:                     
@@ -107,4 +108,9 @@ flutter:
       fonts:
         - asset: assets/fonts/wednesday.ttf
 
-  
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#00000000" # transparent or your preferred color
+  adaptive_icon_foreground: "assets/icon/app_icon.png"  

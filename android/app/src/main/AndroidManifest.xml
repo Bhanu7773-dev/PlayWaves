@@ -19,7 +19,7 @@
     </queries>
 
     <application
-        android:label="playwaves"
+        android:label="PlayWaves"
         android:icon="@mipmap/ic_launcher">
 
         <activity

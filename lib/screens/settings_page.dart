@@ -2196,6 +2196,18 @@ class _SettingsPageState extends State<SettingsPage>
               ],
             ),
           ),
+          if (title == "System & Preferences")
+            Padding(
+              padding: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
+              child: Text(
+                "Coming soon (when the developer feels less lazy)",
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
           ...children,
         ],
       ),
@@ -2330,7 +2342,7 @@ class _SettingsPageState extends State<SettingsPage>
               ),
               const SizedBox(height: 12),
               Text(
-                'Special thanks to our amazing collaborators:\nineffable & darkx dev',
+                'Special thanks to our amazing collaborators:\nSusime & darkx dev',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.white60,
