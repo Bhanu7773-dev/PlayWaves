@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'homepage.dart';
 import '../services/auth_services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WelcomePage extends StatefulWidget {
   const WelcomePage({Key? key}) : super(key: key);
@@ -342,11 +343,19 @@ class _WelcomePageState extends State<WelcomePage>
                                 const SizedBox(height: 11),
                                 // Skip button
                                 TextButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pushReplacement(
+                                  onPressed: () async {
+                                    final prefs =
+                                        await SharedPreferences.getInstance();
+                                    await prefs.setBool(
+                                      'welcome_skipped',
+                                      true,
+                                    );
+                                    if (!mounted) return;
+                                    Navigator.of(context).pushAndRemoveUntil(
                                       MaterialPageRoute(
                                         builder: (context) => const HomePage(),
                                       ),
+                                      (route) => false,
                                     );
                                   },
                                   child: Text(

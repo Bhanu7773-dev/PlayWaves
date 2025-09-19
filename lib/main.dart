@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart' as pv;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -161,6 +162,22 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   User? _previousUser;
+  bool _welcomeSkipped = false;
+  bool _prefsLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _welcomeSkipped = prefs.getBool('welcome_skipped') ?? false;
+      _prefsLoaded = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -182,6 +199,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
         _previousUser = currentUser;
 
+        // Wait for prefs to load
+        if (!_prefsLoaded) {
+          return const AuthLoadingScreen();
+        }
+
         // Show loading screen while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const AuthLoadingScreen();
@@ -192,7 +214,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
           return const HomePage();
         }
 
-        // If user is not logged in, show WelcomePage
+        // If user is not logged in, check if skip was set
+        if (_welcomeSkipped) {
+          return const HomePage();
+        }
+
+        // If user is not logged in and not skipped, show WelcomePage
         return const WelcomePage();
       },
     );
