@@ -1,0 +1,17 @@
+name: install_plugin_v2_fork
+description: Local fork of install_plugin_v2 with Gradle/Kotlin fixes.
+version: 1.0.0
+publish_to: "none"
+author: YourName
+homepage: https://example.com
+environment:
+  sdk: ">=2.17.0 <4.0.0"
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.playwaves.installpluginfork
+        pluginClass: InstallPluginV2Fork
+dependencies:
+  flutter:
+    sdk: flutter

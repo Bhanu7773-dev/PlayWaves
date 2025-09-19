@@ -10,6 +10,7 @@ import '../services/pitch_black_theme_provider.dart';
 import 'preset_store.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' as riverpod;
 import '../services/custom_theme_provider.dart';
+import 'update_checker_page.dart';
 
 class SettingsPage extends StatefulWidget {
   final VoidCallback onLogout;
@@ -1165,6 +1166,38 @@ class _SettingsPageState extends State<SettingsPage>
                       : null),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            // New horizontal container below stats
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const UpdateCheckerPage(),
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                width: double.infinity,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.15)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'APP UPDATES',
+                      style: TextStyle(color: Colors.white70, fontSize: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(Icons.system_update, color: Colors.white70, size: 22),
+                  ],
+                ),
+              ),
             ),
             // Removed Top Song and Top Artist stats card section
           ],
