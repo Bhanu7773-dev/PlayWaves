@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -27,10 +28,10 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
 
   Map<String, dynamic>? _latestRelease;
 
-  late AnimationController _pulseController;
   late AnimationController _slideController;
-  late Animation<double> _pulseAnimation;
+  late AnimationController _breatheController;
   late Animation<Offset> _slideAnimation;
+  late Animation<double> _breatheAnimation;
 
   @override
   void initState() {
@@ -41,30 +42,30 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
   }
 
   void _initAnimations() {
-    _pulseController = AnimationController(
-      duration: const Duration(seconds: 2),
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+
+    _breatheController = AnimationController(
+      duration: const Duration(seconds: 4),
       vsync: this,
     )..repeat(reverse: true);
 
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
     _slideAnimation = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
         .animate(
-          CurvedAnimation(parent: _slideController, curve: Curves.elasticOut),
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutExpo),
         );
+
+    _breatheAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
+      CurvedAnimation(parent: _breatheController, curve: Curves.easeInOut),
+    );
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
     _slideController.dispose();
+    _breatheController.dispose();
     super.dispose();
   }
 
@@ -123,7 +124,6 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
   Future<void> _downloadAndInstallUpdate() async {
     if (_latestRelease == null) return;
 
-    // Determine Android version using the same logic as music_player.dart
     int sdkInt = 30;
     if (Platform.isAndroid) {
       try {
@@ -159,7 +159,6 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
       return;
     }
 
-    // Request install permission
     if (!await Permission.requestInstallPackages.request().isGranted) {
       _showErrorSnackBar('Install permission is required to update the app');
       return;
@@ -183,7 +182,6 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
       }
 
       final downloadUrl = apkAsset['browser_download_url'];
-      // Save to Downloads directory
       final downloadsDir = Directory('/storage/emulated/0/Download');
       if (!await downloadsDir.exists()) {
         await downloadsDir.create(recursive: true);
@@ -214,7 +212,6 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
         },
       );
 
-      // Use android_intent_plus to launch the APK installer from Downloads
       await _launchInstallerIntent(filePath);
     } catch (e) {
       _showErrorSnackBar('Download or install failed: $e');
@@ -227,9 +224,8 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
   }
 
   Future<void> _launchInstallerIntent(String filePath) async {
-    // Use install_plugin for APK installation (handles FileProvider/content URI)
     try {
-  await InstallPluginV2Fork.installApk(filePath, 'com.playwaves.dark');
+      await InstallPluginV2Fork.installApk(filePath, 'com.playwaves.dark');
     } catch (e) {
       _showErrorSnackBar('Install failed: $e');
     }
@@ -248,10 +244,18 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        backgroundColor: const Color(0xFFFF4757),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.all(16),
+        elevation: 0,
       ),
     );
   }
@@ -261,384 +265,182 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  Widget _buildGlassCard({
+    required Widget child,
+    double? width,
+    double? height,
+    EdgeInsetsGeometry? padding,
+    EdgeInsetsGeometry? margin,
+    double borderRadius = 20,
+    List<Color>? gradientColors,
+    double blur = 15,
+    double opacity = 0.08,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      margin: margin,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(color: Colors.white.withOpacity(0.12), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+          child: Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              gradient: gradientColors != null
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: gradientColors,
+                    )
+                  : null,
+              color: gradientColors == null
+                  ? Colors.white.withOpacity(opacity)
+                  : null,
+              borderRadius: BorderRadius.circular(borderRadius),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F23),
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: _buildGlassCard(
+            width: 74,
+            height: 74,
+            borderRadius: 14,
+            gradientColors: [
+              Colors.white.withOpacity(0.1),
+              Colors.white.withOpacity(0.05),
+            ],
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => Navigator.pop(context),
+              child: const Center(
+                child: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
+        ),
         title: const Text(
           'App Updates',
           style: TextStyle(
             color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
           ),
         ),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF0F0F23), Color(0xFF1A1A2E), Color(0xFF16213E)],
+          gradient: RadialGradient(
+            center: Alignment.topCenter,
+            radius: 1.5,
+            colors: [Color(0xFF1a1a2e), Color(0xFF16213e), Color(0xFF0f0f23)],
+            stops: [0.0, 0.5, 1.0],
           ),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              children: [
-                _buildCurrentVersionCard(),
-                const SizedBox(height: 20),
-                _buildCheckButton(),
-                const SizedBox(height: 20),
-                if (_hasUpdate && _latestRelease != null)
-                  Expanded(child: _buildUpdateCard()),
-                if (_isChecking) _buildCheckingWidget(),
-                if (!_hasUpdate && !_isChecking && _latestRelease != null)
-                  _buildUpToDateWidget(),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCurrentVersionCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6366f1).withOpacity(0.3),
-            blurRadius: 20,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.music_note, color: Colors.white, size: 40),
-          const SizedBox(height: 10),
-          const Text(
-            'PlayWaves',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Wednesday',
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            'Current Version: v$_currentVersion',
-            style: const TextStyle(color: Colors.white70, fontSize: 16),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCheckButton() {
-    return AnimatedBuilder(
-      animation: _pulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _isChecking ? _pulseAnimation.value : 1.0,
-          child: Container(
-            width: double.infinity,
-            height: 60,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: _isChecking
-                    ? [Colors.orange, Colors.deepOrange]
-                    : [const Color(0xFF6366f1), const Color(0xFF8b5cf6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                  color: (_isChecking ? Colors.orange : const Color(0xFF6366f1))
-                      .withOpacity(0.4),
-                  blurRadius: 15,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-              ),
-              onPressed: _isChecking ? null : _checkForUpdates,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (_isChecking)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  else
-                    const Icon(Icons.refresh, color: Colors.white, size: 24),
-                  const SizedBox(width: 10),
-                  Text(
-                    _isChecking
-                        ? 'Checking for Updates...'
-                        : 'Check for Updates',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildUpdateCard() {
-    return SlideTransition(
-      position: _slideAnimation,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 20,
-              spreadRadius: 5,
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            // Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF00C851), Color(0xFF007E33)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-              ),
-              child: Column(
-                children: [
-                  const Icon(
-                    Icons.system_update,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    '🎉 Update Available!',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Version ${_latestRelease!['tag_name']}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                ],
-              ),
-            ),
-
-            // Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Release Info
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.calendar_today,
-                          color: Colors.grey,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Released: ${_formatDate(_latestRelease!['published_at'])}',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Changelog
-                    const Text(
-                      '📝 What\'s New:',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(15),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: SingleChildScrollView(
-                          child: Text(
-                            _latestRelease!['body'] ??
-                                'No changelog available.',
-                            style: TextStyle(
-                              color: Colors.grey[700],
-                              fontSize: 14,
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Download Progress
-                    if (_isDownloading) ...[
-                      Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Downloading...',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              Text(
-                                '${(_downloadProgress * 100).toStringAsFixed(1)}%',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          LinearProgressIndicator(
-                            value: _downloadProgress,
-                            backgroundColor: Colors.grey[300],
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFF6366f1),
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            _downloadSpeed,
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-
-                    // Download Button
-                    Container(
-                      width: double.infinity,
-                      height: 55,
+            // Animated background elements (smaller)
+            Positioned(
+              top: -80,
+              right: -80,
+              child: AnimatedBuilder(
+                animation: _breatheAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _breatheAnimation.value,
+                    child: Container(
+                      width: 200,
+                      height: 200,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6366f1).withOpacity(0.4),
-                            blurRadius: 15,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                        ),
-                        onPressed: _isDownloading
-                            ? null
-                            : _downloadAndInstallUpdate,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _isDownloading
-                                  ? Icons.downloading
-                                  : Icons.download,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              _isDownloading
-                                  ? 'Downloading...'
-                                  : 'Download & Install',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFF6366f1).withOpacity(0.08),
+                            Colors.transparent,
                           ],
                         ),
                       ),
                     ),
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              bottom: -100,
+              left: -100,
+              child: AnimatedBuilder(
+                animation: _breatheAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: 1.2 - (_breatheAnimation.value - 0.95) * 2,
+                    child: Container(
+                      width: 250,
+                      height: 250,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFF8b5cf6).withOpacity(0.06),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    _buildAppHeader(),
+                    const SizedBox(height: 20),
+                    _buildCheckButton(),
+                    const SizedBox(height: 20),
+                    if (_hasUpdate && _latestRelease != null)
+                      Expanded(child: _buildUpdateCard()),
+                    if (!_hasUpdate && !_isChecking) _buildUpToDateWidget(),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -649,51 +451,370 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
     );
   }
 
-  Widget _buildCheckingWidget() {
-    return Expanded(
-      child: Center(
+  Widget _buildAppHeader() {
+    return _buildGlassCard(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      gradientColors: [
+        Colors.white.withOpacity(0.12),
+        Colors.white.withOpacity(0.06),
+      ],
+      child: Column(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF6366f1),
+                  Color(0xFF8b5cf6),
+                  Color(0xFFa855f7),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6366f1).withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.music_note_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'PlayWaves',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.8,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Version $_currentVersion',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckButton() {
+    return _buildGlassCard(
+      width: double.infinity,
+      height: 52,
+      gradientColors: [
+        const Color(0xFF6366f1).withOpacity(0.8),
+        const Color(0xFF8b5cf6).withOpacity(0.8),
+      ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: _isChecking ? null : _checkForUpdates,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_isChecking)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.refresh_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                const SizedBox(width: 12),
+                Text(
+                  _isChecking ? 'Checking...' : 'Check for Updates',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUpdateCard() {
+    return SlideTransition(
+      position: _slideAnimation,
+      child: _buildGlassCard(
+        width: double.infinity,
+        gradientColors: [
+          Colors.white.withOpacity(0.1),
+          Colors.white.withOpacity(0.05),
+        ],
+        borderRadius: 24,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AnimatedBuilder(
-              animation: _pulseAnimation,
-              builder: (context, child) {
-                return Transform.scale(
-                  scale: _pulseAnimation.value,
-                  child: Container(
-                    width: 80,
-                    height: 80,
+            // Header (more compact)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF00d4aa),
+                    Color(0xFF01a085),
+                    Color(0xFF00b894),
+                  ],
+                ),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(40),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF6366f1).withOpacity(0.4),
-                          blurRadius: 20,
-                          spreadRadius: 5,
-                        ),
-                      ],
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
-                      Icons.search,
+                      Icons.system_update_rounded,
                       color: Colors.white,
-                      size: 40,
+                      size: 24,
                     ),
                   ),
-                );
-              },
+                  const SizedBox(height: 12),
+                  const Text(
+                    '🎉 Update Available',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Version ${_latestRelease!['tag_name']}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 20),
-            const Text(
-              'Checking for updates...',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
+
+            // Content (more compact)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Release Info (smaller)
+                    _buildGlassCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      borderRadius: 12,
+                      gradientColors: [
+                        const Color(0xFF6366f1).withOpacity(0.15),
+                        const Color(0xFF8b5cf6).withOpacity(0.10),
+                      ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.schedule_rounded,
+                            color: Colors.white.withOpacity(0.8),
+                            size: 14,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Released ${_formatDate(_latestRelease!['published_at'])}',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Changelog (smaller)
+                    const Text(
+                      'What\'s New',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Expanded(
+                      child: _buildGlassCard(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        borderRadius: 16,
+                        gradientColors: [
+                          Colors.white.withOpacity(0.08),
+                          Colors.white.withOpacity(0.04),
+                        ],
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: Text(
+                            _latestRelease!['body'] ??
+                                'No release notes available.',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.8),
+                              fontSize: 13,
+                              height: 1.5,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Download Progress (smaller)
+                    if (_isDownloading) ...[
+                      _buildGlassCard(
+                        padding: const EdgeInsets.all(16),
+                        borderRadius: 16,
+                        gradientColors: [
+                          const Color(0xFF6366f1).withOpacity(0.15),
+                          const Color(0xFF8b5cf6).withOpacity(0.10),
+                        ],
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Downloading...',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                Text(
+                                  '${(_downloadProgress * 100).toStringAsFixed(1)}%',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF6366f1),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: LinearProgressIndicator(
+                                value: _downloadProgress,
+                                backgroundColor: Colors.white.withOpacity(0.1),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF6366f1),
+                                ),
+                                minHeight: 6,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _downloadSpeed,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Download Button (smaller)
+                    _buildGlassCard(
+                      width: double.infinity,
+                      height: 48,
+                      gradientColors: [
+                        const Color(0xFF6366f1).withOpacity(0.9),
+                        const Color(0xFF8b5cf6).withOpacity(0.9),
+                      ],
+                      borderRadius: 16,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: _isDownloading
+                              ? null
+                              : _downloadAndInstallUpdate,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _isDownloading
+                                      ? Icons.downloading_rounded
+                                      : Icons.download_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _isDownloading
+                                      ? 'Downloading...'
+                                      : 'Download & Install',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -708,43 +829,48 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00C851), Color(0xFF007E33)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(40),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF00C851).withOpacity(0.4),
-                    blurRadius: 20,
-                    spreadRadius: 5,
+            AnimatedBuilder(
+              animation: _breatheAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _breatheAnimation.value,
+                  child: _buildGlassCard(
+                    width: 72,
+                    height: 72,
+                    borderRadius: 24,
+                    gradientColors: [
+                      const Color(0xFF00d4aa).withOpacity(0.9),
+                      const Color(0xFF01a085).withOpacity(0.9),
+                    ],
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
                   ),
-                ],
-              ),
-              child: const Icon(
-                Icons.check_circle,
-                color: Colors.white,
-                size: 40,
-              ),
+                );
+              },
             ),
             const SizedBox(height: 20),
             const Text(
-              '🎉 You\'re up to date!',
+              'You\'re up to date! 🎉',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.5,
               ),
             ),
-            const SizedBox(height: 10),
-            const Text(
-              'You have the latest version of PlayWaves',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
+            const SizedBox(height: 8),
+            Text(
+              _latestRelease != null
+                  ? 'App already on latest version'
+                  : 'Unable to check for updates',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
