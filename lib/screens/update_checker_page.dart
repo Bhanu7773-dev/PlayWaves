@@ -186,8 +186,7 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
       if (!await downloadsDir.exists()) {
         await downloadsDir.create(recursive: true);
       }
-      final filePath =
-          '${downloadsDir.path}/PlayWaves_${_latestRelease!['tag_name']}.apk';
+      final filePath = '${downloadsDir.path}/${apkAsset['name']}';
 
       final dio = Dio();
       final stopwatch = Stopwatch()..start();
@@ -226,6 +225,10 @@ class _UpdateCheckerPageState extends State<UpdateCheckerPage>
   Future<void> _launchInstallerIntent(String filePath) async {
     try {
       await InstallPluginV2Fork.installApk(filePath, 'com.playwaves.dark');
+      // Refresh version after install
+      await _getCurrentVersion();
+      // Re-check for updates to reflect the new version
+      await _checkForUpdates();
     } catch (e) {
       _showErrorSnackBar('Install failed: $e');
     }

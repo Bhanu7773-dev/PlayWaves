@@ -12,6 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' as riverpod;
 import '../services/custom_theme_provider.dart';
 import 'update_checker_page.dart';
 
+import '_launcher_icon_picker.dart';
+
 class SettingsPage extends StatefulWidget {
   final VoidCallback onLogout;
   final void Function(int) onNavTap;
@@ -1684,6 +1686,11 @@ class _SettingsPageState extends State<SettingsPage>
               ),
             ),
           ),
+        ),
+        // --- LAUNCHER ICON PICKER ---
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: LauncherIconPicker(),
         ),
 
         if (materialPresetEnabled)
